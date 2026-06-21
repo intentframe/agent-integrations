@@ -1,0 +1,13 @@
+intentframe_schema_version: 1
+agent_id: example_agent
+
+metadata:
+  note: Template RUN_COMMAND policy — copy to integrations/<agent>/policy.yaml
+
+allowed_actions:
+  RUN_COMMAND:
+    safe: false
+    constraints:
+      blocked_patterns:
+        - sudo
+        - "rm -rf /"

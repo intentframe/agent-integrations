@@ -129,4 +129,20 @@ export IF_AGENT_BRIDGE_SECRET="test-bridge-typescript-secret-dev-only"
 export IF_SECURITY_BRIDGE_SOCKET="$BRIDGE_SOCKET"
 (cd "$REPO_ROOT" && node "$EXAMPLES_TS")
 
+step "Hermes adapter unit tests"
+(cd "$REPO_ROOT" && uv run --directory integrations/hermes/adapter python tests/test_adapter.py)
+
+step "Hermes plugin unit tests"
+(cd "$REPO_ROOT" && uv run --with httpx --package intentframe-integrations-cli python tests/hermes_plugin/test_gate.py)
+(cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/hermes_plugin/test_integrate.py)
+
+step "Integrations CLI unit tests"
+(cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_runtime_lifecycle.py)
+(cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_integration_pack.py)
+(cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_cli_start.py)
+(cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_adapter_lifecycle.py)
+
+step "Hermes live integration (adapter + plugin gate)"
+bash "${SCRIPT_DIR}/test-hermes-integration.sh"
+
 step "All e2e checks passed"

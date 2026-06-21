@@ -1,0 +1,25 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hermes-adapter"
+version = "0.1.0"
+description = "Hermes agent adapter sidecar — maps Hermes tools to IntentFrame validate bridge"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+dependencies = [
+  "if-integration-bridge-client",
+  "starlette>=0.37.2",
+  "uvicorn>=0.24.0",
+]
+
+[project.scripts]
+hermes-adapter = "hermes_adapter.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hermes_adapter"]
+
+[tool.uv.sources]
+if-integration-bridge-client = { workspace = true }

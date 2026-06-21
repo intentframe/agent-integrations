@@ -4,20 +4,45 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
-from if_security_backend.agent_config import load_agent_pack
 from if_security_backend.cli import main as backend_main
 
 from intentframe_integrations.__version__ import __version__
+from intentframe_integrations.adapter_lifecycle import (
+    AdapterError,
+    adapter_status_line,
+    is_adapter_running,
+    start_adapter,
+    stop_adapter,
+)
+from intentframe_integrations.hermes_integrate import (
+    doctor_hermes,
+    format_env_exports,
+    integrate_hermes,
+    load_hermes_pack,
+)
+from intentframe_integrations.integration_pack import IntegrationPack, load_integration_pack
 from intentframe_integrations.paths import agent_config_path, list_agents
+from intentframe_integrations.runtime_lifecycle import (
+    backend_ready_for_pack,
+    ensure_backend_for_pack,
+    iter_agent_configs,
+)
 
 
-def _apply_agent_env(agent_config: Path) -> None:
-    pack = load_agent_pack(agent_config)
-    os.environ.setdefault("INTENTFRAME_USER_ID", pack.user_id)
-    os.environ.setdefault("INTENTFRAME_AGENT_ID", pack.agent_id)
+def _apply_agent_env(pack: IntegrationPack) -> None:
+    os.environ.setdefault("INTENTFRAME_USER_ID", pack.agent.user_id)
+    os.environ.setdefault("INTENTFRAME_AGENT_ID", pack.agent.agent_id)
+    for key, value in pack.agent.env.items():
+        os.environ.setdefault(key, os.path.expanduser(value))
+
+
+def _load_pack(agent: str) -> IntegrationPack:
+    return load_integration_pack(agent_config_path(agent))
 
 
 def _run_backend(argv: list[str]) -> int:
@@ -36,7 +61,8 @@ def _require_openai_api_key() -> int | None:
 
 def _seed_agent_config(cfg: Path, *, skip_if_exists: bool) -> int:
     if cfg.is_file():
-        _apply_agent_env(cfg)
+        pack = load_integration_pack(cfg)
+        _apply_agent_env(pack)
         paths = [cfg]
     elif cfg.is_dir():
         paths = sorted(cfg.rglob("agent.json"))
@@ -57,27 +83,79 @@ def _seed_agent_config(cfg: Path, *, skip_if_exists: bool) -> int:
     return 0
 
 
+def _start_adapter_for_pack(pack: IntegrationPack) -> int:
+    if pack.adapter is None:
+        return 0
+    try:
+        start_adapter(pack)
+    except AdapterError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def _start_adapters_for_configs(configs: list[Path]) -> int:
+    for path in configs:
+        pack = load_integration_pack(path)
+        if pack.adapter is None:
+            continue
+        ec = _start_adapter_for_pack(pack)
+        if ec:
+            return ec
+    return 0
+
+
+def _start_pack(
+    pack: IntegrationPack,
+    *,
+    seed: bool,
+    skip_if_exists: bool,
+) -> int:
+    """Start backend + adapter for one integration pack with rollback on adapter failure."""
+    ok, err, started_backend = ensure_backend_for_pack(pack, run_backend_start=_run_backend)
+    if not ok:
+        print(f"ERROR: {err}", file=sys.stderr)
+        return 1
+
+    started_adapter = False
+    agent_id = pack.agent.agent_id
+    if pack.adapter is not None and not is_adapter_running(agent_id):
+        ec = _start_adapter_for_pack(pack)
+        if ec:
+            if started_backend:
+                _run_backend(["stop"])
+            return ec
+        started_adapter = True
+
+    if seed:
+        ec = _seed_agent_config(pack.agent.source_path, skip_if_exists=skip_if_exists)
+        if ec:
+            if started_adapter:
+                stop_adapter(agent_id, quiet=True)
+            if started_backend:
+                _run_backend(["stop"])
+            return ec
+
+    return 0
+
+
 def _cmd_start(agent: str, *, seed: bool, skip_if_exists: bool) -> int:
     if (ec := _require_openai_api_key()) is not None:
         return ec
 
-    cfg = agent_config_path(agent)
-    _apply_agent_env(cfg)
+    pack = _load_pack(agent)
+    _apply_agent_env(pack)
 
-    ec = _run_backend(["start", "--agent-config", str(cfg)])
+    ec = _start_pack(pack, seed=seed, skip_if_exists=skip_if_exists)
     if ec:
         return ec
 
-    if seed:
-        ec = _seed_agent_config(cfg, skip_if_exists=skip_if_exists)
-        if ec:
-            return ec
-
     print(
         f"\nIntentFrame Integrations runtime is up for agent {agent!r}.\n"
-        "Bridge: ~/.intentframe/backend/bridge.sock\n"
-        "If Hermes is already installed, export env from integrations/hermes/agent.json "
-        "and restart your Hermes gateway so the IntentFrame plugin can connect."
+        f"Backend bridge: ~/.intentframe/backend/bridge.sock\n"
+        f"{adapter_status_line(pack)}\n"
+        f"Next: bin/intentframe-integrations integrate {agent}\n"
+        "Export env for Hermes, then restart your gateway."
     )
     return 0
 
@@ -92,13 +170,29 @@ def _cmd_start_config(
         return ec
 
     cfg = agent_config.expanduser().resolve()
-    if cfg.is_file():
-        _apply_agent_env(cfg)
-    elif not cfg.is_dir():
+    configs = iter_agent_configs(cfg)
+    if not configs:
         print(f"ERROR: agent config not found: {cfg}", file=sys.stderr)
         return 1
 
+    if cfg.is_file():
+        pack = load_integration_pack(cfg)
+        _apply_agent_env(pack)
+        ec = _start_pack(pack, seed=seed, skip_if_exists=skip_if_exists)
+        if ec:
+            return ec
+        print(
+            f"\nIntentFrame Integrations runtime is up ({cfg}).\n"
+            f"Backend bridge: ~/.intentframe/backend/bridge.sock\n"
+            f"{adapter_status_line(pack)}"
+        )
+        return 0
+
     ec = _run_backend(["start", "--agent-config", str(cfg)])
+    if ec:
+        return ec
+
+    ec = _start_adapters_for_configs(configs)
     if ec:
         return ec
 
@@ -109,9 +203,27 @@ def _cmd_start_config(
 
     print(
         f"\nIntentFrame Integrations runtime is up ({cfg}).\n"
-        "Bridge: ~/.intentframe/backend/bridge.sock"
+        "Backend bridge: ~/.intentframe/backend/bridge.sock"
     )
     return 0
+
+
+def _cmd_stop() -> int:
+    for agent in list_agents():
+        stop_adapter(agent, quiet=True)
+    return _run_backend(["stop"])
+
+
+def _cmd_status() -> int:
+    ec = _run_backend(["status"])
+    for agent in list_agents():
+        try:
+            pack = _load_pack(agent)
+        except (FileNotFoundError, ValueError):
+            continue
+        if pack.adapter is not None:
+            print(adapter_status_line(pack))
+    return ec
 
 
 def _cmd_seed(agent: str, *, skip_if_exists: bool) -> int:
@@ -132,14 +244,22 @@ def _cmd_test(agent_config: Path | None) -> int:
 
 
 def _cmd_doctor(agent: str) -> int:
-    cfg = agent_config_path(agent)
-    pack = load_agent_pack(cfg)
+    if agent == "hermes":
+        pack = load_hermes_pack()
+        report = doctor_hermes(pack)
+        for line in report.lines:
+            print(line)
+        if not report.ok:
+            print("\nExport env for Hermes:", file=sys.stderr)
+            print(format_env_exports(pack), file=sys.stderr)
+        return 0 if report.ok else 1
+
+    pack = _load_pack(agent)
     bridge_socket = Path(os.path.expanduser("~/.intentframe/backend/bridge.sock"))
 
-    print(f"Repo agent config: {cfg}")
-    print(f"  agent_id:  {pack.agent_id}")
-    print(f"  user_id:   {pack.user_id}")
-    print(f"  bridge:    {pack.env.get('IF_SECURITY_BRIDGE_SOCKET', '~/.intentframe/backend/bridge.sock')}")
+    print(f"Repo agent config: {pack.agent.source_path}")
+    print(f"  agent_id:  {pack.agent.agent_id}")
+    print(f"  user_id:   {pack.agent.user_id}")
 
     if os.environ.get("OPENAI_API_KEY"):
         print("  OPENAI_API_KEY: set")
@@ -152,6 +272,88 @@ def _cmd_doctor(agent: str) -> int:
     else:
         print(f"  bridge socket: not found ({bridge_socket}) — run: intentframe-integrations start {agent}")
     return 0
+
+
+def _cmd_integrate(agent: str, *, copy: bool, skip_config: bool) -> int:
+    if agent != "hermes":
+        print(f"ERROR: integrate is only implemented for hermes (got {agent!r})", file=sys.stderr)
+        return 1
+
+    pack = load_hermes_pack()
+    try:
+        result = integrate_hermes(pack, copy=copy, skip_config=skip_config)
+    except FileNotFoundError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    except subprocess.CalledProcessError as exc:
+        print(f"ERROR: integration command failed: {exc}", file=sys.stderr)
+        return 1
+
+    for msg in result.messages:
+        print(msg)
+
+    print("\nExport these env vars before starting Hermes:")
+    print(format_env_exports(pack))
+    print("\nThen restart your Hermes gateway (e.g. hermes gateway).")
+    return 0
+
+
+def _ensure_runtime(pack: IntegrationPack) -> int:
+    if backend_ready_for_pack(pack) and (
+        pack.adapter is None or is_adapter_running(pack.agent.agent_id)
+    ):
+        return 0
+
+    ok, err, _started_backend = ensure_backend_for_pack(pack, run_backend_start=_run_backend)
+    if not ok:
+        print(f"ERROR: {err}", file=sys.stderr)
+        return 1
+
+    if pack.adapter is not None and not is_adapter_running(pack.agent.agent_id):
+        ec = _start_adapter_for_pack(pack)
+        if ec:
+            return ec
+
+    if not backend_ready_for_pack(pack):
+        print("ERROR: IntentFrame runtime is not ready for this agent.", file=sys.stderr)
+        return 1
+    return 0
+
+
+def _cmd_run(agent: str, *, gateway_args: list[str]) -> int:
+    if agent != "hermes":
+        print(f"ERROR: run is only implemented for hermes (got {agent!r})", file=sys.stderr)
+        return 1
+
+    if (ec := _require_openai_api_key()) is not None:
+        return ec
+
+    pack = load_hermes_pack()
+    _apply_agent_env(pack)
+
+    ec = _ensure_runtime(pack)
+    if ec:
+        return ec
+
+    ec = _cmd_integrate(agent, copy=False, skip_config=False)
+    if ec:
+        return ec
+
+    hermes_bin = "hermes"
+    if shutil.which(hermes_bin) is None:
+        print(
+            "ERROR: 'hermes' not found on PATH. Install Hermes Agent first.",
+            file=sys.stderr,
+        )
+        return 1
+
+    cmd = [hermes_bin, "gateway", *gateway_args]
+    print(f"\nLaunching: {' '.join(cmd)}", file=sys.stderr)
+    print("Hermes plugin env is applied to this process.", file=sys.stderr)
+    try:
+        return subprocess.call(cmd)
+    except KeyboardInterrupt:
+        return 130
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -169,7 +371,7 @@ def main(argv: list[str] | None = None) -> int:
 
     p_start = sub.add_parser(
         "start",
-        help="Start validate runtime + bridge for an agent profile",
+        help="Start validate runtime + bridge + agent adapter",
     )
     p_start.add_argument(
         "agent",
@@ -194,8 +396,8 @@ def main(argv: list[str] | None = None) -> int:
         help="Pass --skip-if-exists to seed-policy",
     )
 
-    sub.add_parser("stop", help="Stop IntentFrame runtime and bridge")
-    sub.add_parser("status", help="Runtime and bridge status")
+    sub.add_parser("stop", help="Stop agent adapters, IntentFrame runtime, and bridge")
+    sub.add_parser("status", help="Runtime, bridge, and adapter status")
 
     p_seed = sub.add_parser("seed", help="Seed policy for an agent profile")
     p_seed.add_argument("agent", nargs="?", choices=agents)
@@ -221,6 +423,33 @@ def main(argv: list[str] | None = None) -> int:
     p_doctor = sub.add_parser("doctor", help="Check agent config and runtime prerequisites")
     p_doctor.add_argument("agent", choices=agents)
 
+    p_integrate = sub.add_parser(
+        "integrate",
+        help="Install Hermes plugin, sync adapter venv, merge ~/.hermes/config.yaml",
+    )
+    p_integrate.add_argument("agent", choices=agents)
+    p_integrate.add_argument(
+        "--copy",
+        action="store_true",
+        help="Copy plugin instead of symlinking",
+    )
+    p_integrate.add_argument(
+        "--skip-config",
+        action="store_true",
+        help="Do not merge ~/.hermes/config.yaml",
+    )
+
+    p_run = sub.add_parser(
+        "run",
+        help="Start IF runtime, integrate plugin, and launch agent (Hermes: hermes gateway)",
+    )
+    p_run.add_argument("agent", choices=agents)
+    p_run.add_argument(
+        "gateway_args",
+        nargs=argparse.REMAINDER,
+        help="Extra args passed to hermes gateway (after --)",
+    )
+
     args = parser.parse_args(argv)
 
     match args.command:
@@ -241,9 +470,9 @@ def main(argv: list[str] | None = None) -> int:
                 skip_if_exists=args.skip_if_exists,
             )
         case "stop":
-            return _run_backend(["stop"])
+            return _cmd_stop()
         case "status":
-            return _run_backend(["status"])
+            return _cmd_status()
         case "seed":
             if args.agent_config is not None:
                 if args.agent is not None:
@@ -256,6 +485,17 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_test(args.agent_config)
         case "doctor":
             return _cmd_doctor(args.agent)
+        case "integrate":
+            return _cmd_integrate(
+                args.agent,
+                copy=args.copy,
+                skip_config=args.skip_config,
+            )
+        case "run":
+            gateway_args = args.gateway_args
+            if gateway_args and gateway_args[0] == "--":
+                gateway_args = gateway_args[1:]
+            return _cmd_run(args.agent, gateway_args=gateway_args)
         case _:
             parser.error(f"Unknown command: {args.command}")
             return 2

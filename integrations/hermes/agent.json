@@ -5,10 +5,14 @@
   "action_types": ["RUN_COMMAND"],
   "bridge_secret": "change-me-hermes-dev-only",
   "policy_file": "policy.yaml",
+  "adapter": {
+    "runtime": "python",
+    "python": "3.12",
+    "module": "hermes_adapter.main",
+    "source": "adapter",
+    "socket": "~/.intentframe/integrations/hermes/adapter.sock"
+  },
   "env": {
-    "INTENTFRAME_USER_ID": "dev_user",
-    "INTENTFRAME_AGENT_ID": "hermes",
-    "IF_AGENT_BRIDGE_SECRET": "change-me-hermes-dev-only",
-    "IF_SECURITY_BRIDGE_SOCKET": "~/.intentframe/backend/bridge.sock"
+    "IF_AGENT_ADAPTER_SOCKET": "~/.intentframe/integrations/hermes/adapter.sock"
   }
 }

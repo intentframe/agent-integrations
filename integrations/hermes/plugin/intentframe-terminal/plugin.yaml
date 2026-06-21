@@ -1,0 +1,8 @@
+name: intentframe-terminal
+version: 0.1.0
+description: "IntentFrame validate-only gate for Hermes terminal — requires reason, calls adapter before shell execution."
+author: "IntentFrame Integrations"
+provides_tools:
+  - terminal
+requires_env:
+  - IF_AGENT_ADAPTER_SOCKET
