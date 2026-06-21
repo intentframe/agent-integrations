@@ -197,6 +197,7 @@ def format_diagnostics(env: IsolatedEnv) -> str:
         ("bridge.log", env.bridge_log, _read_tail),
         ("supervisor.log", env.supervisor_log, _read_tail),
         ("executor.log", env.executor_log, _read_tail),
+        ("intentframe-server.log", env.intentframe_server_log, _read_tail),
         ("Hermes config.yaml", env.hermes_config_path, _read_tail),
         ("Hermes .env", env.hermes_env_file, _redact_env_tail),
     ):
@@ -247,3 +248,9 @@ class CliError(RuntimeError):
 
 def step(message: str) -> None:
     print(f"\n==> {message}", file=sys.stderr, flush=True)
+
+
+def log_sandbox_paths(env: IsolatedEnv, *, when: str) -> None:
+    from isolation import format_sandbox_log_paths
+
+    step(f"E2E log paths ({when})\n{format_sandbox_log_paths(env)}")

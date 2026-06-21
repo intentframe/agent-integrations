@@ -19,7 +19,7 @@ from api_client import (  # noqa: E402
     run_block_once,
     wait_health,
 )
-from cli_runner import CliError, format_diagnostics, run_cli, step, stop_everything  # noqa: E402
+from cli_runner import CliError, format_diagnostics, log_sandbox_paths, run_cli, step, stop_everything  # noqa: E402
 from isolation import (  # noqa: E402
     IsolatedEnv,
     activate,
@@ -54,6 +54,7 @@ def _activate_sandbox(env: IsolatedEnv) -> None:
     seed_hermes_openai_for_e2e(env)
     assert_hermes_openai_seeded(env)
     step(f"Sandbox ready (API port={env.api_port})")
+    log_sandbox_paths(env, when="activate — paths appear as services start")
 
 
 def _plugin_enabled(config_path: Path) -> bool:
@@ -136,6 +137,10 @@ def _gateway_stop(env: IsolatedEnv, *, label: str) -> None:
 
 
 def _run_api_allow_block(env: IsolatedEnv, *, label: str) -> None:
+    log_sandbox_paths(
+        env,
+        when=f"{label} before /v1/responses — tail intentframe-server + gateway for tool calls",
+    )
     step(f"{label}: GET /v1/capabilities")
     caps = get_capabilities(host=API_HOST, port=env.api_port, api_key=env.api_key)
     if not caps:

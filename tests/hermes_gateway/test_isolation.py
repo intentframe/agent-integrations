@@ -17,6 +17,7 @@ if str(HERE) not in sys.path:
 
 from isolation import (  # noqa: E402
     HERMES_E2E_DEFAULT_MODEL,
+    HERMES_E2E_OPENAI_API_MODE,
     HERMES_E2E_OPENAI_PROVIDER,
     _MAX_UDS_PATH_LEN,
     _assert_uds_paths_fit,
@@ -83,7 +84,15 @@ class HermesOpenAiSeedTests(unittest.TestCase):
             model = raw["model"]
             self.assertEqual(model["provider"], HERMES_E2E_OPENAI_PROVIDER)
             self.assertEqual(model["default"], HERMES_E2E_DEFAULT_MODEL)
+            self.assertEqual(model["api_mode"], HERMES_E2E_OPENAI_API_MODE)
             self.assertEqual(raw["plugins"]["enabled"], [])
+
+            labels = {label for label, _ in env.sandbox_log_catalog()}
+            self.assertIn("IntentFrame core (policy/AE)", labels)
+            self.assertEqual(
+                env.intentframe_server_log,
+                env.home / ".intentframe" / "logs" / "intentframe-server.log",
+            )
 
             env_text = env.hermes_env_file.read_text(encoding="utf-8")
             self.assertIn("OPENAI_API_KEY=sk-test-seed", env_text)

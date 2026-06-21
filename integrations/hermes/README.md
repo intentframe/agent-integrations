@@ -117,9 +117,10 @@ RUN_HERMES_GATEWAY_E2E=1 ./tests/scripts/test-hermes-gateway-e2e.sh
 ```
 
 Requires `OPENAI_API_KEY` in the environment (IntentFrame backend + Hermes LLM). The test
-seeds an isolated `$HERMES_HOME` with `model.provider: openai-api` only — production
-`~/.hermes` is never modified. Override the model with `INTENTFRAME_HERMES_E2E_MODEL`
-(default: `gpt-4o-mini`).
+seeds an isolated `$HERMES_HOME` with `model.provider: openai-api` and
+`model.api_mode: chat_completions` (so `gpt-4o-mini` works; Hermes 0.17 otherwise uses
+the Responses API for api.openai.com). Production `~/.hermes` is never modified. Override
+the model with `INTENTFRAME_HERMES_E2E_MODEL` (default: `gpt-4o-mini`).
 
 Covers pass 1 (greenfield install), pass 2a (reuse our install), pass 2b (external Hermes via `HERMES_BIN` then integrate),
 and `/v1/responses` ALLOW/BLOCK through real Hermes gateway + IntentFrame plugin.

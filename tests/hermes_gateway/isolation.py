@@ -18,6 +18,9 @@ _LONGEST_UDS_NAME = "policy-registry.sock"
 
 # Test-only Hermes LLM defaults (production CLI never writes these).
 HERMES_E2E_OPENAI_PROVIDER = "openai-api"
+# gpt-4o-mini is chat-completions-only; Hermes 0.17 auto-picks codex_responses for
+# api.openai.com unless api_mode is set explicitly.
+HERMES_E2E_OPENAI_API_MODE = "chat_completions"
 HERMES_E2E_DEFAULT_MODEL = "gpt-4o-mini"
 HERMES_E2E_MODEL_ENV = "INTENTFRAME_HERMES_E2E_MODEL"
 
@@ -77,8 +80,36 @@ class IsolatedEnv:
         return self.home / ".intentframe" / "logs" / "executor.log"
 
     @property
+    def intentframe_server_log(self) -> Path:
+        return self.home / ".intentframe" / "logs" / "intentframe-server.log"
+
+    @property
     def hermes_env_file(self) -> Path:
         return self.hermes_home / ".env"
+
+    def sandbox_log_catalog(self) -> tuple[tuple[str, Path], ...]:
+        """Labelled sandbox log paths for tailing during E2E (not real ~/.intentframe)."""
+        return (
+            ("Hermes gateway", self.gateway_log),
+            ("Hermes adapter", self.adapter_log),
+            ("IntentFrame bridge", self.bridge_log),
+            ("IntentFrame supervisor", self.supervisor_log),
+            ("IntentFrame executor", self.executor_log),
+            ("IntentFrame core (policy/AE)", self.intentframe_server_log),
+            ("Hermes config", self.hermes_config_path),
+            ("Hermes .env", self.hermes_env_file),
+        )
+
+
+def format_sandbox_log_paths(env: IsolatedEnv) -> str:
+    lines = [
+        f"Sandbox HOME={env.home}",
+        f"Sandbox HERMES_HOME={env.hermes_home}",
+        "Tail during this run (not ~/.intentframe):",
+    ]
+    for label, path in env.sandbox_log_catalog():
+        lines.append(f"  {label}: {path}")
+    return "\n".join(lines)
 
 
 def _free_port() -> int:
@@ -283,6 +314,7 @@ def seed_hermes_openai_for_e2e(env: IsolatedEnv) -> None:
         cfg["model"] = model_cfg
     model_cfg["provider"] = HERMES_E2E_OPENAI_PROVIDER
     model_cfg["default"] = model
+    model_cfg["api_mode"] = HERMES_E2E_OPENAI_API_MODE
 
     plugins = cfg.get("plugins")
     if not isinstance(plugins, dict):
@@ -318,6 +350,12 @@ def assert_hermes_openai_seeded(env: IsolatedEnv) -> None:
     default = model.get("default")
     if not default:
         raise AssertionError("Hermes config missing model.default")
+
+    api_mode = model.get("api_mode")
+    if api_mode != HERMES_E2E_OPENAI_API_MODE:
+        raise AssertionError(
+            f"Expected Hermes api_mode {HERMES_E2E_OPENAI_API_MODE!r}, got {api_mode!r}"
+        )
 
     env_values = _parse_env_file(env.hermes_env_file)
     if not env_values.get("OPENAI_API_KEY") and not os.environ.get("OPENAI_API_KEY"):
