@@ -30,8 +30,13 @@ def adapter_log_file(agent_id: str) -> Path:
     return integration_state_dir(agent_id) / "adapter.log"
 
 
+def _venv_bin_dir(venv_dir: Path) -> Path:
+    return venv_dir / ("Scripts" if os.name == "nt" else "bin")
+
+
 def adapter_venv_python(agent_id: str) -> Path:
-    return integration_state_dir(agent_id) / ".venv" / "bin" / "python"
+    exe = "python.exe" if os.name == "nt" else "python"
+    return _venv_bin_dir(integration_state_dir(agent_id) / ".venv") / exe
 
 
 def _read_pid(path: Path) -> int | None:
@@ -49,6 +54,29 @@ def _pid_alive(pid: int) -> bool:
         return True
     except OSError:
         return False
+
+
+def _process_group_kwargs() -> dict[str, object]:
+    if os.name == "nt":
+        return {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+    return {"start_new_session": True}
+
+
+def _terminate_pid(pid: int) -> None:
+    if os.name == "nt":
+        try:
+            os.kill(pid, signal.CTRL_BREAK_EVENT)
+            return
+        except OSError:
+            pass
+    os.kill(pid, signal.SIGTERM)
+
+
+def _kill_pid(pid: int) -> None:
+    if os.name == "nt":
+        os.kill(pid, signal.SIGTERM)
+    else:
+        os.kill(pid, signal.SIGKILL)
 
 
 def is_adapter_running(agent_id: str) -> bool:
@@ -176,7 +204,7 @@ def start_adapter(
         env=_adapter_env(pack),
         stdout=log_fh,
         stderr=subprocess.STDOUT,
-        start_new_session=True,
+        **_process_group_kwargs(),
     )
     adapter_pid_file(agent_id).write_text(str(proc.pid), encoding="utf-8")
     log_fh.close()
@@ -221,13 +249,13 @@ def stop_adapter(agent_id: str, *, timeout: float = 15.0, quiet: bool = False) -
 
     if not quiet:
         print(f"Stopping adapter for {agent_id!r} (pid {pid})...", file=sys.stderr)
-    os.kill(pid, signal.SIGTERM)
+    _terminate_pid(pid)
 
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline and _pid_alive(pid):
         time.sleep(0.25)
     if _pid_alive(pid):
-        os.kill(pid, signal.SIGKILL)
+        _kill_pid(pid)
 
     for spec in _adapter_socket_candidates(agent_id):
         spec.unlink(missing_ok=True)

@@ -100,4 +100,29 @@ Then restart your Hermes gateway.
 4. `bin/intentframe-integrations doctor hermes`
 5. `bin/intentframe-integrations gateway start hermes --api-server`
 6. Ask LLM to run `echo ok` with a reason → executes
-7. Ask LLM to run `sudo rm -rf /` → blocked by IntentFrame
+7. Ask LLM to run `sudo echo intentframe-e2e-block-probe` → blocked by IntentFrame policy (`sudo` pattern)
+
+## Gateway E2E test (opt-in)
+
+Full production journey with isolated `HOME` / `HERMES_HOME` (does not touch real
+`~/.hermes` or `~/.intentframe/integrations/hermes`). The Python entrypoint is primary and the shell
+script is a convenience wrapper:
+
+```bash
+RUN_HERMES_GATEWAY_E2E=1 \
+  uv run --with httpx --package intentframe-integrations-cli \
+  python tests/hermes_gateway/test_gateway_e2e.py
+
+RUN_HERMES_GATEWAY_E2E=1 ./tests/scripts/test-hermes-gateway-e2e.sh
+```
+
+Requires `OPENAI_API_KEY` in the environment (IntentFrame backend + Hermes LLM). The test
+seeds an isolated `$HERMES_HOME` with `model.provider: openai-api` only — production
+`~/.hermes` is never modified. Override the model with `INTENTFRAME_HERMES_E2E_MODEL`
+(default: `gpt-4o-mini`).
+
+Covers pass 1 (greenfield install), pass 2a (reuse our install), pass 2b (external Hermes via `HERMES_BIN` then integrate),
+and `/v1/responses` ALLOW/BLOCK through real Hermes gateway + IntentFrame plugin.
+The test uses dynamic localhost ports, hides any system `hermes` from `PATH` during
+greenfield install, tracks runtime PIDs for cleanup verification, and verifies gateway/runtime
+cleanup before deleting temp dirs.

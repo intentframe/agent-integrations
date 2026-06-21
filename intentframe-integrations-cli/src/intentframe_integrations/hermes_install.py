@@ -40,12 +40,22 @@ def managed_venv_dir() -> Path:
     return integration_state_dir("hermes") / HERMES_VENV_DIR_NAME
 
 
+def _venv_bin_dir(venv_dir: Path) -> Path:
+    return venv_dir / ("Scripts" if os.name == "nt" else "bin")
+
+
+def _venv_python(venv_dir: Path) -> Path:
+    exe = "python.exe" if os.name == "nt" else "python"
+    return _venv_bin_dir(venv_dir) / exe
+
+
 def install_record_path() -> Path:
     return integration_state_dir("hermes") / INSTALL_RECORD_NAME
 
 
 def managed_hermes_bin() -> Path:
-    return managed_venv_dir() / "bin" / "hermes"
+    exe = "hermes.exe" if os.name == "nt" else "hermes"
+    return _venv_bin_dir(managed_venv_dir()) / exe
 
 
 def _load_install_record() -> dict[str, object] | None:
@@ -147,8 +157,9 @@ def install_hermes_agent(*, version: str | None = None, force: bool = False) -> 
 
     integration_state_dir("hermes").mkdir(parents=True, exist_ok=True)
     bootstrap_hermes_home()
+    venv_python = _venv_python(venv_dir)
 
-    if not (venv_dir / "bin" / "python").is_file() or force:
+    if not venv_python.is_file() or force:
         if venv_dir.exists() and force:
             shutil.rmtree(venv_dir)
         subprocess.check_call(
@@ -171,7 +182,7 @@ def install_hermes_agent(*, version: str | None = None, force: bool = False) -> 
             "pip",
             "install",
             "--python",
-            str(venv_dir / "bin" / "python"),
+            str(venv_python),
             f"hermes-agent=={target_version}",
             "-q",
         ],

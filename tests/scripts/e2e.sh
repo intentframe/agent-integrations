@@ -143,7 +143,15 @@ step "Integrations CLI unit tests"
 (cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_adapter_lifecycle.py)
 (cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_hermes_install.py)
 
+step "Hermes gateway isolation unit tests"
+(cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_isolation.py)
+
 step "Hermes live integration (adapter + plugin gate)"
 bash "${SCRIPT_DIR}/test-hermes-integration.sh"
+
+if [[ "${RUN_HERMES_GATEWAY_E2E:-}" == "1" ]]; then
+  step "Hermes gateway E2E (opt-in)"
+  bash "${SCRIPT_DIR}/test-hermes-gateway-e2e.sh"
+fi
 
 step "All e2e checks passed"

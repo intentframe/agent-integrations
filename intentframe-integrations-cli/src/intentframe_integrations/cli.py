@@ -439,7 +439,7 @@ def _cmd_run(agent: str, *, gateway_args: list[str]) -> int:
         )
         return 1
 
-    cmd = [str(binary), "gateway", *gateway_args]
+    cmd = [str(binary), "gateway", *normalize_hermes_gateway_argv(gateway_args)]
     env = os.environ.copy()
     from intentframe_integrations.hermes_paths import hermes_home
 

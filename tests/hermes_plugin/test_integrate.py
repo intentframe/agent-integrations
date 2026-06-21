@@ -49,6 +49,26 @@ class TestIntegrateHermes(unittest.TestCase):
             self.assertFalse(merge_plugin_enabled(cfg))
             self.assertTrue(is_plugin_enabled(cfg))
 
+    def test_merge_preserves_existing_config_comments(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Path(tmp) / "config.yaml"
+            cfg.write_text(
+                "# user comment\n"
+                "model:\n"
+                "  provider: openai-api\n"
+                "plugins:\n"
+                "  enabled:\n"
+                "    - other-plugin\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(merge_plugin_enabled(cfg))
+            text = cfg.read_text(encoding="utf-8")
+            self.assertIn("# user comment", text)
+            self.assertIn("provider: openai-api", text)
+            self.assertIn("- other-plugin", text)
+            self.assertIn(f"- {PLUGIN_KEY}", text)
+            self.assertTrue((cfg.with_name("config.yaml.intentframe.bak")).is_file())
+
     def test_copy_install_idempotent(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp) / "home"

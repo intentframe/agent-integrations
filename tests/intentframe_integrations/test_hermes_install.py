@@ -17,8 +17,10 @@ if str(CLI_SRC) not in sys.path:
     sys.path.insert(0, str(CLI_SRC))
 
 from intentframe_integrations.hermes_gateway import (  # noqa: E402
+    DEFAULT_HERMES_GATEWAY_COMMAND,
     ensure_api_server_config,
     gateway_pid_file,
+    normalize_hermes_gateway_argv,
 )
 from intentframe_integrations.hermes_install import (  # noqa: E402
     DEFAULT_HERMES_AGENT_VERSION,
@@ -79,13 +81,12 @@ class TestHermesResolver(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp) / "home"
             home.mkdir()
-            managed = home / ".intentframe" / "integrations" / "hermes" / "hermes-agent-venv" / "bin"
-            managed.mkdir(parents=True)
-            binary = managed / "hermes"
-            binary.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
-            binary.chmod(0o755)
 
             with patch_home(home):
+                binary = managed_hermes_bin()
+                binary.parent.mkdir(parents=True)
+                binary.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+                binary.chmod(0o755)
                 with patch.dict(os.environ, {}, clear=True):
                     os.environ["HOME"] = str(home)
                     resolved = resolve_hermes_bin()
@@ -103,8 +104,10 @@ class TestHermesInstall(unittest.TestCase):
             def fake_check_call(cmd: list[str]) -> None:
                 if cmd[:3] == ["uv", "venv"]:
                     venv = Path(cmd[2])
-                    (venv / "bin").mkdir(parents=True, exist_ok=True)
-                    py = venv / "bin" / "python"
+                    scripts = "Scripts" if os.name == "nt" else "bin"
+                    exe = "python.exe" if os.name == "nt" else "python"
+                    (venv / scripts).mkdir(parents=True, exist_ok=True)
+                    py = venv / scripts / exe
                     py.write_text("", encoding="utf-8")
                 if cmd[:3] == ["uv", "pip", "install"]:
                     binary = managed_hermes_bin()
@@ -131,7 +134,8 @@ class TestHermesInstall(unittest.TestCase):
             def fake_check_call(cmd: list[str]) -> None:
                 if cmd[:3] == ["uv", "venv"]:
                     venv = Path(cmd[2])
-                    (venv / "bin").mkdir(parents=True, exist_ok=True)
+                    scripts = "Scripts" if os.name == "nt" else "bin"
+                    (venv / scripts).mkdir(parents=True, exist_ok=True)
 
             with patch_home(home):
                 with patch("intentframe_integrations.hermes_install.subprocess.check_call", side_effect=fake_check_call):
@@ -155,13 +159,12 @@ class TestDoctorStages(unittest.TestCase):
             home = Path(tmp) / "home"
             hermes_data = Path(tmp) / "hermes-home"
             home.mkdir()
-            managed = home / ".intentframe" / "integrations" / "hermes" / "hermes-agent-venv" / "bin"
-            managed.mkdir(parents=True)
-            binary = managed / "hermes"
-            binary.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
-            binary.chmod(0o755)
 
             with patch_home(home, hermes_home=hermes_data):
+                binary = managed_hermes_bin()
+                binary.parent.mkdir(parents=True)
+                binary.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+                binary.chmod(0o755)
                 pack = load_hermes_pack()
                 _apply_env(pack)
                 report = doctor_hermes(pack)
@@ -174,20 +177,21 @@ class TestDoctorStages(unittest.TestCase):
             home = Path(tmp) / "home"
             hermes_data = Path(tmp) / "hermes-home"
             home.mkdir()
-            managed = home / ".intentframe" / "integrations" / "hermes" / "hermes-agent-venv" / "bin"
-            managed.mkdir(parents=True)
-            binary = managed / "hermes"
-            binary.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
-            binary.chmod(0o755)
 
             with patch_home(home, hermes_home=hermes_data):
+                binary = managed_hermes_bin()
+                binary.parent.mkdir(parents=True)
+                binary.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+                binary.chmod(0o755)
                 pack = load_hermes_pack()
                 _apply_env(pack)
                 integrate_hermes(pack, sync_adapter=False)
                 bridge = home / ".intentframe" / "backend" / "bridge.sock"
                 bridge.parent.mkdir(parents=True, exist_ok=True)
                 bridge.write_text("", encoding="utf-8")
-                venv_py = home / ".intentframe" / "integrations" / "hermes" / ".venv" / "bin" / "python"
+                scripts = "Scripts" if os.name == "nt" else "bin"
+                exe = "python.exe" if os.name == "nt" else "python"
+                venv_py = home / ".intentframe" / "integrations" / "hermes" / ".venv" / scripts / exe
                 venv_py.parent.mkdir(parents=True, exist_ok=True)
                 venv_py.write_text("", encoding="utf-8")
                 with patch("if_security_backend.runtime.paths.bridge_socket_path", return_value=bridge):
@@ -198,6 +202,23 @@ class TestDoctorStages(unittest.TestCase):
 
 
 class TestGatewayConfig(unittest.TestCase):
+    def test_normalize_hermes_gateway_argv_defaults_to_run(self) -> None:
+        self.assertEqual(normalize_hermes_gateway_argv(None), [DEFAULT_HERMES_GATEWAY_COMMAND])
+        self.assertEqual(normalize_hermes_gateway_argv([]), [DEFAULT_HERMES_GATEWAY_COMMAND])
+        self.assertEqual(
+            normalize_hermes_gateway_argv(["--accept-hooks"]),
+            [DEFAULT_HERMES_GATEWAY_COMMAND, "--accept-hooks"],
+        )
+        self.assertEqual(normalize_hermes_gateway_argv(["stop"]), [DEFAULT_HERMES_GATEWAY_COMMAND])
+        self.assertEqual(
+            normalize_hermes_gateway_argv(["start", "--replace"]),
+            [DEFAULT_HERMES_GATEWAY_COMMAND, "--replace"],
+        )
+        self.assertEqual(
+            normalize_hermes_gateway_argv(["run", "--verbose"]),
+            [DEFAULT_HERMES_GATEWAY_COMMAND, "--verbose"],
+        )
+
     def test_api_server_env_written_to_hermes_home(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             hermes_data = Path(tmp) / "hermes-home"

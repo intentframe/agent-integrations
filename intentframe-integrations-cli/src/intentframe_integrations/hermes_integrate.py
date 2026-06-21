@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -79,6 +80,61 @@ def _dump_yaml(data: dict[str, Any]) -> str:
     return yaml.safe_dump(data, default_flow_style=False, sort_keys=False)
 
 
+def _backup_config(path: Path) -> None:
+    if not path.is_file():
+        return
+    backup = path.with_name(f"{path.name}.intentframe.bak")
+    shutil.copy2(path, backup)
+
+
+def _try_append_plugin_enabled_in_place(text: str, plugin_key: str) -> str | None:
+    cfg = yaml.safe_load(text)
+    if not isinstance(cfg, dict):
+        return None
+    plugins = cfg.get("plugins")
+    if not isinstance(plugins, dict):
+        return None
+    enabled = plugins.get("enabled")
+    if not isinstance(enabled, list):
+        return None
+    if plugin_key in enabled:
+        return None
+
+    lines = text.splitlines(keepends=True)
+    in_plugins = False
+    in_enabled = False
+    list_indent = ""
+    insert_at: int | None = None
+
+    for index, line in enumerate(lines):
+        stripped = line.lstrip()
+        if stripped.startswith("plugins:"):
+            in_plugins = True
+            in_enabled = False
+            continue
+        if not in_plugins:
+            continue
+        if stripped.startswith("enabled:"):
+            in_enabled = True
+            list_indent = line[: len(line) - len(stripped)] + "  "
+            if stripped.strip() == "enabled: []":
+                lines[index] = f"{line[: len(line) - len(stripped)]}enabled:\n"
+                insert_at = index + 1
+            continue
+        if in_enabled:
+            if stripped.startswith("- "):
+                insert_at = index + 1
+                continue
+            if stripped and not stripped.startswith("#"):
+                break
+
+    if insert_at is None:
+        return None
+
+    lines.insert(insert_at, f"{list_indent}- {plugin_key}\n")
+    return "".join(lines)
+
+
 def is_plugin_enabled(config_path: Path | None = None) -> bool:
     cfg = _load_yaml(config_path or hermes_config_path())
     plugins = cfg.get("plugins")
@@ -93,6 +149,24 @@ def is_plugin_enabled(config_path: Path | None = None) -> bool:
 def merge_plugin_enabled(config_path: Path | None = None) -> bool:
     """Ensure ``intentframe-terminal`` is in ``plugins.enabled``. Returns True if changed."""
     path = config_path or hermes_config_path()
+    if is_plugin_enabled(path):
+        return False
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not path.is_file():
+        path.write_text(
+            _dump_yaml({"plugins": {"enabled": [PLUGIN_KEY]}}),
+            encoding="utf-8",
+        )
+        return True
+
+    original = path.read_text(encoding="utf-8")
+    updated = _try_append_plugin_enabled_in_place(original, PLUGIN_KEY)
+    if updated is not None:
+        _backup_config(path)
+        path.write_text(updated, encoding="utf-8")
+        return True
+
     cfg = _load_yaml(path)
     plugins = cfg.setdefault("plugins", {})
     if not isinstance(plugins, dict):
@@ -102,10 +176,8 @@ def merge_plugin_enabled(config_path: Path | None = None) -> bool:
     if not isinstance(enabled, list):
         enabled = []
         plugins["enabled"] = enabled
-    if PLUGIN_KEY in enabled:
-        return False
     enabled.append(PLUGIN_KEY)
-    path.parent.mkdir(parents=True, exist_ok=True)
+    _backup_config(path)
     path.write_text(_dump_yaml(cfg), encoding="utf-8")
     return True
 

@@ -69,15 +69,15 @@ class TestAdapterVenvSyncReal(unittest.TestCase):
             os.environ["HOME"] = str(home)
             try:
                 sync_adapter_venv(pack)
+                venv_py = adapter_venv_python("hermes")
+                state = integration_state_dir("hermes")
             finally:
                 if previous is None:
                     os.environ.pop("HOME", None)
                 else:
                     os.environ["HOME"] = previous
 
-            venv_py = adapter_venv_python("hermes")
             self.assertTrue(venv_py.is_file())
-            state = integration_state_dir("hermes")
             self.assertTrue((state / "adapter-requirements.txt").is_file())
 
             proc = __import__("subprocess").run(
