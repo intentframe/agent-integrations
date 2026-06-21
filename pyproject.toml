@@ -9,4 +9,5 @@ dependencies = []
 members = [
   "if-integration-backend",
   "if-integration-clients/python",
+  "intentframe-integrations-cli",
 ]

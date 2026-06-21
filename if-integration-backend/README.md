@@ -2,7 +2,7 @@
 
 Generic **IntentFrame validate-only** platform: one runtime, one noop executor pack (`validate_only`), one UDS bridge.
 
-Agent folders (`hermes-integration/`, etc.) only ship `agent.json` + `policy.yaml` — no executor packs.
+Agent profiles live under `../integrations/` (e.g. `integrations/hermes/`) — each ships `agent.json` + `policy.yaml` only, no executor packs.
 
 ## Quick start
 
@@ -38,11 +38,18 @@ Requires `node`, `npm`, and `OPENAI_API_KEY`. Bootstraps `uv` if missing. See ro
 
 ## Hermes agent
 
+From the **repo root**:
+
+```bash
+bin/intentframe-integrations start hermes
+bin/intentframe-integrations seed hermes --skip-if-exists
+```
+
+Or via the internal runtime CLI:
+
 ```bash
 uv run --package if-integration-backend if-integration-backend start \
-  --agent-config ../hermes-integration/agent.json
-uv run --package if-integration-backend if-integration-backend seed-policy \
-  --agent-config ../hermes-integration/agent.json --skip-if-exists
+  --agent-config ../integrations/hermes/agent.json
 ```
 
 State: `~/.intentframe/backend/` · Bridge: `~/.intentframe/backend/bridge.sock`

@@ -2,7 +2,7 @@ intentframe_schema_version: 1
 agent_id: hermes
 
 metadata:
-  note: Hermes validate-only RUN_COMMAND policy (hermes-integration)
+  note: Hermes validate-only RUN_COMMAND policy (integrations/hermes)
 
 allowed_actions:
   RUN_COMMAND:

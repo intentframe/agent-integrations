@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "intentframe-integrations-cli"
+version = "0.1.0"
+description = "User-facing CLI for IntentFrame agent integrations (Hermes, OpenClaw, …)"
+readme = "README.md"
+requires-python = ">=3.14"
+license = "Apache-2.0"
+dependencies = [
+  "if-integration-backend",
+]
+
+[project.scripts]
+intentframe-integrations = "intentframe_integrations.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/intentframe_integrations"]
+
+[tool.uv.sources]
+if-integration-backend = { workspace = true }

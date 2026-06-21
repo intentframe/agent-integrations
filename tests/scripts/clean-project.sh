@@ -10,6 +10,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+IF_INTEGRATIONS="${REPO_ROOT}/bin/intentframe-integrations"
 BACKEND_DIR="${REPO_ROOT}/if-integration-backend"
 PY_CLIENT_DIR="${REPO_ROOT}/if-integration-clients/python"
 TS_CLIENT_DIR="${REPO_ROOT}/if-integration-clients/typescript"
@@ -24,7 +25,7 @@ usage() {
 Usage: clean-project.sh [OPTIONS]
 
 Remove local Python/npm build artifacts created by development and e2e tests.
-By default also stops if-integration-backend and clears ~/.intentframe runtime state.
+By default also stops the integrations runtime and clears ~/.intentframe runtime state.
 
 Options:
   --keep-runtime   Remove repo venvs/node_modules only; do not touch ~/.intentframe
@@ -79,15 +80,15 @@ remove_pycache_under() {
   fi
 }
 
-step "Stop if-integration-backend runtime (if installed)"
-if [[ -d "$BACKEND_DIR" ]] && command -v uv >/dev/null 2>&1; then
+step "Stop integrations runtime (if installed)"
+if [[ -x "$IF_INTEGRATIONS" ]] && command -v uv >/dev/null 2>&1; then
   if (( DRY_RUN )); then
-    printf '[dry-run] (cd %q && uv run --package if-integration-backend if-integration-backend stop) || true\n' "$REPO_ROOT"
+    printf '[dry-run] (cd %q && %q stop) || true\n' "$REPO_ROOT" "$IF_INTEGRATIONS"
   else
-    (cd "$REPO_ROOT" && uv run --package if-integration-backend if-integration-backend stop) 2>/dev/null || true
+    (cd "$REPO_ROOT" && "$IF_INTEGRATIONS" stop) 2>/dev/null || true
   fi
 else
-  echo "    skipped (backend dir or uv not available)"
+  echo "    skipped (launcher or uv not available)"
 fi
 
 step "Remove Python virtualenvs (workspace + legacy member venvs)"

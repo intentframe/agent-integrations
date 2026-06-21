@@ -7,6 +7,7 @@ members = [
     "agent-integrations",
     "if-integration-backend",
     "if-integration-bridge-client",
+    "intentframe-integrations-cli",
 ]
 
 [[package]]
@@ -516,6 +517,17 @@ sdist = { url = "https://files.pythonhosted.org/packages/eb/e9/0c2483a261bdbf8d9
 wheels = [
     { url = "https://files.pythonhosted.org/packages/72/2d/6fd39649165e140f4adf21a23571797e9cd7a0dde0bfbf6663114c9eb475/intentframe_executor_sdk-0.1.1-py3-none-any.whl", hash = "sha256:57d8d193fa6fa5878c6c394f8cac7785e43bcf9e6413d41f2f6c6308e8dff88a", size = 35555, upload-time = "2026-06-21T05:41:40.681Z" },
 ]
+
+[[package]]
+name = "intentframe-integrations-cli"
+version = "0.1.0"
+source = { editable = "intentframe-integrations-cli" }
+dependencies = [
+    { name = "if-integration-backend" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "if-integration-backend", editable = "if-integration-backend" }]
 
 [[package]]
 name = "intentframe-native-kit"

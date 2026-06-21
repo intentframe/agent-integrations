@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Self-contained end-to-end test for if-integration-backend (monorepo workspace).
+# Self-contained end-to-end test for agent-integrations (monorepo workspace).
+# Runtime lifecycle goes through bin/intentframe-integrations (orchestrator → backend).
 #
 # Prerequisites (must already be on PATH):
 #   - node + npm
@@ -10,6 +11,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+IF_INTEGRATIONS="${REPO_ROOT}/bin/intentframe-integrations"
 AGENTS_DIR="${REPO_ROOT}/tests/agents"
 EXAMPLES_PY="${REPO_ROOT}/tests/examples/python/test_validate.py"
 EXAMPLES_TS="${REPO_ROOT}/tests/examples/typescript/test_validate.mjs"
@@ -18,6 +20,10 @@ BRIDGE_SOCKET="${HOME}/.intentframe/backend/bridge.sock"
 RUNTIME_STARTED=0
 
 step() { printf '\n==> %s\n' "$*"; }
+
+if_cli() {
+  (cd "$REPO_ROOT" && "$IF_INTEGRATIONS" "$@")
+}
 
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -51,7 +57,7 @@ cleanup() {
   local ec=$?
   if (( RUNTIME_STARTED )); then
     step "Stop everything (cleanup)"
-    (cd "$REPO_ROOT" && uv run --package if-integration-backend if-integration-backend stop) || true
+    if_cli stop || true
     RUNTIME_STARTED=0
   fi
   trap - EXIT INT TERM
@@ -60,6 +66,11 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 resolve_repo_root
+
+if [[ ! -x "$IF_INTEGRATIONS" ]]; then
+  echo "ERROR: intentframe-integrations launcher not found: ${IF_INTEGRATIONS}" >&2
+  exit 1
+fi
 
 if [[ ! -d "${REPO_ROOT}/if-integration-backend" ]]; then
   echo "ERROR: if-integration-backend not found under ${REPO_ROOT}" >&2
@@ -90,24 +101,23 @@ if [[ ! -f "$TS_CLIENT_DIST" ]]; then
 fi
 
 step "Stop everything (core + bridge + sockets)"
-(cd "$REPO_ROOT" && uv run --package if-integration-backend if-integration-backend stop) || true
+if_cli stop || true
 
 step "Start core + executor + bridge (tests/agents)"
 RUNTIME_STARTED=1
-(cd "$REPO_ROOT" && uv run --package if-integration-backend if-integration-backend start --agent-config "$AGENTS_DIR")
+if_cli start --agent-config "$AGENTS_DIR" --no-seed
 
 step "Seed policies for each e2e agent"
 for agent_json in "$AGENTS_DIR"/*/agent.json; do
-  (cd "$REPO_ROOT" && uv run --package if-integration-backend if-integration-backend seed-policy \
-    --agent-config "$agent_json" --skip-if-exists)
+  if_cli seed --agent-config "$agent_json" --skip-if-exists
 done
 
 step "Status"
-(cd "$REPO_ROOT" && uv run --package if-integration-backend if-integration-backend status)
+if_cli status
 test -S "$BRIDGE_SOCKET"
 
 step "Backend integration tests (core Actor + bridge HTTP)"
-(cd "$REPO_ROOT" && uv run --package if-integration-backend if-integration-backend test)
+if_cli test
 
 step "Python bridge client example"
 export IF_AGENT_BRIDGE_SECRET="test-bridge-python-secret-dev-only"

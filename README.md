@@ -2,6 +2,19 @@
 
 IntentFrame agent integration monorepo: validate-only backend, bridge clients, and e2e tests.
 
+## Quick start (Hermes)
+
+From repo root after `uv sync --all-packages`:
+
+```bash
+export OPENAI_API_KEY=sk-...
+bin/intentframe-integrations start hermes
+bin/intentframe-integrations status
+bin/intentframe-integrations stop
+```
+
+See `integrations/hermes/README.md` for Hermes env and plugin notes.
+
 ## Quick start (e2e)
 
 From a fresh clone, one command installs everything and runs the full test pipeline:
@@ -23,10 +36,13 @@ Reset local artifacts first:
 
 | Path | Purpose |
 |------|---------|
-| `if-integration-backend/` | Runtime: supervisor, bridge, executor pack, backend integration tests |
+| `bin/intentframe-integrations` | User-facing CLI (start/stop/status per agent profile) |
+| `intentframe-integrations-cli/` | Orchestrator package (delegates to `if-integration-backend`) |
+| `integrations/` | Agent profiles (`agent.json` + `policy.yaml`) |
+| `if-integration-backend/` | Runtime: supervisor, bridge, executor pack |
 | `if-integration-clients/` | Reusable bridge clients (Python + TypeScript) |
-| `tests/agents/` | E2e agent configs (`agent.json` + `policy.yaml`) |
-| `tests/examples/` | Thin client library examples |
+| `tests/agents/` | E2e agent configs |
+| `tests/examples/` | Client library examples |
 | `tests/scripts/` | `e2e.sh`, `clean-project.sh` |
 | `pyproject.toml` | uv workspace root |
 | `package.json` | npm workspaces root |
@@ -34,11 +50,13 @@ Reset local artifacts first:
 ## Workspace commands
 
 ```bash
-# Python (all workspace packages)
 uv sync --all-packages
-uv run --package if-integration-backend if-integration-backend start
+bin/intentframe-integrations start hermes
 
-# TypeScript (all workspaces)
+# Lower-level runtime CLI (internal)
+uv run --package if-integration-backend if-integration-backend test
+
+# TypeScript workspaces
 npm install
 npm run build
 ```
