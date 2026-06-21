@@ -1,0 +1,8 @@
+{
+  "name": "if-integration-bridge-example-ts",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@if-integration/bridge-client": "*"
+  }
+}

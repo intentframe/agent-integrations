@@ -1,0 +1,16 @@
+# Generic validate-only core profile.
+
+bundles:
+  - native
+
+executor:
+  mode: real
+  socket_path: ~/.intentframe/run/executor.sock
+  dry_run_context: null
+  hmac_key: "if_backend_dev_only_change_in_prod"
+
+runtime:
+  verbose: true
+  skip_onboarding: false
+
+bundle_options: {}

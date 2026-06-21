@@ -1,0 +1,14 @@
+{
+  "agent_id": "bridge_typescript_client",
+  "user_id": "test_user",
+  "agent_type": "bridge_typescript",
+  "action_types": ["RUN_COMMAND"],
+  "bridge_secret": "test-bridge-typescript-secret-dev-only",
+  "policy_file": "policy.yaml",
+  "env": {
+    "INTENTFRAME_USER_ID": "test_user",
+    "INTENTFRAME_AGENT_ID": "bridge_typescript_client",
+    "IF_AGENT_BRIDGE_SECRET": "test-bridge-typescript-secret-dev-only",
+    "IF_SECURITY_BRIDGE_SOCKET": "~/.intentframe/backend/bridge.sock"
+  }
+}

@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "if-integration-backend"
+version = "0.2.0"
+description = "Generic IntentFrame validate-only backend: runtime, bridge, noop executor"
+readme = "README.md"
+requires-python = ">=3.14"
+license = "Apache-2.0"
+dependencies = [
+  "intentframe-supervisor==0.1.1",
+  "intentframe-native-kit==0.1.1",
+  "intentframe-executor-sdk==0.1.1",
+  "intentframe-actor==0.1.1",
+  "intentframe-bundle-sdk==0.1.1",
+  "httpx>=0.28.1",
+  "pyyaml>=6.0",
+]
+
+[project.scripts]
+if-integration-backend = "if_security_backend.cli:main"
+
+[project.entry-points."intentframe.executor_packs"]
+validate_only = "if_security_backend.executor_pack:register_all"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/if_security_backend"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/src/if_security_backend",
+  "/README.md",
+  "/tests",
+]

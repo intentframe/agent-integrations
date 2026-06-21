@@ -1,0 +1,14 @@
+{
+  "agent_id": "bridge_test",
+  "user_id": "test_user",
+  "agent_type": "test",
+  "action_types": ["RUN_COMMAND"],
+  "bridge_secret": "test-bridge-secret-dev-only",
+  "policy_file": "policy.yaml",
+  "env": {
+    "INTENTFRAME_USER_ID": "test_user",
+    "INTENTFRAME_AGENT_ID": "bridge_test",
+    "IF_AGENT_BRIDGE_SECRET": "test-bridge-secret-dev-only",
+    "IF_SECURITY_BRIDGE_SOCKET": "~/.intentframe/backend/bridge.sock"
+  }
+}

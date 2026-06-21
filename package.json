@@ -1,0 +1,11 @@
+{
+  "name": "agent-integrations",
+  "private": true,
+  "workspaces": [
+    "if-integration-clients/typescript",
+    "tests/examples/typescript"
+  ],
+  "scripts": {
+    "build": "npm run build -w @if-integration/bridge-client"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "agent_id": "hermes",
+  "user_id": "dev_user",
+  "agent_type": "hermes",
+  "action_types": ["RUN_COMMAND"],
+  "bridge_secret": "change-me-hermes-dev-only",
+  "policy_file": "policy.yaml",
+  "env": {
+    "INTENTFRAME_USER_ID": "dev_user",
+    "INTENTFRAME_AGENT_ID": "hermes",
+    "IF_AGENT_BRIDGE_SECRET": "change-me-hermes-dev-only",
+    "IF_SECURITY_BRIDGE_SOCKET": "~/.intentframe/backend/bridge.sock"
+  }
+}

@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "if-integration-bridge-client"
+version = "0.1.0"
+description = "HTTP-over-UDS client for the IntentFrame validate bridge (handshake + validate)"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+dependencies = [
+  "httpx>=0.28.1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/if_integration_bridge"]
