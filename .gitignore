@@ -2,6 +2,8 @@
 external-libs/
 external-reference-only-libs/
 .cursor_chats/
+.claude/
+.claude_chats/
 
 # Environment and secrets
 .env
