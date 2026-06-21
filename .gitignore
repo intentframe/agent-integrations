@@ -1,5 +1,6 @@
 # Project-local
 external-libs/
+external-reference-only-libs/
 .cursor_chats/
 
 # Environment and secrets
