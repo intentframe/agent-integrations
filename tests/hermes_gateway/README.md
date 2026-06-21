@@ -1,0 +1,138 @@
+# Hermes gateway E2E
+
+Opt-in end-to-end test for the **production CLI journey** plus real `/v1/responses`
+ALLOW/BLOCK through Hermes gateway, the IntentFrame plugin, adapter, and backend.
+
+Primary entrypoint: `test_gateway_e2e.py`. Shell wrapper: `tests/scripts/test-hermes-gateway-e2e.sh`.
+
+## Run
+
+From repo root (requires `OPENAI_API_KEY`):
+
+```bash
+RUN_HERMES_GATEWAY_E2E=1 \
+  uv run --with httpx --package intentframe-integrations-cli \
+  python tests/hermes_gateway/test_gateway_e2e.py
+```
+
+Or via the shell wrapper:
+
+```bash
+RUN_HERMES_GATEWAY_E2E=1 ./tests/scripts/test-hermes-gateway-e2e.sh
+```
+
+Included in the main pipeline when opted in:
+
+```bash
+RUN_HERMES_GATEWAY_E2E=1 ./scripts/e2e.sh
+```
+
+## What it covers
+
+| Pass | Scenario |
+|------|----------|
+| **1** | Greenfield: `install` → `start` → `integrate` → `doctor` → `gateway start --api-server` → `/v1/responses` |
+| **2a** | Reuse managed install from pass 1 (idempotent `integrate`, gateway restart) |
+| **2b** | External Hermes via `HERMES_BIN`, then `integrate` and gateway E2E |
+
+Each pass runs two HTTP assertions against the gateway API:
+
+- **ALLOW** — LLM issues a `terminal` tool call for `printf '<marker>'` with a reason; IntentFrame policy allows it.
+- **BLOCK** — LLM issues `terminal` for `sudo echo intentframe-e2e-block-probe`; policy blocks via the `sudo` pattern.
+
+## Sandbox isolation
+
+Each run creates a disposable tree under `/tmp/hg{8-char-id}/` (short path for macOS UDS limits):
+
+- `HOME` → `$test_root/home`
+- `HERMES_HOME` → `$test_root/home/.hermes`
+
+Real `~/.hermes` and `~/.intentframe/integrations/hermes` are snapshotted before the run and
+asserted unchanged after cleanup. System `hermes` on `PATH` is hidden during greenfield install.
+
+Cleanup removes **only that run's** `test_root`, not other `/tmp/hg*` sandboxes.
+
+## Log paths (important)
+
+E2E uses sandbox paths, **not** your real `~/.intentframe`. The test prints a catalog at
+sandbox activation and again before `/v1/responses`:
+
+| Label | Path (under sandbox) |
+|-------|----------------------|
+| Hermes gateway | `$HOME/.intentframe/integrations/hermes/gateway.log` |
+| Hermes adapter | `$HOME/.intentframe/integrations/hermes/adapter.log` |
+| IntentFrame bridge | `$HOME/.intentframe/backend/bridge.log` |
+| IntentFrame supervisor | `$HOME/.intentframe/backend/supervisor.log` |
+| IntentFrame executor | `$HOME/.intentframe/logs/executor.log` |
+| IntentFrame core (policy/AE) | `$HOME/.intentframe/logs/intentframe-server.log` |
+| Hermes config | `$HERMES_HOME/config.yaml` |
+| Hermes `.env` | `$HERMES_HOME/.env` |
+
+Example (paths vary per run):
+
+```bash
+tail -f /tmp/hg62012319/home/.intentframe/logs/intentframe-server.log
+tail -f /tmp/hg62012319/home/.intentframe/integrations/hermes/gateway.log
+```
+
+On failure, `format_diagnostics()` in `cli_runner.py` also lists these paths (with secrets redacted from Hermes `.env`).
+
+### Expected trace in `intentframe-server.log`
+
+When `/v1/responses` reaches the plugin and adapter:
+
+1. Adapter handshake on first validate
+2. Four intent evaluations for the two ALLOW/BLOCK probes (two tool calls each in a typical run)
+
+If the LLM fails before emitting a `terminal` function call, **IntentFrame logs may be empty**
+for that request — tail `gateway.log` and OpenAI error text in test output instead.
+
+## Hermes LLM config (test-only seed)
+
+Production `integrate hermes` does **not** set Hermes model or provider. E2E seeds isolated
+`$HERMES_HOME/config.yaml` before gateway start:
+
+- `model.provider: openai-api`
+- `model.api_mode: chat_completions`
+- `model.name: gpt-4o-mini` (override with `INTENTFRAME_HERMES_E2E_MODEL`)
+
+Hermes 0.17+ auto-selects OpenAI **Responses API** (`codex_responses`) for `api.openai.com`
+unless `api_mode` is set. `gpt-4o-mini` does not support that mode (OpenAI 400:
+"Encrypted content is not supported with this model"). The E2E seed avoids that mismatch.
+
+IntentFrame backend uses its own `OPENAI_API_KEY` from the environment (Agents SDK / Responses API
+for policy evaluation). That is separate from Hermes gateway LLM calls.
+
+## Gateway lifecycle notes
+
+`gateway start hermes` resolves to `hermes gateway run` (foreground runner). Service-style
+subcommands passed through the orchestrator are stripped — see
+`normalize_hermes_gateway_argv()` in `hermes_gateway.py`.
+
+Startup waits on HTTP `/health` and process liveness; early exit dumps a tail of `gateway.log`.
+Stop uses process-group termination (`start_new_session=True`) and verifies PID is still a
+Hermes gateway before trusting stale PID files.
+
+## Troubleshooting
+
+| Symptom | Likely cause | Where to look |
+|---------|--------------|---------------|
+| Gateway health timeout | Wrong argv, crash on boot, port conflict | Sandbox `gateway.log`, test diagnostics |
+| `/v1/responses` 400 from OpenAI | Responses API + unsupported model | `$HERMES_HOME/config.yaml` `api_mode` |
+| ALLOW test: no `function_call` | LLM did not call `terminal` | `gateway.log`, retry logs in test output |
+| BLOCK test passes but no IF log lines | Same — request never reached plugin | `gateway.log` first |
+| Pass 2a idempotency failure | CLI stdout not captured | Fixed in `cli_runner.run_cli()` |
+| Stale gateway after stop | PID reuse / wrong process | `_pid_is_hermes_gateway()` in `hermes_gateway.py` |
+
+## Related docs
+
+- `integrations/hermes/README.md` — integration architecture and manual checklist
+- `intentframe-integrations-cli/README.md` — CLI command reference
+
+## Unit tests (no network)
+
+```bash
+uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_isolation.py
+uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_cli_runner.py
+uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_hermes_reference_contract.py
+```

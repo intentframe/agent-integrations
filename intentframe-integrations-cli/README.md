@@ -64,4 +64,12 @@ Hermes binary resolution order:
 4. `gateway start hermes` — launch Hermes gateway (optionally with API server)
 5. `stop` — stop gateway started by orchestrator, adapters, and backend runtime
 
-See `integrations/hermes/README.md` for architecture details.
+`gateway start hermes` always invokes `hermes gateway run` (foreground process). Extra gateway
+args are normalized to run flags only; service subcommands are ignored. Stop uses process-group
+termination and verifies the PID is still a Hermes gateway before trusting stale PID files.
+
+The CLI does **not** configure Hermes LLM model or provider — only plugin install, config merge,
+adapter sync, and gateway lifecycle.
+
+See `integrations/hermes/README.md` for architecture. Opt-in gateway E2E (sandbox, log paths,
+troubleshooting): `tests/hermes_gateway/README.md`.

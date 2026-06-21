@@ -150,7 +150,7 @@ step "Hermes live integration (adapter + plugin gate)"
 bash "${SCRIPT_DIR}/test-hermes-integration.sh"
 
 if [[ "${RUN_HERMES_GATEWAY_E2E:-}" == "1" ]]; then
-  step "Hermes gateway E2E (opt-in)"
+  step "Hermes gateway E2E (opt-in; see tests/hermes_gateway/README.md)"
   bash "${SCRIPT_DIR}/test-hermes-gateway-e2e.sh"
 fi
 

@@ -3,6 +3,8 @@
 #
 # Opt-in (slow, networked, LLM-dependent; OPENAI_API_KEY must be in the environment):
 #   RUN_HERMES_GATEWAY_E2E=1 ./tests/scripts/test-hermes-gateway-e2e.sh
+#
+# Docs: tests/hermes_gateway/README.md (sandbox /tmp/hg*, log path catalog, troubleshooting)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

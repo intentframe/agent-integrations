@@ -34,6 +34,14 @@ From a fresh clone, one command installs everything and runs the full test pipel
 
 Requires `node`, `npm`, and `OPENAI_API_KEY` in the environment.
 
+Optional Hermes gateway E2E (slow, networked, LLM-dependent; isolated sandbox):
+
+```bash
+RUN_HERMES_GATEWAY_E2E=1 ./scripts/e2e.sh
+```
+
+See [`tests/hermes_gateway/README.md`](tests/hermes_gateway/README.md) for log paths and troubleshooting.
+
 Reset local artifacts first:
 
 ```bash
@@ -52,7 +60,8 @@ Reset local artifacts first:
 | `if-integration-clients/` | Reusable bridge clients (Python + TypeScript) |
 | `tests/agents/` | E2e agent configs |
 | `tests/examples/` | Client library examples |
-| `tests/scripts/` | `e2e.sh`, `clean-project.sh` |
+| `tests/hermes_gateway/` | Opt-in Hermes gateway E2E (isolated sandbox) |
+| `tests/scripts/` | `e2e.sh`, `test-hermes-gateway-e2e.sh`, `clean-project.sh` |
 | `pyproject.toml` | uv workspace root |
 | `package.json` | npm workspaces root |
 

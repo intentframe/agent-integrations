@@ -102,11 +102,31 @@ Then restart your Hermes gateway.
 6. Ask LLM to run `echo ok` with a reason → executes
 7. Ask LLM to run `sudo echo intentframe-e2e-block-probe` → blocked by IntentFrame policy (`sudo` pattern)
 
+## What the CLI configures (and what it does not)
+
+| Step | Configures |
+|------|------------|
+| `install hermes` | Managed Hermes venv under `~/.intentframe/integrations/hermes/` |
+| `start hermes` | IntentFrame backend + adapter sidecar |
+| `integrate hermes` | Plugin symlink, `plugins.enabled` merge (with `config.yaml.intentframe.bak`), adapter venv sync |
+| `gateway start hermes` | Launches `hermes gateway run` (+ optional API server); does **not** set LLM model/provider |
+
+Hermes LLM settings (`model.provider`, `model.name`, `model.api_mode`) remain the user's
+responsibility in `$HERMES_HOME/config.yaml` / `.env`. Only the opt-in gateway E2E test
+seeds OpenAI defaults in an isolated sandbox — see below.
+
+`integrate hermes` merges `plugins.enabled` in place when possible instead of rewriting the
+full config file.
+
 ## Gateway E2E test (opt-in)
 
 Full production journey with isolated `HOME` / `HERMES_HOME` (does not touch real
-`~/.hermes` or `~/.intentframe/integrations/hermes`). The Python entrypoint is primary and the shell
-script is a convenience wrapper:
+`~/.hermes` or `~/.intentframe/integrations/hermes`).
+
+**Detailed guide:** [`tests/hermes_gateway/README.md`](../../tests/hermes_gateway/README.md)
+(log paths, troubleshooting, ALLOW/BLOCK semantics).
+
+Quick run:
 
 ```bash
 RUN_HERMES_GATEWAY_E2E=1 \
@@ -116,14 +136,14 @@ RUN_HERMES_GATEWAY_E2E=1 \
 RUN_HERMES_GATEWAY_E2E=1 ./tests/scripts/test-hermes-gateway-e2e.sh
 ```
 
-Requires `OPENAI_API_KEY` in the environment (IntentFrame backend + Hermes LLM). The test
-seeds an isolated `$HERMES_HOME` with `model.provider: openai-api` and
-`model.api_mode: chat_completions` (so `gpt-4o-mini` works; Hermes 0.17 otherwise uses
-the Responses API for api.openai.com). Production `~/.hermes` is never modified. Override
-the model with `INTENTFRAME_HERMES_E2E_MODEL` (default: `gpt-4o-mini`).
+Requires `OPENAI_API_KEY` (IntentFrame backend + Hermes gateway LLM). E2E seeds isolated
+`$HERMES_HOME` with `openai-api`, `api_mode: chat_completions`, and `gpt-4o-mini` (override:
+`INTENTFRAME_HERMES_E2E_MODEL`). Hermes 0.17 otherwise auto-picks OpenAI Responses API for
+`api.openai.com`, which breaks `gpt-4o-mini`.
 
-Covers pass 1 (greenfield install), pass 2a (reuse our install), pass 2b (external Hermes via `HERMES_BIN` then integrate),
-and `/v1/responses` ALLOW/BLOCK through real Hermes gateway + IntentFrame plugin.
-The test uses dynamic localhost ports, hides any system `hermes` from `PATH` during
-greenfield install, tracks runtime PIDs for cleanup verification, and verifies gateway/runtime
-cleanup before deleting temp dirs.
+The test prints **sandbox log paths** at activation and before `/v1/responses` — tail those
+files, not real `~/.intentframe`, while debugging.
+
+Covers pass 1 (greenfield), pass 2a (reuse managed install), pass 2b (external Hermes via
+`HERMES_BIN`), and `/v1/responses` ALLOW/BLOCK. Each sandbox lives under `/tmp/hg*` and is
+removed after that run only.
