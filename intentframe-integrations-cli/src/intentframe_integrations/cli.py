@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -18,6 +17,16 @@ from intentframe_integrations.adapter_lifecycle import (
     is_adapter_running,
     start_adapter,
     stop_adapter,
+)
+from intentframe_integrations.hermes_gateway import (
+    HermesGatewayError,
+    start_hermes_gateway,
+    stop_hermes_gateway,
+)
+from intentframe_integrations.hermes_install import (
+    HermesInstallError,
+    install_hermes_agent,
+    resolve_hermes_bin,
 )
 from intentframe_integrations.hermes_integrate import (
     doctor_hermes,
@@ -209,6 +218,7 @@ def _cmd_start_config(
 
 
 def _cmd_stop() -> int:
+    stop_hermes_gateway(quiet=True)
     for agent in list_agents():
         stop_adapter(agent, quiet=True)
     return _run_backend(["stop"])
@@ -243,10 +253,20 @@ def _cmd_test(agent_config: Path | None) -> int:
     return _run_backend(argv)
 
 
-def _cmd_doctor(agent: str) -> int:
+def _cmd_doctor(
+    agent: str,
+    *,
+    require_hermes: bool = True,
+    require_integration: bool = True,
+) -> int:
     if agent == "hermes":
         pack = load_hermes_pack()
-        report = doctor_hermes(pack)
+        _apply_agent_env(pack)
+        report = doctor_hermes(
+            pack,
+            require_hermes=require_hermes,
+            require_integration=require_integration,
+        )
         for line in report.lines:
             print(line)
         if not report.ok:
@@ -280,6 +300,7 @@ def _cmd_integrate(agent: str, *, copy: bool, skip_config: bool) -> int:
         return 1
 
     pack = load_hermes_pack()
+    _apply_agent_env(pack)
     try:
         result = integrate_hermes(pack, copy=copy, skip_config=skip_config)
     except FileNotFoundError as exc:
@@ -292,9 +313,75 @@ def _cmd_integrate(agent: str, *, copy: bool, skip_config: bool) -> int:
     for msg in result.messages:
         print(msg)
 
-    print("\nExport these env vars before starting Hermes:")
+    print("\nEnvironment applied for this process:")
     print(format_env_exports(pack))
-    print("\nThen restart your Hermes gateway (e.g. hermes gateway).")
+    print("\nThen restart your Hermes gateway (e.g. intentframe-integrations gateway start hermes).")
+    return 0
+
+
+def _cmd_install_hermes(*, version: str | None, force: bool) -> int:
+    try:
+        result = install_hermes_agent(version=version, force=force)
+    except HermesInstallError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    except subprocess.CalledProcessError as exc:
+        print(f"ERROR: Hermes install command failed: {exc}", file=sys.stderr)
+        return 1
+
+    for msg in result.messages:
+        print(msg)
+
+    print("\nNext:")
+    print("  bin/intentframe-integrations start hermes")
+    print("  bin/intentframe-integrations integrate hermes")
+    print("  bin/intentframe-integrations gateway start hermes --api-server")
+    return 0
+
+
+def _cmd_gateway_start(
+    agent: str,
+    *,
+    api_server: bool,
+    api_port: int | None,
+    api_key: str | None,
+    detach: bool,
+    gateway_args: list[str],
+) -> int:
+    if agent != "hermes":
+        print(f"ERROR: gateway start is only implemented for hermes (got {agent!r})", file=sys.stderr)
+        return 1
+
+    pack = load_hermes_pack()
+    _apply_agent_env(pack)
+
+    if resolve_hermes_bin() is None:
+        print(
+            "ERROR: Hermes CLI not found — run: intentframe-integrations install hermes",
+            file=sys.stderr,
+        )
+        return 1
+
+    try:
+        start_hermes_gateway(
+            pack,
+            detach=detach,
+            api_server=api_server,
+            api_key=api_key,
+            api_port=api_port,
+            gateway_args=gateway_args,
+        )
+    except HermesGatewayError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def _cmd_gateway_stop(agent: str) -> int:
+    if agent != "hermes":
+        print(f"ERROR: gateway stop is only implemented for hermes (got {agent!r})", file=sys.stderr)
+        return 1
+    stop_hermes_gateway()
     return 0
 
 
@@ -339,19 +426,28 @@ def _cmd_run(agent: str, *, gateway_args: list[str]) -> int:
     if ec:
         return ec
 
-    hermes_bin = "hermes"
-    if shutil.which(hermes_bin) is None:
+    if resolve_hermes_bin() is None:
+        ec = _cmd_install_hermes(version=None, force=False)
+        if ec:
+            return ec
+
+    binary = resolve_hermes_bin()
+    if binary is None:
         print(
-            "ERROR: 'hermes' not found on PATH. Install Hermes Agent first.",
+            "ERROR: Hermes CLI not found after install — run: intentframe-integrations install hermes",
             file=sys.stderr,
         )
         return 1
 
-    cmd = [hermes_bin, "gateway", *gateway_args]
+    cmd = [str(binary), "gateway", *gateway_args]
+    env = os.environ.copy()
+    from intentframe_integrations.hermes_paths import hermes_home
+
+    env["HERMES_HOME"] = str(hermes_home())
     print(f"\nLaunching: {' '.join(cmd)}", file=sys.stderr)
     print("Hermes plugin env is applied to this process.", file=sys.stderr)
     try:
-        return subprocess.call(cmd)
+        return subprocess.call(cmd, env=env)
     except KeyboardInterrupt:
         return 130
 
@@ -422,6 +518,27 @@ def main(argv: list[str] | None = None) -> int:
 
     p_doctor = sub.add_parser("doctor", help="Check agent config and runtime prerequisites")
     p_doctor.add_argument("agent", choices=agents)
+    p_doctor.add_argument(
+        "--install-only",
+        action="store_true",
+        help="Check Hermes install only (skip IntentFrame integration requirements)",
+    )
+
+    p_install = sub.add_parser(
+        "install",
+        help="Install Hermes Agent into the orchestrator-managed environment",
+    )
+    p_install.add_argument("agent", choices=agents)
+    p_install.add_argument(
+        "--version",
+        default=None,
+        help="Hermes Agent version to install (default: pinned release)",
+    )
+    p_install.add_argument(
+        "--force",
+        action="store_true",
+        help="Reinstall Hermes Agent even if already present",
+    )
 
     p_integrate = sub.add_parser(
         "integrate",
@@ -449,6 +566,44 @@ def main(argv: list[str] | None = None) -> int:
         nargs=argparse.REMAINDER,
         help="Extra args passed to hermes gateway (after --)",
     )
+
+    p_gateway = sub.add_parser("gateway", help="Manage Hermes gateway lifecycle")
+    gateway_sub = p_gateway.add_subparsers(dest="gateway_command", required=True)
+
+    p_gateway_start = gateway_sub.add_parser(
+        "start",
+        help="Start Hermes gateway in the background",
+    )
+    p_gateway_start.add_argument("agent", choices=agents)
+    p_gateway_start.add_argument(
+        "--api-server",
+        action="store_true",
+        help="Enable Hermes API server and wait for /health",
+    )
+    p_gateway_start.add_argument(
+        "--api-port",
+        type=int,
+        default=None,
+        help="API server port (default: 8642)",
+    )
+    p_gateway_start.add_argument(
+        "--api-key",
+        default=None,
+        help="API server key (default: INTENTFRAME_HERMES_API_KEY or generated local key)",
+    )
+    p_gateway_start.add_argument(
+        "--no-detach",
+        action="store_true",
+        help="Run gateway in foreground (blocks until gateway exits)",
+    )
+    p_gateway_start.add_argument(
+        "gateway_args",
+        nargs=argparse.REMAINDER,
+        help="Extra args passed to hermes gateway (after --)",
+    )
+
+    p_gateway_stop = gateway_sub.add_parser("stop", help="Stop orchestrator-managed Hermes gateway")
+    p_gateway_stop.add_argument("agent", choices=agents)
 
     args = parser.parse_args(argv)
 
@@ -484,7 +639,18 @@ def main(argv: list[str] | None = None) -> int:
         case "test":
             return _cmd_test(args.agent_config)
         case "doctor":
-            return _cmd_doctor(args.agent)
+            if args.agent != "hermes":
+                return _cmd_doctor(args.agent)
+            return _cmd_doctor(
+                args.agent,
+                require_hermes=True,
+                require_integration=not args.install_only,
+            )
+        case "install":
+            if args.agent != "hermes":
+                print(f"ERROR: install is only implemented for hermes (got {args.agent!r})", file=sys.stderr)
+                return 1
+            return _cmd_install_hermes(version=args.version, force=args.force)
         case "integrate":
             return _cmd_integrate(
                 args.agent,
@@ -496,6 +662,25 @@ def main(argv: list[str] | None = None) -> int:
             if gateway_args and gateway_args[0] == "--":
                 gateway_args = gateway_args[1:]
             return _cmd_run(args.agent, gateway_args=gateway_args)
+        case "gateway":
+            match args.gateway_command:
+                case "start":
+                    gateway_args = args.gateway_args
+                    if gateway_args and gateway_args[0] == "--":
+                        gateway_args = gateway_args[1:]
+                    return _cmd_gateway_start(
+                        args.agent,
+                        api_server=args.api_server,
+                        api_port=args.api_port,
+                        api_key=args.api_key,
+                        detach=not args.no_detach,
+                        gateway_args=gateway_args,
+                    )
+                case "stop":
+                    return _cmd_gateway_stop(args.agent)
+                case _:
+                    parser.error(f"Unknown gateway command: {args.gateway_command}")
+                    return 2
         case _:
             parser.error(f"Unknown command: {args.command}")
             return 2

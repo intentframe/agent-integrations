@@ -17,30 +17,36 @@ From the **repo root**:
 uv sync --all-packages
 export OPENAI_API_KEY=sk-...
 
+bin/intentframe-integrations install hermes
 bin/intentframe-integrations run hermes
 ```
 
 Or step by step:
 
 ```bash
+bin/intentframe-integrations install hermes
 bin/intentframe-integrations start hermes
 bin/intentframe-integrations integrate hermes
-export IF_AGENT_ADAPTER_SOCKET=~/.intentframe/integrations/hermes/adapter.sock
-hermes gateway
+bin/intentframe-integrations doctor hermes
+bin/intentframe-integrations gateway start hermes --api-server
 ```
 
 ## Commands
 
 ```bash
+bin/intentframe-integrations install hermes [--version VERSION] [--force]
 bin/intentframe-integrations start hermes
 bin/intentframe-integrations integrate hermes [--copy] [--skip-config]
-bin/intentframe-integrations doctor hermes
+bin/intentframe-integrations doctor hermes [--install-only]
+bin/intentframe-integrations gateway start hermes [--api-server]
+bin/intentframe-integrations gateway stop hermes
 bin/intentframe-integrations run hermes
 bin/intentframe-integrations stop
 ```
 
-`integrate hermes` symlinks the plugin to `~/.hermes/plugins/intentframe-terminal`, merges
-`plugins.enabled` in `~/.hermes/config.yaml`, and syncs the adapter venv at
+`install hermes` installs Hermes Agent into the orchestrator-managed venv.
+`integrate hermes` symlinks the plugin to `$HERMES_HOME/plugins/intentframe-terminal`, merges
+`plugins.enabled` in `$HERMES_HOME/config.yaml`, and syncs the adapter venv at
 `~/.intentframe/integrations/hermes/.venv`.
 
 ## Architecture
@@ -88,8 +94,10 @@ Then restart your Hermes gateway.
 
 ## Manual acceptance checklist
 
-1. `bin/intentframe-integrations start hermes`
-2. `bin/intentframe-integrations integrate hermes` + export `IF_AGENT_ADAPTER_SOCKET`
-3. `hermes gateway`
-4. Ask LLM to run `echo ok` with a reason → executes
-5. Ask LLM to run `sudo rm -rf /` → blocked by IntentFrame
+1. `bin/intentframe-integrations install hermes`
+2. `bin/intentframe-integrations start hermes`
+3. `bin/intentframe-integrations integrate hermes`
+4. `bin/intentframe-integrations doctor hermes`
+5. `bin/intentframe-integrations gateway start hermes --api-server`
+6. Ask LLM to run `echo ok` with a reason → executes
+7. Ask LLM to run `sudo rm -rf /` → blocked by IntentFrame

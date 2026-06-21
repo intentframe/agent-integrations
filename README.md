@@ -8,16 +8,18 @@ From repo root after `uv sync --all-packages`:
 
 ```bash
 export OPENAI_API_KEY=sk-...
+bin/intentframe-integrations install hermes
 bin/intentframe-integrations run hermes
 ```
 
 Or step by step:
 
 ```bash
+bin/intentframe-integrations install hermes
 bin/intentframe-integrations start hermes
 bin/intentframe-integrations integrate hermes
 bin/intentframe-integrations doctor hermes
-hermes gateway
+bin/intentframe-integrations gateway start hermes --api-server
 ```
 
 See `integrations/hermes/README.md` for details.

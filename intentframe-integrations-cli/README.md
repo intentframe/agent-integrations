@@ -6,15 +6,18 @@ User-facing orchestrator for agent profiles under `integrations/`. Delegates run
 ## Commands
 
 ```bash
+intentframe-integrations install hermes [--version VERSION] [--force]
 intentframe-integrations start hermes [--no-seed] [--skip-if-exists]
 intentframe-integrations start --agent-config path/to/agent.json [--no-seed]
 intentframe-integrations integrate hermes [--copy] [--skip-config]
+intentframe-integrations gateway start hermes [--api-server] [--api-port PORT] [--api-key KEY]
+intentframe-integrations gateway stop hermes
 intentframe-integrations run hermes [-- extra hermes gateway args]
 intentframe-integrations stop
 intentframe-integrations status
 intentframe-integrations seed hermes [--skip-if-exists]
 intentframe-integrations test [--agent-config path/to/agent.json]
-intentframe-integrations doctor hermes
+intentframe-integrations doctor hermes [--install-only]
 ```
 
 Run from repo root via `bin/intentframe-integrations` or:
@@ -23,21 +26,42 @@ Run from repo root via `bin/intentframe-integrations` or:
 uv run --package intentframe-integrations-cli intentframe-integrations start hermes
 ```
 
-## Hermes one-liner
+## Hermes production flow
+
+Greenfield user (no Hermes installed):
+
+```bash
+export OPENAI_API_KEY=sk-...
+bin/intentframe-integrations install hermes
+bin/intentframe-integrations start hermes
+bin/intentframe-integrations integrate hermes
+bin/intentframe-integrations doctor hermes
+bin/intentframe-integrations gateway start hermes --api-server
+```
+
+Returning user / one-liner:
 
 ```bash
 export OPENAI_API_KEY=sk-...
 bin/intentframe-integrations run hermes
 ```
 
-Starts IntentFrame runtime + bridge + Hermes adapter, installs the plugin, syncs the adapter
-venv, applies env, and launches `hermes gateway`.
+`install hermes` installs Hermes Agent into a managed venv at
+`~/.intentframe/integrations/hermes/hermes-agent-venv/`. Hermes data lives under
+`HERMES_HOME` (default `~/.hermes`).
 
-## Hermes flow
+Hermes binary resolution order:
 
-1. `start hermes` — backend bridge + adapter sidecar (`~/.intentframe/integrations/hermes/`)
-2. `integrate hermes` — plugin symlink + adapter venv sync
-3. Export `IF_AGENT_ADAPTER_SOCKET` (printed by `integrate`)
-4. Restart Hermes gateway
+1. `HERMES_BIN` if set
+2. Managed install from `install hermes`
+3. `hermes` on `PATH` (standalone user install)
+
+## Hermes stack
+
+1. `install hermes` — Hermes Agent CLI (managed venv, pinned version)
+2. `start hermes` — backend bridge + adapter sidecar (`~/.intentframe/integrations/hermes/`)
+3. `integrate hermes` — plugin symlink + adapter venv sync + config merge
+4. `gateway start hermes` — launch Hermes gateway (optionally with API server)
+5. `stop` — stop gateway started by orchestrator, adapters, and backend runtime
 
 See `integrations/hermes/README.md` for architecture details.

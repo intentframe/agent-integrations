@@ -141,6 +141,7 @@ step "Integrations CLI unit tests"
 (cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_integration_pack.py)
 (cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_cli_start.py)
 (cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_adapter_lifecycle.py)
+(cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_hermes_install.py)
 
 step "Hermes live integration (adapter + plugin gate)"
 bash "${SCRIPT_DIR}/test-hermes-integration.sh"

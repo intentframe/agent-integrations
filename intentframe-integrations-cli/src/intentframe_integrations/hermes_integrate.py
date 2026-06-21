@@ -17,23 +17,17 @@ from intentframe_integrations.adapter_lifecycle import (
     is_adapter_running,
     sync_adapter_venv,
 )
+from intentframe_integrations.hermes_install import install_status_lines, resolve_hermes_bin
+from intentframe_integrations.hermes_paths import (
+    hermes_config_path,
+    hermes_home,
+    hermes_plugins_dir,
+)
 from intentframe_integrations.integration_pack import IntegrationPack, load_integration_pack
 from intentframe_integrations.paths import agent_config_path, repo_root
 
 PLUGIN_KEY = "intentframe-terminal"
 PLUGIN_DIR_NAME = "intentframe-terminal"
-
-
-def hermes_home() -> Path:
-    return Path(os.environ.get("HERMES_HOME", Path.home() / ".hermes")).expanduser()
-
-
-def hermes_plugins_dir() -> Path:
-    return hermes_home() / "plugins"
-
-
-def hermes_config_path() -> Path:
-    return hermes_home() / "config.yaml"
 
 
 def plugin_source_dir() -> Path:
@@ -209,28 +203,38 @@ class DoctorReport:
     lines: tuple[str, ...]
 
 
-def doctor_hermes(pack: IntegrationPack) -> DoctorReport:
+def doctor_hermes(
+    pack: IntegrationPack,
+    *,
+    require_hermes: bool = True,
+    require_integration: bool = True,
+) -> DoctorReport:
     lines: list[str] = []
     ok = True
 
+    lines.extend(install_status_lines())
     lines.append(f"Agent config: {pack.agent.source_path}")
     lines.append(f"  agent_id: {pack.agent.agent_id}")
     lines.append(f"  user_id:  {pack.agent.user_id}")
 
     if os.environ.get("OPENAI_API_KEY"):
         lines.append("  OPENAI_API_KEY: set")
-    else:
+    elif require_integration:
         lines.append("  OPENAI_API_KEY: MISSING (required for IntentFrame runtime)")
         ok = False
+    else:
+        lines.append("  OPENAI_API_KEY: not set")
 
     from if_security_backend.runtime.paths import bridge_socket_path
 
     bridge_socket = bridge_socket_path()
     if bridge_socket.exists():
         lines.append(f"  backend bridge: present ({bridge_socket})")
-    else:
+    elif require_integration:
         lines.append(f"  backend bridge: not found — run: intentframe-integrations start hermes")
         ok = False
+    else:
+        lines.append(f"  backend bridge: not running ({bridge_socket})")
 
     src = plugin_source_dir()
     if src.is_dir():
@@ -242,21 +246,27 @@ def doctor_hermes(pack: IntegrationPack) -> DoctorReport:
     dest = plugin_install_path()
     if is_plugin_installed(source=src):
         lines.append(f"  plugin install: ok ({dest})")
-    else:
+    elif require_integration:
         lines.append(f"  plugin install: missing — run: intentframe-integrations integrate hermes")
         ok = False
+    else:
+        lines.append(f"  plugin install: not installed ({dest})")
 
     hcfg = hermes_config_path()
     if is_plugin_enabled(hcfg):
         lines.append(f"  hermes config: {PLUGIN_KEY} enabled in {hcfg}")
-    elif hcfg.is_file():
-        lines.append(f"  hermes config: {PLUGIN_KEY} not in plugins.enabled ({hcfg})")
+    elif require_integration:
+        if hcfg.is_file():
+            lines.append(f"  hermes config: {PLUGIN_KEY} not in plugins.enabled ({hcfg})")
+        else:
+            lines.append(f"  hermes config: not found ({hcfg})")
         ok = False
+    elif hcfg.is_file():
+        lines.append(f"  hermes config: present ({hcfg}), plugin not enabled")
     else:
         lines.append(f"  hermes config: not found ({hcfg})")
-        ok = False
 
-    if pack.adapter is not None:
+    if pack.adapter is not None and require_integration:
         lines.append(f"  {adapter_status_line(pack)}")
         if not is_adapter_running(pack.agent.agent_id):
             ok = False
@@ -270,25 +280,25 @@ def doctor_hermes(pack: IntegrationPack) -> DoctorReport:
         if log.is_file():
             lines.append(f"  adapter log: {log}")
 
-    adapter_socket = pack.agent.env.get("IF_AGENT_ADAPTER_SOCKET")
-    if adapter_socket:
-        expanded = Path(os.path.expanduser(adapter_socket))
-        if os.environ.get("IF_AGENT_ADAPTER_SOCKET"):
-            lines.append("  env IF_AGENT_ADAPTER_SOCKET: set")
+    if require_integration:
+        adapter_socket = pack.agent.env.get("IF_AGENT_ADAPTER_SOCKET")
+        if adapter_socket:
+            expanded = Path(os.path.expanduser(adapter_socket))
+            if os.environ.get("IF_AGENT_ADAPTER_SOCKET"):
+                lines.append("  env IF_AGENT_ADAPTER_SOCKET: set")
+            else:
+                lines.append("  env IF_AGENT_ADAPTER_SOCKET: not set (required by Hermes plugin)")
+                ok = False
+            if not expanded.exists() and not is_adapter_running(pack.agent.agent_id):
+                lines.append(f"  adapter socket: not found ({expanded})")
         else:
-            lines.append("  env IF_AGENT_ADAPTER_SOCKET: not exported (required by Hermes plugin)")
+            lines.append("  env IF_AGENT_ADAPTER_SOCKET: missing from agent.json")
             ok = False
-        if not expanded.exists() and not is_adapter_running(pack.agent.agent_id):
-            lines.append(f"  adapter socket: not found ({expanded})")
-    else:
-        lines.append("  env IF_AGENT_ADAPTER_SOCKET: missing from agent.json")
-        ok = False
+    elif pack.adapter is not None:
+        lines.append(f"  {adapter_status_line(pack)}")
 
-    hermes_bin = __import__("shutil").which("hermes")
-    if hermes_bin:
-        lines.append(f"  hermes CLI: {hermes_bin}")
-    else:
-        lines.append("  hermes CLI: not on PATH")
+    if require_hermes and resolve_hermes_bin() is None:
+        ok = False
 
     return DoctorReport(ok=ok, lines=tuple(lines))
 
