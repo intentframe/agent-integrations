@@ -1,0 +1,81 @@
+name: PR
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: pr-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-tests:
+    name: Unit tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install Python workspace
+        run: uv sync --all-packages
+
+      - name: Hermes adapter unit tests
+        run: uv run --directory integrations/hermes/adapter python tests/test_adapter.py
+
+      - name: Hermes plugin unit tests
+        run: |
+          uv run --with httpx --package intentframe-integrations-cli python tests/hermes_plugin/test_gate.py
+          uv run --package intentframe-integrations-cli python tests/hermes_plugin/test_integrate.py
+
+      - name: Integrations CLI unit tests
+        run: |
+          uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_runtime_lifecycle.py
+          uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_integration_pack.py
+          uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_cli_start.py
+          uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_adapter_lifecycle.py
+          uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_hermes_install.py
+
+      - name: Hermes gateway unit tests
+        run: |
+          uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_isolation.py
+          uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_cli_runner.py
+          uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_hermes_reference_contract.py
+
+  typescript:
+    name: TypeScript build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install and build
+        run: |
+          npm ci
+          npm run build
+          test -f if-integration-clients/typescript/dist/index.js
