@@ -31,8 +31,22 @@ class ToolSpec:
 
 
 def _repo_governance_path() -> Path | None:
-    here = Path(__file__).resolve()
-    candidate = here.parents[3] / "governance" / "tools.yaml"
+    here = Path(__file__).resolve().parent
+    candidate = here.parents[2] / "governance" / "tools.yaml"
+    if candidate.is_file():
+        return candidate
+    return None
+
+
+def _runtime_governance_path() -> Path | None:
+    candidate = (
+        Path.home()
+        / ".intentframe"
+        / "integrations"
+        / "hermes"
+        / "governance"
+        / "tools.yaml"
+    )
     if candidate.is_file():
         return candidate
     return None
@@ -54,6 +68,10 @@ def _resolve_yaml_path(explicit: Path | None = None) -> Path:
     repo_path = _repo_governance_path()
     if repo_path is not None:
         return repo_path
+
+    runtime_path = _runtime_governance_path()
+    if runtime_path is not None:
+        return runtime_path
 
     bundled = resources.files("hermes_governance").joinpath("tools.yaml")
     with resources.as_file(bundled) as path:

@@ -2,8 +2,24 @@
 
 from __future__ import annotations
 
-# All tools listed in integrations/hermes/governance/tools.yaml
-GOVERNED_TOOL_NAMES = frozenset({"terminal", "process", "write_file", "delete_file", "patch"})
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+CANONICAL_GOVERNANCE_YAML = (
+    REPO_ROOT / "integrations" / "hermes" / "governance" / "tools.yaml"
+)
+SHARED_SRC = REPO_ROOT / "integrations" / "hermes" / "shared" / "src"
+
+if str(SHARED_SRC) not in sys.path:
+    sys.path.insert(0, str(SHARED_SRC))
+
+from hermes_governance.loader import load_governed_tools  # type: ignore[import-not-found] # noqa: E402
+
+# Loaded from integrations/hermes/governance/tools.yaml (single source of truth).
+GOVERNED_TOOL_NAMES = frozenset(
+    load_governed_tools(str(CANONICAL_GOVERNANCE_YAML)).keys()
+)
 
 
 def process_allow_args(*, reason: str = "Live process allow test") -> dict[str, str]:

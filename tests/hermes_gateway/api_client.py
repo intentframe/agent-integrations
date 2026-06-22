@@ -140,6 +140,24 @@ def get_capabilities(*, host: str, port: int, api_key: str) -> dict[str, Any]:
         return body
 
 
+def get_toolsets(*, host: str, port: int, api_key: str) -> dict[str, Any]:
+    url = f"http://{host}:{port}/v1/toolsets"
+    headers = {"Authorization": f"Bearer {api_key}"}
+    with httpx.Client(timeout=30.0) as client:
+        resp = client.get(url, headers=headers)
+        resp.raise_for_status()
+        body = resp.json()
+        if not isinstance(body, dict):
+            raise AssertionError(f"Expected toolsets object, got: {body!r}")
+        return body
+
+
+def assert_intentframe_gate_toolsets(body: dict[str, Any]) -> None:
+    from toolsets_contract import assert_intentframe_gate_toolsets_surface
+
+    assert_intentframe_gate_toolsets_surface(body)
+
+
 def post_responses(
     *,
     host: str,

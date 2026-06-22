@@ -273,7 +273,9 @@ your_tool:
   blocked_response: generic_json
 ```
 
-Sync bundled copy under `plugin/intentframe-gate/` if your install path copies it.
+Sync is automatic: `integrate hermes` copies canonical yaml to
+`~/.intentframe/integrations/hermes/governance/tools.yaml` and exports
+`HERMES_GOVERNANCE_YAML` for the gateway.
 
 Optional override path: `HERMES_GOVERNANCE_YAML`.
 

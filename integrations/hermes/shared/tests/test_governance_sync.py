@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Ensure canonical and plugin-bundled governance YAML stay in sync."""
+"""Governance contract: single canonical YAML in the repo."""
 
 from __future__ import annotations
 
@@ -22,11 +22,20 @@ PLUGIN_COPY = (
 )
 
 
-class TestGovernanceSync(unittest.TestCase):
-    def test_plugin_copy_matches_canonical(self) -> None:
-        canonical = yaml.safe_load(CANONICAL.read_text(encoding="utf-8"))
-        plugin_copy = yaml.safe_load(PLUGIN_COPY.read_text(encoding="utf-8"))
-        self.assertEqual(canonical, plugin_copy)
+class TestGovernanceContract(unittest.TestCase):
+    def test_canonical_yaml_exists_and_has_tools(self) -> None:
+        self.assertTrue(CANONICAL.is_file(), f"missing canonical contract: {CANONICAL}")
+        raw = yaml.safe_load(CANONICAL.read_text(encoding="utf-8"))
+        tools = raw.get("tools")
+        self.assertIsInstance(tools, dict)
+        self.assertGreater(len(tools), 0)
+
+    def test_no_duplicate_plugin_bundled_yaml(self) -> None:
+        self.assertFalse(
+            PLUGIN_COPY.is_file(),
+            "plugin/intentframe-gate/governance/tools.yaml must not exist; "
+            "use integrations/hermes/governance/tools.yaml only",
+        )
 
 
 def main() -> int:

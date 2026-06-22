@@ -13,8 +13,16 @@ HERE = Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 
+_TESTS_DIR = HERE.parent
+if str(_TESTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_TESTS_DIR))
+
+from hermes_tool_probes import GOVERNED_TOOL_NAMES  # noqa: E402
+
 from api_client import (  # noqa: E402
+    assert_intentframe_gate_toolsets,
     get_capabilities,
+    get_toolsets,
     run_allow_with_retries,
     run_block_once,
     run_delete_file_block_once,
@@ -45,6 +53,7 @@ from isolation import (  # noqa: E402
     seed_hermes_openai_for_e2e,
 )
 from isolation import _e2e_openai_model  # noqa: E402
+from toolsets_contract import format_toolsets_snapshot, parse_toolsets_response  # noqa: E402
 
 PLUGIN_KEY = "intentframe-gate"
 API_HOST = "127.0.0.1"
@@ -156,71 +165,82 @@ def _run_api_allow_block(env: IsolatedEnv, *, label: str) -> None:
     if not caps:
         raise AssertionError("Empty /v1/capabilities response")
 
-    marker = f"intentframe-hermes-e2e-ok-{env.run_id}"
-    step(f"{label}: POST /v1/responses ALLOW (LLM → terminal → adapter → bridge)")
-    run_allow_with_retries(host=API_HOST, port=env.api_port, api_key=env.api_key, marker=marker)
+    step(f"{label}: GET /v1/toolsets (api_server surface after intentframe-gate)")
+    toolsets_body = get_toolsets(host=API_HOST, port=env.api_port, api_key=env.api_key)
+    assert_intentframe_gate_toolsets(toolsets_body)
+    toolsets_snapshot = parse_toolsets_response(toolsets_body)
+    print(f"\n==> {label} toolsets snapshot\n{format_toolsets_snapshot(toolsets_snapshot)}", file=sys.stderr)
 
-    step(f"{label}: POST /v1/responses BLOCK (policy should deny sudo)")
-    run_block_once(host=API_HOST, port=env.api_port, api_key=env.api_key)
+    if "terminal" in GOVERNED_TOOL_NAMES:
+        marker = f"intentframe-hermes-e2e-ok-{env.run_id}"
+        step(f"{label}: POST /v1/responses ALLOW (LLM → terminal → adapter → bridge)")
+        run_allow_with_retries(host=API_HOST, port=env.api_port, api_key=env.api_key, marker=marker)
 
-    step(f"{label}: POST /v1/responses process ALLOW")
-    run_process_allow_with_retries(host=API_HOST, port=env.api_port, api_key=env.api_key)
+        step(f"{label}: POST /v1/responses BLOCK (policy should deny sudo)")
+        run_block_once(host=API_HOST, port=env.api_port, api_key=env.api_key)
 
-    step(f"{label}: POST /v1/responses process BLOCK (sudo in mapped RUN_COMMAND)")
-    run_process_block_once(host=API_HOST, port=env.api_port, api_key=env.api_key)
+    if "process" in GOVERNED_TOOL_NAMES:
+        step(f"{label}: POST /v1/responses process ALLOW")
+        run_process_allow_with_retries(host=API_HOST, port=env.api_port, api_key=env.api_key)
 
-    write_marker = f"intentframe-hermes-write-ok-{env.run_id}"
-    step(f"{label}: POST /v1/responses write_file ALLOW")
-    run_write_file_allow_with_retries(
-        host=API_HOST,
-        port=env.api_port,
-        api_key=env.api_key,
-        marker=write_marker,
-    )
+        step(f"{label}: POST /v1/responses process BLOCK (sudo in mapped RUN_COMMAND)")
+        run_process_block_once(host=API_HOST, port=env.api_port, api_key=env.api_key)
 
-    step(f"{label}: POST /v1/responses write_file BLOCK (disallowed /etc path)")
-    run_write_file_block_once(host=API_HOST, port=env.api_port, api_key=env.api_key)
+    if "write_file" in GOVERNED_TOOL_NAMES:
+        write_marker = f"intentframe-hermes-write-ok-{env.run_id}"
+        step(f"{label}: POST /v1/responses write_file ALLOW")
+        run_write_file_allow_with_retries(
+            host=API_HOST,
+            port=env.api_port,
+            api_key=env.api_key,
+            marker=write_marker,
+        )
 
-    delete_marker = f"intentframe-hermes-delete-ok-{env.run_id}"
-    step(f"{label}: POST /v1/responses delete_file semantic ~/ (ALLOW or BLOCK)")
-    run_delete_file_semantic_with_retries(
-        host=API_HOST,
-        port=env.api_port,
-        api_key=env.api_key,
-        marker=delete_marker,
-    )
+        step(f"{label}: POST /v1/responses write_file BLOCK (disallowed /etc path)")
+        run_write_file_block_once(host=API_HOST, port=env.api_port, api_key=env.api_key)
 
-    step(f"{label}: POST /v1/responses delete_file BLOCK (disallowed /etc path)")
-    run_delete_file_block_once(host=API_HOST, port=env.api_port, api_key=env.api_key)
+    if "delete_file" in GOVERNED_TOOL_NAMES:
+        delete_marker = f"intentframe-hermes-delete-ok-{env.run_id}"
+        step(f"{label}: POST /v1/responses delete_file semantic ~/ (ALLOW or BLOCK)")
+        run_delete_file_semantic_with_retries(
+            host=API_HOST,
+            port=env.api_port,
+            api_key=env.api_key,
+            marker=delete_marker,
+        )
 
-    patch_marker = f"intentframe-hermes-patch-ok-{env.run_id}"
-    step(f"{label}: POST /v1/responses patch replace ALLOW")
-    run_patch_replace_allow_with_retries(
-        host=API_HOST,
-        port=env.api_port,
-        api_key=env.api_key,
-        marker=patch_marker,
-    )
+        step(f"{label}: POST /v1/responses delete_file BLOCK (disallowed /etc path)")
+        run_delete_file_block_once(host=API_HOST, port=env.api_port, api_key=env.api_key)
 
-    step(f"{label}: POST /v1/responses patch replace BLOCK (disallowed /etc path)")
-    run_patch_replace_block_once(host=API_HOST, port=env.api_port, api_key=env.api_key)
+    if "patch" in GOVERNED_TOOL_NAMES:
+        patch_marker = f"intentframe-hermes-patch-ok-{env.run_id}"
+        step(f"{label}: POST /v1/responses patch replace ALLOW")
+        run_patch_replace_allow_with_retries(
+            host=API_HOST,
+            port=env.api_port,
+            api_key=env.api_key,
+            marker=patch_marker,
+        )
 
-    v4a_marker = f"intentframe-hermes-v4a-{env.run_id}"
-    step(f"{label}: POST /v1/responses patch V4A mixed semantic (home delete ALLOW or BLOCK)")
-    run_patch_v4a_mixed_home_delete_semantic_with_retries(
-        host=API_HOST,
-        port=env.api_port,
-        api_key=env.api_key,
-        marker=v4a_marker,
-    )
+        step(f"{label}: POST /v1/responses patch replace BLOCK (disallowed /etc path)")
+        run_patch_replace_block_once(host=API_HOST, port=env.api_port, api_key=env.api_key)
 
-    step(f"{label}: POST /v1/responses patch V4A mixed BLOCK (/etc delete in multi-intent)")
-    run_patch_v4a_mixed_block_once(
-        host=API_HOST,
-        port=env.api_port,
-        api_key=env.api_key,
-        marker=v4a_marker,
-    )
+        v4a_marker = f"intentframe-hermes-v4a-{env.run_id}"
+        step(f"{label}: POST /v1/responses patch V4A mixed semantic (home delete ALLOW or BLOCK)")
+        run_patch_v4a_mixed_home_delete_semantic_with_retries(
+            host=API_HOST,
+            port=env.api_port,
+            api_key=env.api_key,
+            marker=v4a_marker,
+        )
+
+        step(f"{label}: POST /v1/responses patch V4A mixed BLOCK (/etc delete in multi-intent)")
+        run_patch_v4a_mixed_block_once(
+            host=API_HOST,
+            port=env.api_port,
+            api_key=env.api_key,
+            marker=v4a_marker,
+        )
 
 
 def _install_hermes(env: IsolatedEnv, *, label: str) -> None:

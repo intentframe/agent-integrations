@@ -147,4 +147,17 @@ uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_c
 uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_hermes_reference_contract.py
 uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_api_client.py
 uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_governed_tool_coverage.py
+uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_toolsets_contract.py
 ```
+
+## Toolsets surface test (opt-in, no LLM)
+
+Deterministic check of `GET /v1/toolsets` after `integrate hermes`, plus a Hermes-venv
+schema probe that governed tools still use Hermes names with required `reason` and gate
+markers. Does **not** call `/v1/responses`.
+
+```bash
+RUN_HERMES_GATEWAY_TOOLSETS=1 ./tests/scripts/test-hermes-gateway-toolsets.sh
+```
+
+The full gateway E2E also asserts `/v1/toolsets` before the LLM probes.

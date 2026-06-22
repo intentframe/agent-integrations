@@ -101,7 +101,7 @@ Export env from `agent.json`:
 
 ## Adding a governed tool
 
-1. Add an entry to `governance/tools.yaml` (and sync the bundled plugin copy).
+1. Add an entry to `governance/tools.yaml`.
 2. Add a mapper in `adapter/src/hermes_adapter/mapper.py` (or reuse a mapper kind).
 3. Add the IntentFrame action to `agent.json` `action_types` if new.
 4. Add policy constraints in `policy.yaml`.

@@ -13,6 +13,7 @@
     "socket": "~/.intentframe/integrations/hermes/adapter.sock"
   },
   "env": {
-    "IF_AGENT_ADAPTER_SOCKET": "~/.intentframe/integrations/hermes/adapter.sock"
+    "IF_AGENT_ADAPTER_SOCKET": "~/.intentframe/integrations/hermes/adapter.sock",
+    "HERMES_GOVERNANCE_YAML": "~/.intentframe/integrations/hermes/governance/tools.yaml"
   }
 }

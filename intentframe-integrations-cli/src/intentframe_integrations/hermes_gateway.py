@@ -11,6 +11,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from intentframe_integrations.hermes_governance_contract import sync_governance_yaml
 from intentframe_integrations.hermes_install import bootstrap_hermes_home, resolve_hermes_bin
 from intentframe_integrations.hermes_paths import hermes_home
 from intentframe_integrations.integration_pack import IntegrationPack
@@ -265,6 +266,7 @@ def start_hermes_gateway(
 
     integration_state_dir("hermes").mkdir(parents=True, exist_ok=True)
     bootstrap_hermes_home()
+    sync_governance_yaml("hermes")
     env = build_gateway_env(
         pack,
         api_server=api_server,

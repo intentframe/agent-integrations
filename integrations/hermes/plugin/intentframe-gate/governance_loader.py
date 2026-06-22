@@ -29,6 +29,28 @@ class ToolSpec:
         return frozenset({self.action})
 
 
+def _runtime_governance_path() -> Path | None:
+    candidate = (
+        Path.home()
+        / ".intentframe"
+        / "integrations"
+        / "hermes"
+        / "governance"
+        / "tools.yaml"
+    )
+    if candidate.is_file():
+        return candidate
+    return None
+
+
+def _repo_governance_path() -> Path | None:
+    here = Path(__file__).resolve().parent
+    candidate = here.parents[1] / "governance" / "tools.yaml"
+    if candidate.is_file():
+        return candidate
+    return None
+
+
 def _resolve_yaml_path() -> Path:
     env_path = os.environ.get("HERMES_GOVERNANCE_YAML", "").strip()
     if env_path:
@@ -36,16 +58,18 @@ def _resolve_yaml_path() -> Path:
         if path.is_file():
             return path
 
-    here = Path(__file__).resolve().parent
-    bundled = here / "governance" / "tools.yaml"
-    if bundled.is_file():
-        return bundled
-
-    repo = here.parents[2] / "governance" / "tools.yaml"
-    if repo.is_file():
+    repo = _repo_governance_path()
+    if repo is not None:
         return repo
 
-    raise FileNotFoundError("Could not locate Hermes governance tools.yaml")
+    runtime = _runtime_governance_path()
+    if runtime is not None:
+        return runtime
+
+    raise FileNotFoundError(
+        "Could not locate Hermes governance tools.yaml "
+        "(set HERMES_GOVERNANCE_YAML or run intentframe-integrations integrate hermes)"
+    )
 
 
 def _parse_actions(raw: dict[str, Any], primary_action: str) -> tuple[str, ...]:

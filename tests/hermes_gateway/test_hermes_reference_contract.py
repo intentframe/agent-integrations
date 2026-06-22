@@ -46,7 +46,7 @@ class HermesReferenceContractTests(unittest.TestCase):
     def test_api_endpoints_in_reference_server(self) -> None:
         _require_reference()
         text = (HERMES_REF / "gateway" / "platforms" / "api_server.py").read_text(encoding="utf-8")
-        for route in ("/health", "/v1/capabilities", "/v1/responses"):
+        for route in ("/health", "/v1/capabilities", "/v1/responses", "/v1/toolsets"):
             self.assertIn(route, text)
 
     def test_openai_api_provider_in_reference_auth(self) -> None:
