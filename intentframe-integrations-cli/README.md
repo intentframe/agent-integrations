@@ -78,6 +78,22 @@ termination and verifies the PID is still a Hermes gateway before trusting stale
 The CLI does **not** configure Hermes LLM model or provider — only plugin install, config merge,
 adapter sync, and gateway lifecycle.
 
+## Environment variables (Hermes)
+
+| Variable | Set by | Effect |
+|----------|--------|--------|
+| `HERMES_GOVERNANCE_YAML` | `agent.json` default; override in shell or test harness | Which tools are **IntentFrame-governed** at runtime. If already set in the parent environment, `start hermes` (adapter) and `gateway start hermes` preserve it via `setdefault` — they do not replace it with the sandbox-seeded path from `integrate`. |
+| `IF_AGENT_ADAPTER_SOCKET` | `agent.json` | UDS path for plugin → adapter validate calls. |
+
+`integrate hermes` prints `export …` lines from `format_env_exports()`: values already
+present in the shell (including `HERMES_GOVERNANCE_YAML`) win over `agent.json` defaults.
+
+`gateway start hermes` logs the effective governance path to stderr:
+
+```text
+  Hermes governance config: /path/to/tools.yaml
+```
+
 See `integrations/hermes/README.md` for architecture and governed-tool terminology.
 Opt-in gateway E2E (sandbox, log paths, troubleshooting): `tests/hermes_gateway/README.md`.
 Concepts: [`docs/agent-tool-gating.md`](docs/agent-tool-gating.md#terminology-what-governed-means).

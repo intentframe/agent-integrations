@@ -24,6 +24,7 @@ from intentframe_integrations.hermes_governance_contract import (  # noqa: E402
 from hermes_governance.loader import load_governed_tools, load_tool_catalog  # noqa: E402
 from governance_e2e_setup import (  # noqa: E402
     assert_e2e_governance_snapshot,
+    assert_governance_env_contract,
     cleanup_e2e_governance_yaml,
     format_gateway_probe_plan,
     format_governance_snapshot,
@@ -136,6 +137,12 @@ class TestGovernanceE2eSetup(unittest.TestCase):
         text = format_gateway_probe_plan(frozenset({"terminal"}))
         self.assertIn("terminal: RUN", text)
         self.assertIn("process: SKIP", text)
+
+    def test_assert_governance_env_contract(self) -> None:
+        os.environ["HERMES_E2E_GOVERNED_TOOLS"] = "terminal"
+        setup_e2e_governance_yaml()
+        snapshot = assert_governance_env_contract(label="test")
+        self.assertEqual(snapshot.governed, frozenset({"terminal"}))
 
 
 def main() -> int:

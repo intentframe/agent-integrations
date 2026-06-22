@@ -293,9 +293,13 @@ your_tool:
 On first `integrate hermes`, runtime governance at
 `~/.intentframe/integrations/hermes/governance/tools.yaml` is seeded from the repo
 default template if missing. Later integrates do not overwrite user edits unless
-you pass `--reset-governance`. Integration exports `HERMES_GOVERNANCE_YAML` for the gateway.
+you pass `--reset-governance`. `integrate hermes` prints `export HERMES_GOVERNANCE_YAML=…`
+using the effective path (`os.environ` overrides the `agent.json` default).
 
-Optional override path: `HERMES_GOVERNANCE_YAML`.
+Optional override: set `HERMES_GOVERNANCE_YAML` in the shell before
+`start hermes` / `gateway start hermes`. The CLI preserves an existing value when
+building adapter and gateway child environments (`setdefault` on `pack.agent.env`).
+`gateway start` logs the effective path as `Hermes governance config: …`.
 
 ### 4. Mapper
 
@@ -429,8 +433,8 @@ Add tests that simulate re-registration clobber.
 
 ### Per-deployment overrides
 
-- `HERMES_GOVERNANCE_YAML` — alternate governance yaml (which tools are **IntentFrame-governed**)
-- `HERMES_E2E_GOVERNED_TOOLS` — gateway E2E only; comma-separated subset for LLM probes (not Hermes toolsets)
+- `HERMES_GOVERNANCE_YAML` — alternate governance yaml (which tools are **IntentFrame-governed**). Set in the parent shell before `start` / `gateway start`; CLI child env builders preserve it over `agent.json` defaults.
+- `HERMES_E2E_GOVERNED_TOOLS` — gateway E2E only; comma-separated subset for LLM probes (not Hermes toolsets). E2E also asserts env parity via `assert_governance_env_contract`.
 - Policy registry — production policies may diverge from seeded `policy.yaml`
 
 ### Platform executor packs are separate

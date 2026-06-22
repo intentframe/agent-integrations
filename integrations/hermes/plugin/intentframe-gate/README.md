@@ -42,6 +42,12 @@ For each **governed** tool:
 - `IF_AGENT_ADAPTER_SOCKET` — path to Hermes adapter UDS (required)
 - `HERMES_GOVERNANCE_YAML` — optional override for governance yaml (runtime governed set)
 
+The Hermes gateway process and adapter sidecar inherit these from the CLI parent
+environment. If `HERMES_GOVERNANCE_YAML` is already set when you run
+`intentframe-integrations start hermes` or `gateway start hermes`, that value is
+preserved (the CLI does not overwrite it with the sandbox default from
+`agent.json`). `integrate hermes` prints the effective export lines for manual shells.
+
 ## Enable the plugin
 
 ```yaml

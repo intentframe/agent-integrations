@@ -28,8 +28,16 @@ RUN_HERMES_GATEWAY_E2E=1 ./tests/scripts/test-hermes-gateway-e2e.sh
 This E2E harness does **not** toggle Hermes `/v1/toolsets`.
 
 By default the test writes a **throwaway all-governed** governance yaml and sets
-`HERMES_GOVERNANCE_YAML` before `integrate` / `gateway start` (same idea as catalog
-live tests). Real `~/.intentframe` runtime config is not used.
+`HERMES_GOVERNANCE_YAML` in the test runner environment before `integrate` /
+`gateway start` (same idea as catalog live tests). Real `~/.intentframe` runtime
+config is not used.
+
+Before starting the adapter or gateway, the harness calls
+`assert_governance_env_contract()` (`governance_e2e_setup.py`): the path in
+`os.environ["HERMES_GOVERNANCE_YAML"]` must match the governance snapshot and must
+be the same value that `build_gateway_env()` and `_adapter_env()` would pass to
+child processes. This catches wiring drift between the E2E runner, CLI, adapter,
+and gateway.
 
 This controls **IntentFrame plugin governance** (which Hermes tools pass through
 the validate-only gate). It does **not** enable/disable Hermes native tools on
@@ -166,6 +174,7 @@ Hermes gateway before trusting stale PID files.
 | BLOCK test passes but no IF log lines | Same — request never reached plugin | `gateway.log` first |
 | Pass 2a idempotency failure | CLI stdout not captured | Fixed in `cli_runner.run_cli()` |
 | Stale gateway after stop | PID reuse / wrong process | `_pid_is_hermes_gateway()` in `hermes_gateway.py` |
+| Wrong governed set at runtime | Parent env not propagated to adapter/gateway | E2E `assert_governance_env_contract` failure; check `gateway start` stderr for `Hermes governance config:` line |
 
 ## Related docs
 
@@ -181,7 +190,12 @@ uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_h
 uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_api_client.py
 uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_governed_tool_coverage.py
 uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_toolsets_contract.py
+uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_scoped_governance_yaml.py
 ```
+
+`test_scoped_governance_yaml.py` includes `assert_governance_env_contract` (env
+parity with CLI child env builders). `test_hermes_install.py` covers
+`build_gateway_env`, `_adapter_env`, and `format_env_exports` override behavior.
 
 ## Toolsets surface test (opt-in, no LLM)
 

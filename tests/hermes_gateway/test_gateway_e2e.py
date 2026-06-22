@@ -19,6 +19,7 @@ if str(_TESTS_DIR) not in sys.path:
 
 from hermes_governance_fixtures import template_governed_tool_names  # noqa: E402
 from governance_e2e_setup import (  # noqa: E402
+    assert_governance_env_contract,
     cleanup_e2e_governance_yaml,
     format_gateway_probe_plan,
     load_e2e_governance_snapshot,
@@ -137,6 +138,7 @@ def _assert_doctor_fails_plugin_missing(env: IsolatedEnv) -> None:
 
 
 def _gateway_start(env: IsolatedEnv, *, label: str) -> None:
+    assert_governance_env_contract(label=f"{label} gateway")
     step(f"{label}: gateway start hermes --api-server (port {env.api_port})")
     run_cli(
         [
@@ -299,6 +301,7 @@ def _integrate_hermes(env: IsolatedEnv, *, label: str) -> None:
 
 
 def _start_runtime(env: IsolatedEnv, *, label: str) -> None:
+    assert_governance_env_contract(label=f"{label} adapter")
     step(f"{label}: start hermes (IntentFrame backend + adapter)")
     run_cli(["start", "hermes", "--skip-if-exists"], env=env, timeout=GATEWAY_START_TIMEOUT)
     record_runtime_pids(env)

@@ -145,6 +145,44 @@ def format_gateway_probe_plan(governed: frozenset[str]) -> str:
     return "\n".join(lines)
 
 
+def assert_governance_env_contract(*, label: str = "runtime") -> GovernanceSnapshot:
+    """Assert os.environ and CLI-built child env agree on HERMES_GOVERNANCE_YAML."""
+    snapshot = load_e2e_governance_snapshot()
+    actual = os.environ.get("HERMES_GOVERNANCE_YAML", "").strip()
+    if not actual:
+        raise AssertionError(f"{label}: HERMES_GOVERNANCE_YAML must be set before start")
+
+    if Path(actual).expanduser().resolve() != snapshot.yaml_path.resolve():
+        raise AssertionError(
+            f"{label}: HERMES_GOVERNANCE_YAML path mismatch.\n"
+            f"  env:      {actual}\n"
+            f"  snapshot: {snapshot.yaml_path}"
+        )
+
+    from intentframe_integrations.adapter_lifecycle import _adapter_env
+    from intentframe_integrations.hermes_gateway import build_gateway_env
+    from intentframe_integrations.hermes_integrate import load_hermes_pack
+
+    pack = load_hermes_pack()
+    gateway_gov = build_gateway_env(pack).get("HERMES_GOVERNANCE_YAML", "")
+    if gateway_gov != actual:
+        raise AssertionError(
+            f"{label}: build_gateway_env HERMES_GOVERNANCE_YAML differs from os.environ.\n"
+            f"  os.environ:         {actual}\n"
+            f"  build_gateway_env:  {gateway_gov}"
+        )
+
+    adapter_gov = _adapter_env(pack).get("HERMES_GOVERNANCE_YAML", "")
+    if adapter_gov != actual:
+        raise AssertionError(
+            f"{label}: _adapter_env HERMES_GOVERNANCE_YAML differs from os.environ.\n"
+            f"  os.environ:    {actual}\n"
+            f"  _adapter_env:  {adapter_gov}"
+        )
+
+    return snapshot
+
+
 def log_e2e_governance(*, log: Callable[[str], None]) -> GovernanceSnapshot:
     snapshot = load_e2e_governance_snapshot()
     assert_e2e_governance_snapshot(snapshot)

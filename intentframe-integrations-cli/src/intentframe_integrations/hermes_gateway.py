@@ -274,6 +274,14 @@ def start_hermes_gateway(
         api_port=api_port,
         api_host=api_host,
     )
+    gov_yaml = env.get("HERMES_GOVERNANCE_YAML", "").strip()
+    if gov_yaml:
+        print(f"  Hermes governance config: {gov_yaml}", file=sys.stderr)
+    else:
+        print(
+            "  Hermes governance config: using sandbox default (HERMES_GOVERNANCE_YAML unset)",
+            file=sys.stderr,
+        )
     log_path = gateway_log_file()
     gateway_argv = normalize_hermes_gateway_argv(gateway_args)
     cmd = [str(binary), "gateway", *gateway_argv]

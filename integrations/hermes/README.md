@@ -80,6 +80,22 @@ bin/intentframe-integrations stop
 `~/.intentframe/integrations/hermes/.venv`, and seeds runtime governance config at
 `~/.intentframe/integrations/hermes/governance/tools.yaml` if missing.
 
+### Governance env contract
+
+`agent.json` declares a default `HERMES_GOVERNANCE_YAML` (runtime sandbox path above).
+The CLI propagates governance config to child processes as follows:
+
+| Step | Behavior |
+|------|----------|
+| `integrate hermes` | Prints `export HERMES_GOVERNANCE_YAML=…` using the **effective** value (`os.environ` overrides `agent.json`). |
+| `start hermes` (adapter) | `_adapter_env()` copies the parent environment and `setdefault`s `pack.agent.env` keys — an existing `HERMES_GOVERNANCE_YAML` in the shell is preserved. |
+| `gateway start hermes` | `build_gateway_env()` uses the same `setdefault` pattern; logs `Hermes governance config: …` on startup. |
+
+To use a custom governed-tool set without editing runtime yaml, export
+`HERMES_GOVERNANCE_YAML` **before** `start hermes` / `gateway start hermes`. Gateway E2E
+and catalog live tests rely on this (temp throwaway yaml). See
+[`tests/hermes_gateway/README.md`](../../tests/hermes_gateway/README.md).
+
 ## Architecture
 
 ```
@@ -110,9 +126,10 @@ plugins:
     - intentframe-gate
 ```
 
-Export env from `agent.json`:
+Export env from `agent.json` (or set in the shell before `start` / `gateway start`):
 
 - `IF_AGENT_ADAPTER_SOCKET=~/.intentframe/integrations/hermes/adapter.sock`
+- `HERMES_GOVERNANCE_YAML=~/.intentframe/integrations/hermes/governance/tools.yaml` (optional override path for governed-tool set)
 
 ## Adding a governed tool
 

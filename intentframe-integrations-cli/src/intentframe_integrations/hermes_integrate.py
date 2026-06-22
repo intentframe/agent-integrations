@@ -252,8 +252,9 @@ def install_plugin(*, copy: bool = False, source: Path | None = None) -> Path:
 
 def format_env_exports(pack: IntegrationPack) -> str:
     lines = []
-    for key, value in pack.agent.env.items():
-        expanded = os.path.expanduser(value)
+    for key, default in pack.agent.env.items():
+        raw = os.environ.get(key, default)
+        expanded = os.path.expanduser(raw)
         if " " in expanded or "$" in expanded:
             lines.append(f'export {key}="{expanded}"')
         else:

@@ -335,6 +335,10 @@ loaded at process start).
 from the default template via `HERMES_GOVERNANCE_YAML`; they never mutate runtime
 user config. Gateway E2E accepts `HERMES_E2E_GOVERNED_TOOLS=terminal,process` to
 scope which governed tools get LLM probes (plugin gate only — not Hermes toolsets).
+Before adapter and gateway start, E2E asserts that `os.environ["HERMES_GOVERNANCE_YAML"]`
+matches the governance snapshot and agrees with `build_gateway_env()` /
+`_adapter_env()` (see `assert_governance_env_contract` in
+[`tests/hermes_gateway/governance_e2e_setup.py`](../tests/hermes_gateway/governance_e2e_setup.py)).
 See [`tests/hermes_gateway/README.md`](../tests/hermes_gateway/README.md).
 
 ### Lifecycle: a one-shot wrap is not enough

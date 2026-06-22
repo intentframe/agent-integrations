@@ -165,7 +165,9 @@ def _adapter_env(pack: IntegrationPack) -> dict[str, str]:
     env["IF_AGENT_BRIDGE_SECRET"] = agent.bridge_secret
 
     bridge_socket = agent.env.get("IF_SECURITY_BRIDGE_SOCKET", "~/.intentframe/backend/bridge.sock")
-    env["IF_SECURITY_BRIDGE_SOCKET"] = os.path.expanduser(bridge_socket)
+    env.setdefault("IF_SECURITY_BRIDGE_SOCKET", os.path.expanduser(bridge_socket))
+    for key, value in pack.agent.env.items():
+        env.setdefault(key, os.path.expanduser(value))
     return env
 
 
