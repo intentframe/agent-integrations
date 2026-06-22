@@ -259,6 +259,49 @@ Example observed sequence for mixed write+delete under `~/` (when delete is bloc
 
 When the delete intent is **ALLOW**d, the whole batch may succeed. When any intent **BLOCK**s, the overall tool validation fails (fail-closed on the batch).
 
+### Hermes V4A patch mapper (scoped content + batch manifest)
+
+The Hermes adapter maps one `patch` tool call to one IntentFrame validate request **per
+V4A operation**. To avoid false AE “hidden behavior” blocks on write intents, each
+sub-intent must be truthful:
+
+| Field | Write sub-intent (update/add) | Delete sub-intent |
+|-------|------------------------------|-------------------|
+| `data.path` / `target` | That op's file only | That op's file only |
+| `data.content` | **Scoped** V4A fragment for that file only (no sibling `*** Delete File:` lines) | *(omitted)* |
+| `data.irreversible` | — | `true` |
+| `data.patch_op_index` | 1-based index in batch | same |
+| `data.patch_op_count` | total ops in batch | same |
+| `data.patch_operations` | manifest `[{kind, path}, …]` for **all** ops in the patch | same |
+| `reason` | base reason + `[patch op i/N: <kind> <path>]` | same |
+
+Guardian reads the manifest in untrusted `data` and can block a home **write** when
+a sibling op deletes `/etc/…`, even though FILE SHIELD / AE only inspect scoped
+`content` (no hidden delete in payload).
+
+Example — first op of a mixed home write + system delete (from adapter → bridge):
+
+```json
+{
+  "action": "WRITE_HOST_FILE",
+  "target": "~/intentframe-e2e-patch-ok-live.txt",
+  "reason": "E2E V4A patch update home and delete system file [patch op 1/2: update ~/intentframe-e2e-patch-ok-live.txt]",
+  "data": {
+    "path": "~/intentframe-e2e-patch-ok-live.txt",
+    "content": "*** Begin Patch\n*** Update File: ~/intentframe-e2e-patch-ok-live.txt\n@@\n-old\n+new\n*** End Patch",
+    "patch_op_index": 1,
+    "patch_op_count": 2,
+    "patch_operations": [
+      {"kind": "update", "path": "~/intentframe-e2e-patch-ok-live.txt"},
+      {"kind": "delete", "path": "/etc/intentframe-e2e-patch-block-probe"}
+    ]
+  }
+}
+```
+
+Implementation: `integrations/hermes/adapter/src/hermes_adapter/mapper.py` (`map_patch`,
+`_scoped_v4a_fragment`, `_patch_operations_manifest`).
+
 ---
 
 ## Decision matrix (quick reference)
@@ -268,7 +311,8 @@ When the delete intent is **ALLOW**d, the whole batch may succeed. When any inte
 | Action not in `allowed_actions` | Deterministic | `permission` |
 | Path outside `allowed_host_paths` | Deterministic | `constraint` |
 | Path outside `domain_constraints.deletion.allowed_paths` | Deterministic | `domain` |
-| `block_irreversible: true` | Deterministic | `domain` |
+| `block_irreversible: true` | Deterministic | `domain` — blocks all deletes when `irreversible: true` (default on delete intents) |
+| `block_irreversible: false` (Hermes v1 policy) | — | Deletes reach AE + Guardian; path scope still enforced deterministically |
 | Path hits deny floor (e.g. `~/.ssh/…`) | Deterministic | `delete_host_file_floor` |
 | Ordinary `~/foo.txt`, policy allows path | AE + Guardian | **ALLOW or BLOCK** (semantic; integration tests accept either) |
 | Sensitive delete blocked by intent limit text | Guardian | `limit_violated` (LLM) |

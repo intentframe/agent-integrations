@@ -38,14 +38,14 @@ RUN_HERMES_GATEWAY_E2E=1 ./scripts/e2e.sh
 Each pass runs HTTP assertions against the gateway API for **every governed tool**
 (`terminal`, `process`, `write_file`, `delete_file`, `patch`):
 
-| Tool | ALLOW probe | BLOCK probe |
-|------|-------------|-------------|
-| `terminal` | `printf '<marker>'` | `sudo echo …` |
-| `process` | `action: list` | `action: run`, `data` contains `sudo` |
-| `write_file` | path under `~/…` | path under `/etc/…` |
-| `delete_file` | path under `~/…` | path under `/etc/…` |
-| `patch` (replace) | replace under `~/…` | replace under `/etc/…` |
-| `patch` (V4A mixed) | Update `~/…` + Delete `~/…` in one call | Update `~/…` + Delete `/etc/…` (multi-intent block) |
+| Tool | Deterministic ALLOW probe | Deterministic BLOCK probe | Semantic (ALLOW or BLOCK) |
+|------|---------------------------|---------------------------|---------------------------|
+| `terminal` | `printf '<marker>'` | `sudo echo …` | — |
+| `process` | `action: list` | `action: run`, `data` contains `sudo` | — |
+| `write_file` | path under `~/…` | path under `/etc/…` | — |
+| `delete_file` | — | path under `/etc/…` | path under `~/…` |
+| `patch` (replace) | replace under `~/…` | replace under `/etc/…` | — |
+| `patch` (V4A mixed) | — | Update `~/…` + Delete `/etc/…` (fail-closed batch) | Update `~/…` + Delete `~/…` (per-intent AE/Guardian; batch fails if any op BLOCKs) |
 
 Multi-intent `patch` calls map to multiple IntentFrame `/validate` requests inside the adapter;
 the plugin still sees one allow/block for the single Hermes tool call.

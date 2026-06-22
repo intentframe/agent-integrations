@@ -6,8 +6,8 @@
 
 This doc captures the design reasoning behind the Hermes integration and
 generalizes it to other agents (Python and TypeScript SDKs). It is the
-conceptual companion to the implementation roadmap in
-[`hermes/TODO.md`](hermes/TODO.md) and builds on IntentFrame's adoption guidance
+conceptual companion to the Hermes integration docs in
+[`integrations/hermes/README.md`](../integrations/hermes/README.md) and builds on IntentFrame's adoption guidance
 in
 [`do-i-have-to-rewrite-tools.md`](../external-reference-only-libs/intentframe/docs/executor/do-i-have-to-rewrite-tools.md).
 
@@ -204,40 +204,34 @@ The plugin facade `ctx.register_tool` is a thin wrapper over
 `from tools.registry import registry`, and the existing plugin already imports
 Hermes internals — so enumerating the registry is no new coupling.
 
-### Current state: a single-tool gate
+### Current state: contract-driven multi-tool gate (v1)
 
-The shipped plugin gates exactly one tool:
+The shipped plugin **`intentframe-gate`** wraps a curated allowlist from
+[`governance/tools.yaml`](../integrations/hermes/governance/tools.yaml). v1 governs five Hermes
+tools (reads stay ungoverned):
 
-The shipped plugin gates governed tools via `intentframe-gate`:
+| Hermes tool | IntentFrame action(s) |
+|-------------|----------------------|
+| `terminal`, `process` | `RUN_COMMAND` |
+| `write_file`, `patch` (update/add) | `WRITE_HOST_FILE` |
+| `delete_file`, `patch` (V4A delete) | `DELETE_HOST_FILE` |
 
-- [`plugin/intentframe-gate/schema.py`](hermes/plugin/intentframe-gate/schema.py)
-  injects a required `reason` into governed tool schemas (layer 1).
-- [`plugin/intentframe-gate/gate.py`](hermes/plugin/intentframe-gate/gate.py)
-  validates via the adapter, strips `reason`, delegates to the real handler (layer 2).
-- [`plugin/intentframe-gate/__init__.py`](hermes/plugin/intentframe-gate/__init__.py)
-  registers governed tools with `override=True` and hooks `registry.register`.
+Wiring (same two layers per tool):
 
-### Generalizing it
+- [`plugin/intentframe-gate/schema.py`](../integrations/hermes/plugin/intentframe-gate/schema.py)
+  — `inject_reason()` on each governed schema (layer 1).
+- [`plugin/intentframe-gate/gate.py`](../integrations/hermes/plugin/intentframe-gate/gate.py)
+  — validate via adapter, strip `reason`, delegate on ALLOW (layer 2).
+- [`plugin/intentframe-gate/__init__.py`](../integrations/hermes/plugin/intentframe-gate/__init__.py)
+  — snapshot registry, wrap only governed names with `override=True`, hook
+  `registry.register` so MCP refresh cannot reinstall unwrapped handlers.
 
-Replace the hardcoded single tool with a governed-tool loop. The generic wrapper
-is actually **simpler** than the terminal-specific one (which hand-maps named
-kwargs) — it strips `reason` and passes the rest through opaquely:
+The plugin loads the same contract as the adapter (`hermes-governance` / bundled
+YAML). Adding a tool is mostly **config + mapper + policy**, not new plugin code.
 
-```python
-from tools.registry import registry
-
-def register(ctx):
-    for entry in registry._snapshot_entries():
-        if entry.name not in GOVERNED_TOOLS:
-            continue
-        ctx.register_tool(
-            name=entry.name, toolset=entry.toolset,
-            schema=inject_reason(entry.schema),
-            handler=wrap(entry.handler, entry.name),
-            check_fn=entry.check_fn, is_async=entry.is_async,
-            override=True,          # bumps _generation -> schema refresh
-        )
-```
+**History (before v1):** the first proof gated only `terminal` via
+`intentframe-terminal` with a terminal-specific wrapper. That plugin was replaced
+by the generic loop above; there is no legacy migration path.
 
 ### Why toolset filtering fails (the evidence)
 
@@ -252,25 +246,29 @@ Hermes' own toolsets mix reads and writes — proof that you must select by name
 
 ### The real bottleneck: the mapper
 
-[`adapter/src/hermes_adapter/mapper.py`](hermes/adapter/src/hermes_adapter/mapper.py)
-is hardcoded to one tool:
+[`adapter/src/hermes_adapter/mapper.py`](../integrations/hermes/adapter/src/hermes_adapter/mapper.py)
+dispatches through the governance contract — each entry names a `mapper` kind
+(`terminal`, `process`, `write_file`, `delete_file`, `patch`):
 
 ```python
 def map_tool(tool, args):
-    if tool == "terminal":
-        return map_terminal(args)   # -> {"action": "RUN_COMMAND", ...}
-    raise ValidationError(f"Unsupported tool for validation: {tool!r}")
+    spec = load_governed_tools()[tool]  # KeyError -> ValidationError
+    return MAPPERS[spec.mapper](args)   # -> list of IntentFrame validate payloads
 ```
 
-If the plugin gates a tool the mapper doesn't map, validate **fails closed** —
-the tool is blocked, not allowed through. Safe, but it means a half-finished
-allowlist silently bricks tools. Every governed name needs a matching
-`map_<tool>` (→ IntentFrame action). **Wrapping is easy; meaningful per-tool
-policy is the work.**
+`patch` can return **multiple** intents (V4A update + delete); the adapter
+validates each and fails closed on the first BLOCK. Multi-op patches use **scoped
+`content`** (one file's hunk per write intent) and a **`patch_operations`
+manifest** in `data` so Guardian sees sibling ops without AE treating unrelated
+delete lines as “hidden behavior” in write payload.
 
-To prevent drift, make the **adapter the single source of truth**: expose
-`supported_tools()` and have the plugin derive its wrap-set from it (or a shared
-YAML both read).
+If the plugin gates a tool the mapper does not implement, validate **fails
+closed**. Every governed name needs a matching mapper kind and policy.
+**Wrapping is easy; meaningful per-tool mapping + policy is the work.**
+
+Drift is prevented by a **shared contract**: `governance/tools.yaml` +
+`hermes-governance` loader; adapter exposes `supported_tools()` for doctor/sync
+checks.
 
 ### Lifecycle: a one-shot wrap is not enough
 
@@ -292,7 +290,7 @@ handler. Robust options:
 | 3 | Registry lifecycle / MCP robustness | ~20% |
 | 4 | Observability & ops | ~10% |
 
-See [`hermes/TODO.md`](hermes/TODO.md) for the full phased roadmap.
+See [`integrations/hermes/README.md`](../integrations/hermes/README.md) for architecture, governed tools, and the add-tool workflow.
 
 ---
 
@@ -462,10 +460,10 @@ incrementally with policy review each time.
 
 - IntentFrame adoption guidance:
   [`do-i-have-to-rewrite-tools.md`](../external-reference-only-libs/intentframe/docs/executor/do-i-have-to-rewrite-tools.md)
-- Hermes roadmap: [`hermes/TODO.md`](hermes/TODO.md)
-- Current plugin: [`hermes/plugin/intentframe-gate/`](hermes/plugin/intentframe-gate/)
+- Hermes integration: [`integrations/hermes/README.md`](../integrations/hermes/README.md)
+- Current plugin: [`hermes/plugin/intentframe-gate/`](../integrations/hermes/plugin/intentframe-gate/)
 - Mapper bottleneck:
-  [`hermes/adapter/src/hermes_adapter/mapper.py`](hermes/adapter/src/hermes_adapter/mapper.py)
+  [`hermes/adapter/src/hermes_adapter/mapper.py`](../integrations/hermes/adapter/src/hermes_adapter/mapper.py)
 - Hermes tool registry:
   [`tools/registry.py`](../external-reference-only-libs/hermes-agent/tools/registry.py)
 - E2E: [`../tests/hermes_gateway/`](../tests/hermes_gateway/)

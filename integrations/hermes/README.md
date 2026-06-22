@@ -106,6 +106,13 @@ Export env from `agent.json`:
 
 No plugin code changes are required when the mapper kind already exists.
 
+If the tool can emit **multiple IntentFrames per call** (like V4A `patch`), follow
+the `map_patch` pattern in `mapper.py`: scoped per-op `content` for writes (not
+the full multi-file blob), per-op reason suffix, and batch context in `data`
+(`patch_op_index`, `patch_op_count`, `patch_operations`) so AE/Guardian can judge
+each intent honestly. See [`docs/delete-host-file-validation.md`](../../docs/delete-host-file-validation.md)
+(multi-intent + Hermes patch mapper).
+
 ## Manual acceptance checklist
 
 1. `bin/intentframe-integrations install hermes`
@@ -115,10 +122,11 @@ No plugin code changes are required when the mapper kind already exists.
 5. `bin/intentframe-integrations gateway start hermes --api-server`
 6. Ask LLM to run `echo ok` with a reason → executes
 7. Ask LLM to run `sudo echo intentframe-e2e-block-probe` → blocked by IntentFrame policy (`sudo` pattern)
-8. Ask LLM to `write_file` under `~/…` with a reason → executes
-9. Ask LLM to `write_file` to `/etc/…` → blocked by host-path policy
-10. Ask LLM to `delete_file` under `~/…` with a reason → executes
-11. Ask LLM to `delete_file` on `/etc/…` → blocked by host-path policy
+8. Ask LLM to `write_file` under `~/…` with a reason → executes (deterministic ALLOW)
+9. Ask LLM to `write_file` to `/etc/…` → blocked by host-path policy (deterministic)
+10. Ask LLM to `delete_file` under `~/…` with a reason → may ALLOW or BLOCK (semantic;
+    passes path policy; Guardian decides). Not a guaranteed execute.
+11. Ask LLM to `delete_file` on `/etc/…` → blocked by host-path policy (deterministic)
 
 ## Live integration tests (all governed tools)
 
