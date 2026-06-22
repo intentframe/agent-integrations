@@ -34,6 +34,12 @@ from intentframe_integrations.hermes_integrate import (
     integrate_hermes,
     load_hermes_pack,
 )
+from intentframe_integrations.hermes_governance_edit import (
+    GovernanceEditError,
+    list_governed_tools,
+    runtime_governed_tool_names,
+    set_tool_enabled,
+)
 from intentframe_integrations.integration_pack import IntegrationPack, load_integration_pack
 from intentframe_integrations.paths import agent_config_path, list_agents
 from intentframe_integrations.runtime_lifecycle import (
@@ -294,7 +300,13 @@ def _cmd_doctor(
     return 0
 
 
-def _cmd_integrate(agent: str, *, copy: bool, skip_config: bool) -> int:
+def _cmd_integrate(
+    agent: str,
+    *,
+    copy: bool,
+    skip_config: bool,
+    reset_governance: bool,
+) -> int:
     if agent != "hermes":
         print(f"ERROR: integrate is only implemented for hermes (got {agent!r})", file=sys.stderr)
         return 1
@@ -302,7 +314,12 @@ def _cmd_integrate(agent: str, *, copy: bool, skip_config: bool) -> int:
     pack = load_hermes_pack()
     _apply_agent_env(pack)
     try:
-        result = integrate_hermes(pack, copy=copy, skip_config=skip_config)
+        result = integrate_hermes(
+            pack,
+            copy=copy,
+            skip_config=skip_config,
+            reset_governance=reset_governance,
+        )
     except FileNotFoundError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
@@ -385,6 +402,45 @@ def _cmd_gateway_stop(agent: str) -> int:
     return 0
 
 
+def _cmd_governance_list(agent: str) -> int:
+    if agent != "hermes":
+        print(f"ERROR: governance is only implemented for hermes (got {agent!r})", file=sys.stderr)
+        return 1
+    try:
+        entries = list_governed_tools(agent)
+    except GovernanceEditError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+
+    print(f"Governed tool catalog ({agent}):")
+    for name, enabled in entries:
+        state = "enabled" if enabled else "disabled"
+        print(f"  {name:15} {state}")
+
+    governed = runtime_governed_tool_names(agent)
+    print(f"\nGoverned at runtime: {', '.join(governed) if governed else '(none)'}")
+    return 0
+
+
+def _cmd_governance_set(agent: str, tool: str, *, enabled: bool) -> int:
+    if agent != "hermes":
+        print(f"ERROR: governance is only implemented for hermes (got {agent!r})", file=sys.stderr)
+        return 1
+    try:
+        path = set_tool_enabled(tool, enabled, agent_id=agent)
+    except GovernanceEditError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+
+    state = "enabled" if enabled else "disabled"
+    print(f"Set {tool!r} to {state} in {path}")
+    print(
+        "Restart Hermes gateway and adapter for changes to take effect "
+        "(governance is loaded at process start)."
+    )
+    return 0
+
+
 def _ensure_runtime(pack: IntegrationPack) -> int:
     if backend_ready_for_pack(pack) and (
         pack.adapter is None or is_adapter_running(pack.agent.agent_id)
@@ -422,7 +478,7 @@ def _cmd_run(agent: str, *, gateway_args: list[str]) -> int:
     if ec:
         return ec
 
-    ec = _cmd_integrate(agent, copy=False, skip_config=False)
+    ec = _cmd_integrate(agent, copy=False, skip_config=False, reset_governance=False)
     if ec:
         return ec
 
@@ -555,6 +611,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Do not merge ~/.hermes/config.yaml",
     )
+    p_integrate.add_argument(
+        "--reset-governance",
+        action="store_true",
+        help="Overwrite runtime governance/tools.yaml from the default template (default: keep user config)",
+    )
 
     p_run = sub.add_parser(
         "run",
@@ -604,6 +665,23 @@ def main(argv: list[str] | None = None) -> int:
 
     p_gateway_stop = gateway_sub.add_parser("stop", help="Stop orchestrator-managed Hermes gateway")
     p_gateway_stop.add_argument("agent", choices=agents)
+
+    p_governance = sub.add_parser(
+        "governance",
+        help="List or enable/disable governed Hermes tools in governance/tools.yaml",
+    )
+    governance_sub = p_governance.add_subparsers(dest="governance_command", required=True)
+
+    p_governance_list = governance_sub.add_parser("list", help="Show catalog and runtime governed tools")
+    p_governance_list.add_argument("agent", choices=agents)
+
+    p_governance_enable = governance_sub.add_parser("enable", help="Enable a governed tool")
+    p_governance_enable.add_argument("agent", choices=agents)
+    p_governance_enable.add_argument("tool", help="Hermes tool name from governance/tools.yaml")
+
+    p_governance_disable = governance_sub.add_parser("disable", help="Disable a governed tool")
+    p_governance_disable.add_argument("agent", choices=agents)
+    p_governance_disable.add_argument("tool", help="Hermes tool name from governance/tools.yaml")
 
     args = parser.parse_args(argv)
 
@@ -656,6 +734,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.agent,
                 copy=args.copy,
                 skip_config=args.skip_config,
+                reset_governance=args.reset_governance,
             )
         case "run":
             gateway_args = args.gateway_args
@@ -680,6 +759,17 @@ def main(argv: list[str] | None = None) -> int:
                     return _cmd_gateway_stop(args.agent)
                 case _:
                     parser.error(f"Unknown gateway command: {args.gateway_command}")
+                    return 2
+        case "governance":
+            match args.governance_command:
+                case "list":
+                    return _cmd_governance_list(args.agent)
+                case "enable":
+                    return _cmd_governance_set(args.agent, args.tool, enabled=True)
+                case "disable":
+                    return _cmd_governance_set(args.agent, args.tool, enabled=False)
+                case _:
+                    parser.error(f"Unknown governance command: {args.governance_command}")
                     return 2
         case _:
             parser.error(f"Unknown command: {args.command}")

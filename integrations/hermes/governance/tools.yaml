@@ -1,32 +1,39 @@
-# Governed Hermes tools — single source of truth for plugin wrap-set and adapter mappers.
+# Default governed-tool template (reference). Runtime user config lives under ~/.intentframe/.
 # Select by tool name (not toolset). Reads stay unlisted unless deployment policy requires them.
+# enabled: true  → IntentFrame gates at runtime (plugin wrap + adapter validate).
+# enabled: false → spec kept in catalog; Hermes runs the tool ungoverned.
 
 tools:
   terminal:
+    enabled: true
     action: RUN_COMMAND
     risk: local_process
     mapper: terminal
     blocked_response: terminal_json
 
   process:
+    enabled: true
     action: RUN_COMMAND
     risk: local_process
     mapper: process
     blocked_response: generic_json
 
   write_file:
+    enabled: true
     action: WRITE_HOST_FILE
     risk: local_write
     mapper: write_file
     blocked_response: generic_json
 
   delete_file:
+    enabled: true
     action: DELETE_HOST_FILE
     risk: local_delete
     mapper: delete_file
     blocked_response: generic_json
 
   patch:
+    enabled: true
     action: WRITE_HOST_FILE
     actions: [WRITE_HOST_FILE, DELETE_HOST_FILE]
     risk: local_write

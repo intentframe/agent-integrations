@@ -17,7 +17,7 @@ _TESTS_DIR = HERE.parent
 if str(_TESTS_DIR) not in sys.path:
     sys.path.insert(0, str(_TESTS_DIR))
 
-from hermes_tool_probes import GOVERNED_TOOL_NAMES  # noqa: E402
+from hermes_governance_fixtures import runtime_governed_tool_names  # noqa: E402
 
 from api_client import (  # noqa: E402
     assert_intentframe_gate_toolsets,
@@ -171,7 +171,9 @@ def _run_api_allow_block(env: IsolatedEnv, *, label: str) -> None:
     toolsets_snapshot = parse_toolsets_response(toolsets_body)
     print(f"\n==> {label} toolsets snapshot\n{format_toolsets_snapshot(toolsets_snapshot)}", file=sys.stderr)
 
-    if "terminal" in GOVERNED_TOOL_NAMES:
+    governed = runtime_governed_tool_names()
+
+    if "terminal" in governed:
         marker = f"intentframe-hermes-e2e-ok-{env.run_id}"
         step(f"{label}: POST /v1/responses ALLOW (LLM → terminal → adapter → bridge)")
         run_allow_with_retries(host=API_HOST, port=env.api_port, api_key=env.api_key, marker=marker)
@@ -179,14 +181,14 @@ def _run_api_allow_block(env: IsolatedEnv, *, label: str) -> None:
         step(f"{label}: POST /v1/responses BLOCK (policy should deny sudo)")
         run_block_once(host=API_HOST, port=env.api_port, api_key=env.api_key)
 
-    if "process" in GOVERNED_TOOL_NAMES:
+    if "process" in governed:
         step(f"{label}: POST /v1/responses process ALLOW")
         run_process_allow_with_retries(host=API_HOST, port=env.api_port, api_key=env.api_key)
 
         step(f"{label}: POST /v1/responses process BLOCK (sudo in mapped RUN_COMMAND)")
         run_process_block_once(host=API_HOST, port=env.api_port, api_key=env.api_key)
 
-    if "write_file" in GOVERNED_TOOL_NAMES:
+    if "write_file" in governed:
         write_marker = f"intentframe-hermes-write-ok-{env.run_id}"
         step(f"{label}: POST /v1/responses write_file ALLOW")
         run_write_file_allow_with_retries(
@@ -199,7 +201,7 @@ def _run_api_allow_block(env: IsolatedEnv, *, label: str) -> None:
         step(f"{label}: POST /v1/responses write_file BLOCK (disallowed /etc path)")
         run_write_file_block_once(host=API_HOST, port=env.api_port, api_key=env.api_key)
 
-    if "delete_file" in GOVERNED_TOOL_NAMES:
+    if "delete_file" in governed:
         delete_marker = f"intentframe-hermes-delete-ok-{env.run_id}"
         step(f"{label}: POST /v1/responses delete_file semantic ~/ (ALLOW or BLOCK)")
         run_delete_file_semantic_with_retries(
@@ -212,7 +214,7 @@ def _run_api_allow_block(env: IsolatedEnv, *, label: str) -> None:
         step(f"{label}: POST /v1/responses delete_file BLOCK (disallowed /etc path)")
         run_delete_file_block_once(host=API_HOST, port=env.api_port, api_key=env.api_key)
 
-    if "patch" in GOVERNED_TOOL_NAMES:
+    if "patch" in governed:
         patch_marker = f"intentframe-hermes-patch-ok-{env.run_id}"
         step(f"{label}: POST /v1/responses patch replace ALLOW")
         run_patch_replace_allow_with_retries(

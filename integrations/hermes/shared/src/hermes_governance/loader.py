@@ -1,4 +1,4 @@
-"""Load governed-tool contract from bundled or repo-local YAML."""
+"""Load governed-tool contract from runtime or bundled default YAML."""
 
 from __future__ import annotations
 
@@ -23,19 +23,12 @@ class ToolSpec:
     mapper: str
     blocked_response: str = "generic_json"
     actions: tuple[str, ...] = ()
+    enabled: bool = True
 
     def policy_actions(self) -> frozenset[str]:
         if self.actions:
             return frozenset(self.actions)
         return frozenset({self.action})
-
-
-def _repo_governance_path() -> Path | None:
-    here = Path(__file__).resolve().parent
-    candidate = here.parents[2] / "governance" / "tools.yaml"
-    if candidate.is_file():
-        return candidate
-    return None
 
 
 def _runtime_governance_path() -> Path | None:
@@ -62,12 +55,11 @@ def _resolve_yaml_path(explicit: Path | None = None) -> Path:
     env_path = os.environ.get("HERMES_GOVERNANCE_YAML", "").strip()
     if env_path:
         path = Path(env_path).expanduser()
-        if path.is_file():
-            return path
-
-    repo_path = _repo_governance_path()
-    if repo_path is not None:
-        return repo_path
+        if not path.is_file():
+            raise FileNotFoundError(
+                f"Governance YAML not found (HERMES_GOVERNANCE_YAML): {path}"
+            )
+        return path
 
     runtime_path = _runtime_governance_path()
     if runtime_path is not None:
@@ -93,6 +85,13 @@ def _parse_actions(raw: dict[str, Any], primary_action: str) -> tuple[str, ...]:
     if primary_action not in parsed:
         raise ValueError("actions must include the primary action field")
     return parsed
+
+
+def _parse_enabled(raw: dict[str, Any]) -> bool:
+    enabled = raw.get("enabled", True)
+    if not isinstance(enabled, bool):
+        raise ValueError("enabled must be a boolean when present")
+    return enabled
 
 
 def _parse_tool(name: str, raw: dict[str, Any]) -> ToolSpec:
@@ -129,11 +128,13 @@ def _parse_tool(name: str, raw: dict[str, Any]) -> ToolSpec:
         mapper=mapper,
         blocked_response=blocked_response,
         actions=_parse_actions(raw, primary_action),
+        enabled=_parse_enabled(raw),
     )
 
 
 @lru_cache(maxsize=4)
-def load_governed_tools(yaml_path: str | None = None) -> dict[str, ToolSpec]:
+def load_tool_catalog(yaml_path: str | None = None) -> dict[str, ToolSpec]:
+    """All tools defined in governance YAML (enabled and disabled)."""
     path = _resolve_yaml_path(Path(yaml_path) if yaml_path else None)
     raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     tools_raw = raw.get("tools")
@@ -148,6 +149,19 @@ def load_governed_tools(yaml_path: str | None = None) -> dict[str, ToolSpec]:
             raise ValueError(f"Duplicate governed tool name: {name!r}")
         tools[name] = _parse_tool(name, spec_raw)
     return tools
+
+
+def load_governed_tools(yaml_path: str | None = None) -> dict[str, ToolSpec]:
+    """Enabled tools only — runtime governed set for plugin and adapter."""
+    catalog = load_tool_catalog(yaml_path)
+    enabled = {name: spec for name, spec in catalog.items() if spec.enabled}
+    if not enabled:
+        raise ValueError("Governance YAML must have at least one enabled tool")
+    return enabled
+
+
+def governance_catalog_names() -> frozenset[str]:
+    return frozenset(load_tool_catalog())
 
 
 def governed_tool_names() -> frozenset[str]:

@@ -2,25 +2,6 @@
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
-CANONICAL_GOVERNANCE_YAML = (
-    REPO_ROOT / "integrations" / "hermes" / "governance" / "tools.yaml"
-)
-SHARED_SRC = REPO_ROOT / "integrations" / "hermes" / "shared" / "src"
-
-if str(SHARED_SRC) not in sys.path:
-    sys.path.insert(0, str(SHARED_SRC))
-
-from hermes_governance.loader import load_governed_tools  # type: ignore[import-not-found] # noqa: E402
-
-# Loaded from integrations/hermes/governance/tools.yaml (single source of truth).
-GOVERNED_TOOL_NAMES = frozenset(
-    load_governed_tools(str(CANONICAL_GOVERNANCE_YAML)).keys()
-)
-
 
 def process_allow_args(*, reason: str = "Live process allow test") -> dict[str, str]:
     return {"action": "list", "reason": reason}
@@ -60,11 +41,6 @@ def delete_deny_floor_args(*, reason: str = "E2E delete sensitive home path prob
         "path": "~/.ssh/intentframe-e2e-delete-deny-floor-probe",
         "reason": reason,
     }
-
-
-def delete_allow_args(*, marker: str, reason: str | None = None) -> dict[str, str]:
-    """Backward-compatible alias for delete_home_args."""
-    return delete_home_args(marker=marker, reason=reason)
 
 
 def delete_block_args(*, reason: str = "E2E delete system path probe") -> dict[str, str]:
@@ -115,16 +91,6 @@ def patch_v4a_mixed_home_delete_args(*, marker: str, reason: str | None = None) 
         "patch": patch_v4a_mixed_home_delete_content(marker=marker),
         "reason": reason or "E2E V4A patch update and delete under home",
     }
-
-
-def patch_v4a_mixed_allow_content(*, marker: str) -> str:
-    """Backward-compatible alias for patch_v4a_mixed_home_delete_content."""
-    return patch_v4a_mixed_home_delete_content(marker=marker)
-
-
-def patch_v4a_mixed_allow_args(*, marker: str, reason: str | None = None) -> dict[str, str]:
-    """Backward-compatible alias for patch_v4a_mixed_home_delete_args."""
-    return patch_v4a_mixed_home_delete_args(marker=marker, reason=reason)
 
 
 def patch_v4a_block_content(*, marker: str) -> str:

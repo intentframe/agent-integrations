@@ -273,9 +273,10 @@ your_tool:
   blocked_response: generic_json
 ```
 
-Sync is automatic: `integrate hermes` copies canonical yaml to
-`~/.intentframe/integrations/hermes/governance/tools.yaml` and exports
-`HERMES_GOVERNANCE_YAML` for the gateway.
+On first `integrate hermes`, runtime governance at
+`~/.intentframe/integrations/hermes/governance/tools.yaml` is seeded from the repo
+default template if missing. Later integrates do not overwrite user edits unless
+you pass `--reset-governance`. Integration exports `HERMES_GOVERNANCE_YAML` for the gateway.
 
 Optional override path: `HERMES_GOVERNANCE_YAML`.
 

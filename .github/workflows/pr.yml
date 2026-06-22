@@ -44,7 +44,7 @@ jobs:
       - name: Hermes governance unit tests
         run: |
           uv run --directory integrations/hermes/shared python tests/test_governance.py
-          uv run --directory integrations/hermes/shared python tests/test_governance_sync.py
+          uv run --directory integrations/hermes/shared python tests/test_governance_template.py
 
       - name: Backend validate adapter unit tests
         run: uv run --package if-integration-backend python if-integration-backend/tests/test_validate_adapter.py
@@ -65,6 +65,9 @@ jobs:
           uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_cli_start.py
           uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_adapter_lifecycle.py
           uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_hermes_install.py
+          uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_governance_edit.py
+          uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_governance_runtime_contract.py
+          uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_make_catalog_yaml.py
 
       - name: Hermes gateway unit tests
         run: |

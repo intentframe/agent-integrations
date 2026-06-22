@@ -5,7 +5,26 @@ from __future__ import annotations
 
 import sys
 import unittest
+from pathlib import Path
 from typing import Any
+
+REPO_ROOT = Path(__file__).resolve().parents[4]
+TESTS_DIR = REPO_ROOT / "tests"
+if str(TESTS_DIR) not in sys.path:
+    sys.path.insert(0, str(TESTS_DIR))
+
+from hermes_governance_fixtures import (  # noqa: E402
+    install_test_governance_env,
+    restore_test_governance_env,
+)
+
+
+def setUpModule() -> None:
+    install_test_governance_env()
+
+
+def tearDownModule() -> None:
+    restore_test_governance_env()
 
 
 class FakeBridge:

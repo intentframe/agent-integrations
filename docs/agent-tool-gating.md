@@ -270,6 +270,29 @@ Drift is prevented by a **shared contract**: `governance/tools.yaml` +
 `hermes-governance` loader; adapter exposes `supported_tools()` for doctor/sync
 checks.
 
+Each tool entry may set `enabled: true|false` (default `true`). Only **enabled**
+tools are governed at runtime (plugin wrap + adapter validate). Disabled tools
+remain in the catalog with full mapper specs but run ungoverned through native
+Hermes handlers.
+
+Users toggle governed tools in the **runtime** config at
+`~/.intentframe/integrations/hermes/governance/tools.yaml` (CLI or hand-edit).
+The repo default template is reference-only; `integrate hermes` seeds runtime
+yaml on first use and does **not** overwrite user changes on later integrates.
+Use `integrate hermes --reset-governance` to restore defaults from the template.
+
+```bash
+intentframe-integrations governance list hermes
+intentframe-integrations governance disable hermes write_file
+intentframe-integrations governance enable hermes write_file
+```
+
+After changing `enabled`, restart the Hermes gateway and adapter (governance is
+loaded at process start).
+
+Catalog-wide integration tests generate a throwaway all-enabled yaml from
+the default template via `HERMES_GOVERNANCE_YAML`; they never mutate runtime user config.
+
 ### Lifecycle: a one-shot wrap is not enough
 
 Built-in tools self-register at import time, but **MCP tools register/refresh

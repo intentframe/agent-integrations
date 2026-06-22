@@ -25,9 +25,9 @@ from intentframe_integrations.hermes_paths import (
     hermes_plugins_dir,
 )
 from intentframe_integrations.hermes_governance_contract import (
-    canonical_governance_yaml_path,
-    ensure_governance_yaml_runtime,
-    sync_governance_yaml,
+    default_governance_template_path,
+    ensure_runtime_governance_yaml,
+    reset_runtime_governance_yaml,
 )
 from intentframe_integrations.integration_pack import IntegrationPack, load_integration_pack
 from intentframe_integrations.paths import agent_config_path, repo_root
@@ -267,6 +267,7 @@ def integrate_hermes(
     copy: bool = False,
     skip_config: bool = False,
     sync_adapter: bool = True,
+    reset_governance: bool = False,
 ) -> IntegrateResult:
     messages: list[str] = []
     src = plugin_source_dir()
@@ -302,12 +303,12 @@ def integrate_hermes(
             f"Adapter venv synced at {integration_state_dir(pack.agent.agent_id) / '.venv'}"
         )
 
-    gov_dest = sync_governance_yaml(pack.agent.agent_id)
-    if gov_dest is not None:
-        messages.append(f"Governance contract synced to {gov_dest}")
+    if reset_governance:
+        gov_dest = reset_runtime_governance_yaml(pack.agent.agent_id)
+        messages.append(f"Governance config reset from default template to {gov_dest}")
     else:
-        runtime = ensure_governance_yaml_runtime(pack.agent.agent_id)
-        messages.append(f"Governance contract at {runtime}")
+        gov_dest = ensure_runtime_governance_yaml(pack.agent.agent_id)
+        messages.append(f"Governance config at {gov_dest}")
 
     return IntegrateResult(
         plugin_installed=True,
@@ -324,7 +325,7 @@ class DoctorReport:
 
 
 def _load_governance_contract() -> dict[str, dict[str, str | list[str]]]:
-    path = canonical_governance_yaml_path()
+    path = default_governance_template_path()
     if not path.is_file():
         raise FileNotFoundError(f"Governance contract missing: {path}")
     raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}

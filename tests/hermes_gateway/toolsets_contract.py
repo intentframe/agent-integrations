@@ -16,7 +16,7 @@ _TESTS_DIR = Path(__file__).resolve().parent.parent
 if str(_TESTS_DIR) not in sys.path:
     sys.path.insert(0, str(_TESTS_DIR))
 
-from hermes_tool_probes import GOVERNED_TOOL_NAMES  # noqa: E402
+from hermes_governance_fixtures import template_enabled_tool_names  # noqa: E402
 
 # Hermes 0.17 hermes-api-server composite (toolsets.py) — names the model may see.
 API_SERVER_COMPOSITE_TOOLSET = "hermes-api-server"
@@ -24,7 +24,9 @@ API_SERVER_COMPOSITE_TOOLSET = "hermes-api-server"
 # Governed tools in governance/tools.yaml that are not standalone Hermes 0.17 registry tools.
 GOVERNED_TOOLS_NOT_ON_API_SERVER = frozenset({"delete_file"})
 
-GOVERNED_TOOLS_ON_API_SERVER = GOVERNED_TOOL_NAMES - GOVERNED_TOOLS_NOT_ON_API_SERVER
+
+def governed_tools_on_api_server() -> frozenset[str]:
+    return template_enabled_tool_names() - GOVERNED_TOOLS_NOT_ON_API_SERVER
 
 # Ungoverned tools that explain LLM tool-selection noise in gateway E2E.
 UNGATED_DISTRACTOR_TOOLS = frozenset(
@@ -166,7 +168,7 @@ def assert_intentframe_gate_toolsets_surface(body: dict[str, Any]) -> ToolsetsSn
                 f"  actual:   {sorted(actual)}"
             )
 
-    missing_governed = sorted(GOVERNED_TOOLS_ON_API_SERVER - snapshot.enabled_tool_names)
+    missing_governed = sorted(governed_tools_on_api_server() - snapshot.enabled_tool_names)
     if missing_governed:
         raise AssertionError(
             f"Governed tools missing from enabled api_server surface: {missing_governed}"
@@ -180,11 +182,13 @@ def assert_intentframe_gate_toolsets_surface(body: dict[str, Any]) -> ToolsetsSn
         )
 
     unexpected_governed_missing = sorted(
-        GOVERNED_TOOL_NAMES - GOVERNED_TOOLS_ON_API_SERVER - GOVERNED_TOOLS_NOT_ON_API_SERVER
+        template_enabled_tool_names()
+        - governed_tools_on_api_server()
+        - GOVERNED_TOOLS_NOT_ON_API_SERVER
     )
     if unexpected_governed_missing:
         raise AssertionError(
-            f"GOVERNED_TOOL_NAMES includes tools not classified for api_server: "
+            f"template_enabled_tool_names includes tools not classified for api_server: "
             f"{unexpected_governed_missing}"
         )
 

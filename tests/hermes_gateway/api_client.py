@@ -16,7 +16,6 @@ if str(_TESTS_DIR) not in sys.path:
     sys.path.insert(0, str(_TESTS_DIR))
 
 from hermes_tool_probes import (  # noqa: E402
-    GOVERNED_TOOL_NAMES,
     patch_replace_allow_args,
     patch_replace_block_args,
     patch_v4a_block_args,

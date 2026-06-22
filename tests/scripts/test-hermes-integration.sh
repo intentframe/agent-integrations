@@ -7,13 +7,18 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 IF_INTEGRATIONS="${REPO_ROOT}/bin/intentframe-integrations"
 ADAPTER_TEST="${REPO_ROOT}/tests/hermes_adapter/test_live.py"
 GATE_TEST="${REPO_ROOT}/tests/hermes_plugin/test_bridge_gate_live.py"
+CATALOG_YAML_SCRIPT="${SCRIPT_DIR}/make_catalog_yaml.py"
 ADAPTER_SOCKET="${HOME}/.intentframe/integrations/hermes/adapter.sock"
 HERMES_STARTED=0
+CATALOG_YAML_DIR=""
 
 cleanup() {
   local ec=$?
   if (( HERMES_STARTED )); then
     (cd "$REPO_ROOT" && "$IF_INTEGRATIONS" stop) || true
+  fi
+  if [[ -n "${CATALOG_YAML_DIR}" && -d "${CATALOG_YAML_DIR}" ]]; then
+    rm -rf "${CATALOG_YAML_DIR}"
   fi
   trap - EXIT INT TERM
   exit "$ec"
@@ -24,6 +29,10 @@ if [[ -z "${OPENAI_API_KEY:-}" ]]; then
   echo "SKIP hermes live integration: OPENAI_API_KEY not set" >&2
   exit 0
 fi
+
+CATALOG_YAML="$(cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python "$CATALOG_YAML_SCRIPT")"
+CATALOG_YAML_DIR="$(dirname "$CATALOG_YAML")"
+export HERMES_GOVERNANCE_YAML="${CATALOG_YAML}"
 
 (cd "$REPO_ROOT" && "$IF_INTEGRATIONS" stop) || true
 (cd "$REPO_ROOT" && "$IF_INTEGRATIONS" start hermes --skip-if-exists)

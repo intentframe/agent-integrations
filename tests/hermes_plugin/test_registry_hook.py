@@ -14,6 +14,7 @@ if str(TESTS_DIR) not in sys.path:
     sys.path.insert(0, str(TESTS_DIR))
 
 from _loader import load_plugin_module  # noqa: E402
+from governance_fixtures import PluginGovernanceEnvMixin  # noqa: E402
 
 registry_hook_mod = load_plugin_module("registry_hook")
 gate_mod = load_plugin_module("gate")
@@ -72,13 +73,14 @@ class FakeRegistry:
         return self.entries[name]
 
 
-class TestRegistryHook(unittest.TestCase):
+class TestRegistryHook(PluginGovernanceEnvMixin, unittest.TestCase):
     def setUp(self) -> None:
+        super().setUp()
         gate_mod.reset_session_client()
-        governance_mod.load_governed_tools.cache_clear()
 
     def tearDown(self) -> None:
         gate_mod.reset_session_client()
+        super().tearDown()
 
     def test_late_registration_is_gated(self) -> None:
         registry = FakeRegistry()

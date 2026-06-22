@@ -135,7 +135,7 @@ step "Hermes adapter unit tests"
 
 step "Hermes governance unit tests"
 (cd "$REPO_ROOT" && uv run --directory integrations/hermes/shared python tests/test_governance.py)
-(cd "$REPO_ROOT" && uv run --directory integrations/hermes/shared python tests/test_governance_sync.py)
+(cd "$REPO_ROOT" && uv run --directory integrations/hermes/shared python tests/test_governance_template.py)
 
 step "Backend validate adapter unit tests"
 (cd "$REPO_ROOT" && uv run --package if-integration-backend python if-integration-backend/tests/test_validate_adapter.py)
@@ -154,6 +154,8 @@ step "Integrations CLI unit tests"
 (cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_cli_start.py)
 (cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_adapter_lifecycle.py)
 (cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_hermes_install.py)
+(cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_governance_edit.py)
+(cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_governance_runtime_contract.py)
 
 step "Hermes gateway unit tests"
 (cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_isolation.py)

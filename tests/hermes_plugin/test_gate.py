@@ -10,10 +10,14 @@ from pathlib import Path
 from typing import Any
 
 TESTS_DIR = Path(__file__).resolve().parent
-if str(TESTS_DIR) not in sys.path:
-    sys.path.insert(0, str(TESTS_DIR))
+_REPO_TESTS = TESTS_DIR.parent
+for path in (TESTS_DIR, _REPO_TESTS):
+    if str(path) not in sys.path:
+        sys.path.insert(0, str(path))
 
 from _loader import load_plugin_module  # noqa: E402
+from governance_fixtures import PluginGovernanceEnvMixin  # noqa: E402
+from hermes_governance_fixtures import ensure_shared_loader_importable  # noqa: E402
 
 schema_mod = load_plugin_module("schema")
 gate_mod = load_plugin_module("gate")
@@ -71,21 +75,24 @@ class TestSchema(unittest.TestCase):
         )
 
 
-class TestGovernanceLoader(unittest.TestCase):
-    def test_load_governed_tools(self) -> None:
-        governance_mod.load_governed_tools.cache_clear()
-        tools = governance_mod.load_governed_tools()
-        self.assertIn("terminal", tools)
-        self.assertIn("write_file", tools)
-        self.assertEqual(tools["write_file"].action, "WRITE_HOST_FILE")
+class TestPluginGovernance(PluginGovernanceEnvMixin, unittest.TestCase):
+    def test_plugin_loader_matches_shared_template(self) -> None:
+        ensure_shared_loader_importable()
+        from hermes_governance.loader import load_governed_tools as shared_load_governed
+
+        plugin_names = frozenset(governance_mod.load_governed_tools().keys())
+        shared_names = frozenset(shared_load_governed().keys())
+        self.assertEqual(plugin_names, shared_names)
 
 
-class TestGateToolCall(unittest.TestCase):
+class TestGateToolCall(PluginGovernanceEnvMixin, unittest.TestCase):
     def setUp(self) -> None:
+        super().setUp()
         gate_mod.reset_session_client()
 
     def tearDown(self) -> None:
         gate_mod.reset_session_client()
+        super().tearDown()
 
     def test_blocks_via_adapter(self) -> None:
         validator = FakeValidator(

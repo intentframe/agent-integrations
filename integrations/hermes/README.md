@@ -6,7 +6,7 @@ Hermes does **not** ship an IntentFrame executor pack or runtime. This folder pr
 |------|---------|
 | `agent.json` | Agent profile, adapter socket, exported `env` for Hermes plugin |
 | `policy.yaml` | RUN_COMMAND + host-file + deletion domain rules seeded into policy-registry |
-| `governance/tools.yaml` | Governed-tool contract (single source of truth) |
+| `governance/tools.yaml` | Default governed-tool template (seeded to runtime on first integrate) |
 | `shared/` | `hermes-governance` package — contract loader for adapter |
 | `adapter/` | Hermes adapter sidecar (bridge client, tool mapping, HTTP/UDS server) |
 | `plugin/intentframe-gate/` | Hermes plugin — selective schema override + adapter gate |
@@ -62,8 +62,9 @@ bin/intentframe-integrations stop
 ```
 
 `integrate hermes` symlinks the plugin to `$HERMES_HOME/plugins/intentframe-gate`, merges
-`plugins.enabled` in `$HERMES_HOME/config.yaml`, and syncs the adapter venv at
-`~/.intentframe/integrations/hermes/.venv`.
+`plugins.enabled` in `$HERMES_HOME/config.yaml`, syncs the adapter venv at
+`~/.intentframe/integrations/hermes/.venv`, and seeds runtime governance config at
+`~/.intentframe/integrations/hermes/governance/tools.yaml` if missing.
 
 ## Architecture
 

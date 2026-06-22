@@ -18,6 +18,7 @@ if str(CLI_SRC) not in sys.path:
 
 from intentframe_integrations.hermes_gateway import (  # noqa: E402
     DEFAULT_HERMES_GATEWAY_COMMAND,
+    build_gateway_env,
     ensure_api_server_config,
     gateway_pid_file,
     normalize_hermes_gateway_argv,
@@ -239,6 +240,13 @@ class TestGatewayConfig(unittest.TestCase):
                     gateway_pid_file(),
                     home / ".intentframe" / "integrations" / "hermes" / "gateway.pid",
                 )
+
+    def test_build_gateway_env_preserves_hermes_governance_yaml_override(self) -> None:
+        pack = load_hermes_pack()
+        override = "/tmp/custom-governance-tools.yaml"
+        with patch.dict(os.environ, {"HERMES_GOVERNANCE_YAML": override}, clear=False):
+            env = build_gateway_env(pack)
+        self.assertEqual(env["HERMES_GOVERNANCE_YAML"], override)
 
 
 def _apply_env(pack: object) -> None:
