@@ -11,6 +11,9 @@ Hermes does **not** ship an IntentFrame executor pack or runtime. This folder pr
 | `adapter/` | Hermes adapter sidecar (bridge client, tool mapping, HTTP/UDS server) |
 | `plugin/intentframe-gate/` | Hermes plugin — selective schema override + adapter gate |
 
+For Linux/macOS native-kit bundle expectations, policy alignment, and how to add
+new governed tools, see [`docs/NATIVE_KIT_INTEGRATION.md`](../../docs/NATIVE_KIT_INTEGRATION.md).
+
 ## Quick start
 
 From the **repo root**:
