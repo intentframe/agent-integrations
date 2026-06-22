@@ -20,7 +20,7 @@ from hermes_tool_probes import (  # noqa: E402
     patch_replace_allow_args,
     patch_replace_block_args,
     patch_v4a_block_args,
-    patch_v4a_mixed_allow_args,
+    patch_v4a_mixed_home_delete_args,
     process_allow_args,
     process_block_args,
 )
@@ -199,6 +199,34 @@ def _looks_blocked(output: str) -> bool:
     return any(marker in lowered for marker in ("blocked", "denied", "not allowed", "policy"))
 
 
+def _parse_tool_output_json(output: str) -> dict[str, Any]:
+    try:
+        parsed = json.loads(output)
+    except json.JSONDecodeError as exc:
+        raise AssertionError(f"Expected JSON tool output, got: {output!r}") from exc
+    if not isinstance(parsed, dict):
+        raise AssertionError(f"Expected JSON object tool output, got: {output!r}")
+    return parsed
+
+
+def _assert_terminal_blocked_output(output: str) -> dict[str, Any]:
+    """Terminal blocks must match Hermes terminal_tool contract (exit_code -1)."""
+    body = _parse_tool_output_json(output)
+    exit_code = body.get("exit_code")
+    if exit_code != -1:
+        raise AssertionError(
+            f"Expected terminal block exit_code=-1, got {exit_code!r} in {output!r}"
+        )
+    status = body.get("status")
+    if status not in {"blocked", "error"}:
+        raise AssertionError(
+            f"Expected terminal block status blocked/error, got {status!r} in {output!r}"
+        )
+    if not body.get("error"):
+        raise AssertionError(f"Expected terminal block error message in {output!r}")
+    return body
+
+
 def assert_block_response(body: dict[str, Any]) -> TerminalCall:
     calls = extract_terminal_calls(body)
     if not calls:
@@ -209,8 +237,7 @@ def assert_block_response(body: dict[str, Any]) -> TerminalCall:
     if "sudo" not in command:
         raise AssertionError(f"Block test command unexpected: {command!r}")
 
-    if not _looks_blocked(call.output):
-        raise AssertionError(f"Expected blocked tool output, got: {call.output!r}")
+    _assert_terminal_blocked_output(call.output)
     return call
 
 
@@ -362,7 +389,8 @@ def run_write_file_block_once(*, host: str, port: int, api_key: str) -> ToolCall
     return assert_write_file_block(body)
 
 
-def assert_delete_file_allow(body: dict[str, Any], *, marker: str) -> ToolCall:
+def assert_delete_file_guardian_block(body: dict[str, Any], *, marker: str) -> ToolCall:
+    """Home-path delete passes deterministic checks but Guardian blocks (HIGH + irreversible)."""
     calls = extract_tool_calls(body, tool_name="delete_file")
     if not calls:
         raise AssertionError(f"No delete_file function_call in response: {json.dumps(body)[:2000]}")
@@ -371,11 +399,18 @@ def assert_delete_file_allow(body: dict[str, Any], *, marker: str) -> ToolCall:
     path = str(call.arguments.get("path", ""))
     if marker not in path and marker not in call.output:
         raise AssertionError(
-            f"Allow test missing marker {marker!r} in path={path!r} output={call.output!r}"
+            f"Guardian block test missing marker {marker!r} in path={path!r} output={call.output!r}"
         )
-    if _looks_blocked(call.output):
-        raise AssertionError(f"Expected allow but got blocked output: {call.output!r}")
+    if path.startswith("/etc/"):
+        raise AssertionError(f"Expected home-path delete probe, got system path: {path!r}")
+    if not _looks_blocked(call.output):
+        raise AssertionError(f"Expected Guardian block but got: {call.output!r}")
     return call
+
+
+def assert_delete_file_allow(body: dict[str, Any], *, marker: str) -> ToolCall:
+    """Backward-compatible alias — today home deletes are blocked by Guardian."""
+    return assert_delete_file_guardian_block(body, marker=marker)
 
 
 def assert_delete_file_block(body: dict[str, Any]) -> ToolCall:
@@ -392,7 +427,7 @@ def assert_delete_file_block(body: dict[str, Any]) -> ToolCall:
     return call
 
 
-def run_delete_file_allow_with_retries(
+def run_delete_file_guardian_block_with_retries(
     *,
     host: str,
     port: int,
@@ -409,10 +444,10 @@ def run_delete_file_allow_with_retries(
     )
     last_error: Exception | None = None
     for attempt in range(1, attempts + 1):
-        step(f"POST /v1/responses delete_file ALLOW (attempt {attempt}/{attempts})")
+        step(f"POST /v1/responses delete_file Guardian BLOCK ~/ (attempt {attempt}/{attempts})")
         prompt = (
             f"Call the delete_file tool exactly once with path: {path} "
-            f"and reason: 'IntentFrame E2E delete allow {attempt}'. "
+            f"and reason: 'IntentFrame E2E delete guardian block {attempt}'. "
             "Do not explain; just run the tool."
         )
         try:
@@ -423,10 +458,30 @@ def run_delete_file_allow_with_retries(
                 prompt=prompt,
                 instructions=instructions,
             )
-            return assert_delete_file_allow(body, marker=marker)
+            return assert_delete_file_guardian_block(body, marker=marker)
         except (AssertionError, RuntimeError) as exc:
             last_error = exc
-    raise AssertionError(f"delete_file allow test failed after {attempts} attempts: {last_error}") from last_error
+    raise AssertionError(
+        f"delete_file guardian block test failed after {attempts} attempts: {last_error}"
+    ) from last_error
+
+
+def run_delete_file_allow_with_retries(
+    *,
+    host: str,
+    port: int,
+    api_key: str,
+    marker: str,
+    attempts: int = 3,
+) -> ToolCall:
+    """Backward-compatible alias — today home deletes are blocked by Guardian."""
+    return run_delete_file_guardian_block_with_retries(
+        host=host,
+        port=port,
+        api_key=api_key,
+        marker=marker,
+        attempts=attempts,
+    )
 
 
 def run_delete_file_block_once(*, host: str, port: int, api_key: str) -> ToolCall:
@@ -582,7 +637,8 @@ def assert_patch_replace_block(body: dict[str, Any]) -> ToolCall:
     return call
 
 
-def assert_patch_v4a_mixed_allow(body: dict[str, Any], *, marker: str) -> ToolCall:
+def assert_patch_v4a_mixed_home_delete_guardian_block(body: dict[str, Any], *, marker: str) -> ToolCall:
+    """V4A home write+delete — delete intent blocked by Guardian, whole patch fails."""
     calls = extract_tool_calls(body, tool_name="patch")
     if not calls:
         raise AssertionError(f"No patch function_call in response: {json.dumps(body)[:2000]}")
@@ -596,13 +652,18 @@ def assert_patch_v4a_mixed_allow(body: dict[str, Any], *, marker: str) -> ToolCa
     patch_text = _patch_text(call)
     if keep not in patch_text or drop not in patch_text:
         raise AssertionError(
-            f"V4A allow test missing paths keep={keep!r} drop={drop!r} patch={patch_text!r}"
+            f"V4A home-delete block test missing paths keep={keep!r} drop={drop!r} patch={patch_text!r}"
         )
     if "Update File" not in patch_text or "Delete File" not in patch_text:
         raise AssertionError(f"Expected mixed V4A update+delete, got: {patch_text!r}")
-    if _looks_blocked(call.output):
-        raise AssertionError(f"Expected allow but got blocked output: {call.output!r}")
+    if not _looks_blocked(call.output):
+        raise AssertionError(f"Expected Guardian block but got: {call.output!r}")
     return call
+
+
+def assert_patch_v4a_mixed_allow(body: dict[str, Any], *, marker: str) -> ToolCall:
+    """Backward-compatible alias — today home delete in V4A mixed patch is blocked."""
+    return assert_patch_v4a_mixed_home_delete_guardian_block(body, marker=marker)
 
 
 def assert_patch_v4a_mixed_block(body: dict[str, Any]) -> ToolCall:
@@ -671,7 +732,7 @@ def run_patch_replace_block_once(*, host: str, port: int, api_key: str) -> ToolC
     return assert_patch_replace_block(body)
 
 
-def run_patch_v4a_mixed_allow_with_retries(
+def run_patch_v4a_mixed_home_delete_guardian_block_with_retries(
     *,
     host: str,
     port: int,
@@ -687,10 +748,13 @@ def run_patch_v4a_mixed_allow_with_retries(
     )
     last_error: Exception | None = None
     for attempt in range(1, attempts + 1):
-        step(f"POST /v1/responses patch V4A mixed ALLOW (attempt {attempt}/{attempts})")
-        args = patch_v4a_mixed_allow_args(
+        step(
+            f"POST /v1/responses patch V4A mixed home-delete Guardian BLOCK "
+            f"(attempt {attempt}/{attempts})"
+        )
+        args = patch_v4a_mixed_home_delete_args(
             marker=marker,
-            reason=f"IntentFrame E2E patch V4A mixed allow {attempt}",
+            reason=f"IntentFrame E2E patch V4A mixed home-delete block {attempt}",
         )
         try:
             body = post_responses(
@@ -700,12 +764,30 @@ def run_patch_v4a_mixed_allow_with_retries(
                 prompt=_format_tool_prompt("patch", args, attempt=attempt),
                 instructions=instructions,
             )
-            return assert_patch_v4a_mixed_allow(body, marker=marker)
+            return assert_patch_v4a_mixed_home_delete_guardian_block(body, marker=marker)
         except (AssertionError, RuntimeError) as exc:
             last_error = exc
     raise AssertionError(
-        f"patch V4A mixed allow test failed after {attempts} attempts: {last_error}"
+        f"patch V4A mixed home-delete guardian block test failed after {attempts} attempts: {last_error}"
     ) from last_error
+
+
+def run_patch_v4a_mixed_allow_with_retries(
+    *,
+    host: str,
+    port: int,
+    api_key: str,
+    marker: str,
+    attempts: int = 5,
+) -> ToolCall:
+    """Backward-compatible alias — today home delete in V4A mixed patch is blocked."""
+    return run_patch_v4a_mixed_home_delete_guardian_block_with_retries(
+        host=host,
+        port=port,
+        api_key=api_key,
+        marker=marker,
+        attempts=attempts,
+    )
 
 
 def run_patch_v4a_mixed_block_once(*, host: str, port: int, api_key: str, marker: str) -> ToolCall:

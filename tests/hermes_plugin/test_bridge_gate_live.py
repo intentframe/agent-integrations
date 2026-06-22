@@ -17,12 +17,12 @@ for path in (TESTS_DIR, ADAPTER_TESTS):
 
 from _loader import load_plugin_module  # noqa: E402
 from live_fixtures import (  # noqa: E402
-    DELETE_ALLOW_ARGS,
     DELETE_BLOCK_ARGS,
+    DELETE_HOME_ARGS,
     PATCH_ALLOW_REPLACE_ARGS,
     PATCH_BLOCK_REPLACE_ARGS,
     PATCH_V4A_BLOCK_ARGS,
-    PATCH_V4A_MIXED_ALLOW_ARGS,
+    PATCH_V4A_MIXED_HOME_DELETE_ARGS,
     PROCESS_ALLOW_ARGS,
     PROCESS_BLOCK_ARGS,
     WRITE_ALLOW_ARGS,
@@ -92,9 +92,9 @@ class TestLiveBridgeGate(unittest.TestCase):
         delegate = MagicMock()
         self._assert_blocked("write_file", WRITE_BLOCK_ARGS, delegate=delegate)
 
-    def test_allow_delete_file(self) -> None:
-        delegate = MagicMock(return_value='{"status": "ok"}')
-        self._assert_allowed("delete_file", DELETE_ALLOW_ARGS, delegate=delegate)
+    def test_block_delete_file_home_guardian(self) -> None:
+        delegate = MagicMock()
+        self._assert_blocked("delete_file", DELETE_HOME_ARGS, delegate=delegate)
 
     def test_block_delete_file(self) -> None:
         delegate = MagicMock()
@@ -108,9 +108,9 @@ class TestLiveBridgeGate(unittest.TestCase):
         delegate = MagicMock()
         self._assert_blocked("patch", PATCH_BLOCK_REPLACE_ARGS, delegate=delegate)
 
-    def test_allow_patch_v4a_mixed(self) -> None:
-        delegate = MagicMock(return_value='{"status": "ok"}')
-        self._assert_allowed("patch", PATCH_V4A_MIXED_ALLOW_ARGS, delegate=delegate)
+    def test_block_patch_v4a_mixed_home_delete(self) -> None:
+        delegate = MagicMock()
+        self._assert_blocked("patch", PATCH_V4A_MIXED_HOME_DELETE_ARGS, delegate=delegate)
 
     def test_block_patch_v4a_mixed_system_delete(self) -> None:
         delegate = MagicMock()

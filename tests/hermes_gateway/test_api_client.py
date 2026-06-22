@@ -13,10 +13,12 @@ if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 
 from api_client import (  # noqa: E402
+    assert_block_response,
+    assert_delete_file_guardian_block,
     assert_patch_replace_allow,
     assert_patch_replace_block,
-    assert_patch_v4a_mixed_allow,
     assert_patch_v4a_mixed_block,
+    assert_patch_v4a_mixed_home_delete_guardian_block,
     assert_process_allow,
     assert_process_block,
 )
@@ -32,6 +34,23 @@ def _response(*, tool: str, arguments: dict[str, object], output: str) -> dict[s
 
 
 class TestApiClientAssertions(unittest.TestCase):
+    def test_assert_terminal_block_response(self) -> None:
+        body = _response(
+            tool="terminal",
+            arguments={"command": "sudo rm -rf /", "reason": "Should block"},
+            output='{"exit_code": -1, "error": "policy", "status": "blocked"}',
+        )
+        assert_block_response(body)
+
+    def test_assert_terminal_block_rejects_generic_json(self) -> None:
+        body = _response(
+            tool="terminal",
+            arguments={"command": "sudo rm -rf /", "reason": "Should block"},
+            output='{"status": "blocked", "error": "policy"}',
+        )
+        with self.assertRaises(AssertionError):
+            assert_block_response(body)
+
     def test_assert_process_allow(self) -> None:
         body = _response(
             tool="process",
@@ -76,7 +95,15 @@ class TestApiClientAssertions(unittest.TestCase):
         )
         assert_patch_replace_block(body)
 
-    def test_assert_patch_v4a_mixed_allow(self) -> None:
+    def test_assert_delete_file_guardian_block(self) -> None:
+        body = _response(
+            tool="delete_file",
+            arguments={"path": "~/intentframe-e2e-delete-marker.txt", "reason": "probe"},
+            output='{"status": "blocked", "error": "policy"}',
+        )
+        assert_delete_file_guardian_block(body, marker="marker")
+
+    def test_assert_patch_v4a_mixed_home_delete_guardian_block(self) -> None:
         patch = (
             "*** Begin Patch\n"
             "*** Update File: ~/intentframe-e2e-patch-keep-marker.txt\n"
@@ -85,10 +112,10 @@ class TestApiClientAssertions(unittest.TestCase):
         )
         body = _response(
             tool="patch",
-            arguments={"mode": "patch", "patch": patch, "reason": "ok"},
-            output='{"status": "ok"}',
+            arguments={"mode": "patch", "patch": patch, "reason": "probe"},
+            output='{"status": "blocked", "error": "policy"}',
         )
-        assert_patch_v4a_mixed_allow(body, marker="marker")
+        assert_patch_v4a_mixed_home_delete_guardian_block(body, marker="marker")
 
     def test_assert_patch_v4a_mixed_block(self) -> None:
         patch = (

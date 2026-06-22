@@ -30,11 +30,17 @@ def write_block_args(*, reason: str = "Should block write") -> dict[str, str]:
     }
 
 
-def delete_allow_args(*, marker: str, reason: str | None = None) -> dict[str, str]:
+def delete_home_args(*, marker: str, reason: str | None = None) -> dict[str, str]:
+    """Home-path delete probe — passes deterministic checks, Guardian blocks today."""
     return {
         "path": f"~/intentframe-e2e-delete-{marker}.txt",
-        "reason": reason or "Live delete allow test",
+        "reason": reason or "Live delete home-path probe",
     }
+
+
+def delete_allow_args(*, marker: str, reason: str | None = None) -> dict[str, str]:
+    """Backward-compatible alias for delete_home_args."""
+    return delete_home_args(marker=marker, reason=reason)
 
 
 def delete_block_args(*, reason: str = "Should block delete") -> dict[str, str]:
@@ -64,7 +70,7 @@ def patch_replace_block_args(*, reason: str = "Should block patch replace") -> d
     }
 
 
-def patch_v4a_mixed_allow_content(*, marker: str) -> str:
+def patch_v4a_mixed_home_delete_content(*, marker: str) -> str:
     keep = f"~/intentframe-e2e-patch-keep-{marker}.txt"
     drop = f"~/intentframe-e2e-patch-drop-{marker}.txt"
     return (
@@ -78,12 +84,23 @@ def patch_v4a_mixed_allow_content(*, marker: str) -> str:
     )
 
 
-def patch_v4a_mixed_allow_args(*, marker: str, reason: str | None = None) -> dict[str, str]:
+def patch_v4a_mixed_home_delete_args(*, marker: str, reason: str | None = None) -> dict[str, str]:
+    """V4A write+delete under ~/ — write intent may pass, delete intent blocked by Guardian."""
     return {
         "mode": "patch",
-        "patch": patch_v4a_mixed_allow_content(marker=marker),
-        "reason": reason or "Live patch V4A mixed allow test",
+        "patch": patch_v4a_mixed_home_delete_content(marker=marker),
+        "reason": reason or "Live patch V4A mixed home-delete probe",
     }
+
+
+def patch_v4a_mixed_allow_content(*, marker: str) -> str:
+    """Backward-compatible alias for patch_v4a_mixed_home_delete_content."""
+    return patch_v4a_mixed_home_delete_content(marker=marker)
+
+
+def patch_v4a_mixed_allow_args(*, marker: str, reason: str | None = None) -> dict[str, str]:
+    """Backward-compatible alias for patch_v4a_mixed_home_delete_args."""
+    return patch_v4a_mixed_home_delete_args(marker=marker, reason=reason)
 
 
 def patch_v4a_block_content(*, marker: str) -> str:

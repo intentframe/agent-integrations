@@ -159,23 +159,23 @@ def run_bridge_connection_tests(agent_config: Path | None = None) -> int:
                     "action": "DELETE_HOST_FILE",
                     "path": "~/intentframe-bridge-delete-ok.txt",
                     "target": "~/intentframe-bridge-delete-ok.txt",
-                    "reason": "Bridge delete allow probe",
+                    "reason": "Bridge delete home-path probe",
                 },
             )
             if delete_benign.status_code != 200:
                 print(
-                    f"FAIL bridge delete benign: status={delete_benign.status_code} "
+                    f"FAIL bridge delete home-path: status={delete_benign.status_code} "
                     f"body={delete_benign.text!r}"
                 )
                 return 1
             delete_benign_body = delete_benign.json()
-            if not delete_benign_body.get("allowed"):
+            if delete_benign_body.get("allowed"):
                 print(
-                    f"FAIL bridge delete benign: expected allowed=True "
+                    f"FAIL bridge delete home-path: expected allowed=False (Guardian block) "
                     f"body={delete_benign_body!r}"
                 )
                 return 1
-            print("PASS bridge delete benign: allowed=True")
+            print("PASS bridge delete home-path: allowed=False (Guardian block)")
 
             delete_blocked = client.post(
                 "/validate",

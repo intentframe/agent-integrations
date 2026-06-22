@@ -17,12 +17,12 @@ from api_client import (  # noqa: E402
     get_capabilities,
     run_allow_with_retries,
     run_block_once,
-    run_delete_file_allow_with_retries,
     run_delete_file_block_once,
+    run_delete_file_guardian_block_with_retries,
     run_patch_replace_allow_with_retries,
     run_patch_replace_block_once,
-    run_patch_v4a_mixed_allow_with_retries,
     run_patch_v4a_mixed_block_once,
+    run_patch_v4a_mixed_home_delete_guardian_block_with_retries,
     run_process_allow_with_retries,
     run_process_block_once,
     run_write_file_allow_with_retries,
@@ -182,8 +182,8 @@ def _run_api_allow_block(env: IsolatedEnv, *, label: str) -> None:
     run_write_file_block_once(host=API_HOST, port=env.api_port, api_key=env.api_key)
 
     delete_marker = f"intentframe-hermes-delete-ok-{env.run_id}"
-    step(f"{label}: POST /v1/responses delete_file ALLOW")
-    run_delete_file_allow_with_retries(
+    step(f"{label}: POST /v1/responses delete_file BLOCK ~/ (Guardian HIGH risk)")
+    run_delete_file_guardian_block_with_retries(
         host=API_HOST,
         port=env.api_port,
         api_key=env.api_key,
@@ -206,8 +206,8 @@ def _run_api_allow_block(env: IsolatedEnv, *, label: str) -> None:
     run_patch_replace_block_once(host=API_HOST, port=env.api_port, api_key=env.api_key)
 
     v4a_marker = f"intentframe-hermes-v4a-{env.run_id}"
-    step(f"{label}: POST /v1/responses patch V4A mixed ALLOW (write+delete multi-intent)")
-    run_patch_v4a_mixed_allow_with_retries(
+    step(f"{label}: POST /v1/responses patch V4A mixed BLOCK (home delete blocked by Guardian)")
+    run_patch_v4a_mixed_home_delete_guardian_block_with_retries(
         host=API_HOST,
         port=env.api_port,
         api_key=env.api_key,

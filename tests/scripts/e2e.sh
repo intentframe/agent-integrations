@@ -13,6 +13,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 IF_INTEGRATIONS="${REPO_ROOT}/bin/intentframe-integrations"
 AGENTS_DIR="${REPO_ROOT}/tests/agents"
+BRIDGE_TEST_AGENT="${AGENTS_DIR}/bridge-test/agent.json"
 EXAMPLES_PY="${REPO_ROOT}/tests/examples/python/test_validate.py"
 EXAMPLES_TS="${REPO_ROOT}/tests/examples/typescript/test_validate.mjs"
 TS_CLIENT_DIST="${REPO_ROOT}/if-integration-clients/typescript/dist/index.js"
@@ -117,7 +118,7 @@ if_cli status
 test -S "$BRIDGE_SOCKET"
 
 step "Backend integration tests (core Actor + bridge HTTP)"
-if_cli test
+if_cli test --agent-config "$BRIDGE_TEST_AGENT"
 
 step "Python bridge client example"
 export IF_AGENT_BRIDGE_SECRET="test-bridge-python-secret-dev-only"
@@ -139,6 +140,9 @@ step "Hermes governance unit tests"
 step "Backend validate adapter unit tests"
 (cd "$REPO_ROOT" && uv run --package if-integration-backend python if-integration-backend/tests/test_validate_adapter.py)
 
+step "E2e bridge_test agent sync (tests/agents vs bundled default)"
+(cd "$REPO_ROOT" && uv run --package if-integration-backend python tests/agents/test_bridge_test_agent_sync.py)
+
 step "Hermes plugin unit tests"
 (cd "$REPO_ROOT" && uv run --with httpx --with pyyaml --package intentframe-integrations-cli python tests/hermes_plugin/test_gate.py)
 (cd "$REPO_ROOT" && uv run --with httpx --with pyyaml --package intentframe-integrations-cli python tests/hermes_plugin/test_registry_hook.py)
@@ -151,8 +155,10 @@ step "Integrations CLI unit tests"
 (cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_adapter_lifecycle.py)
 (cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_hermes_install.py)
 
-step "Hermes gateway isolation unit tests"
+step "Hermes gateway unit tests"
 (cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_isolation.py)
+(cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_cli_runner.py)
+(cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_hermes_reference_contract.py)
 (cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_api_client.py)
 (cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_governed_tool_coverage.py)
 

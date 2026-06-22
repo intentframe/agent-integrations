@@ -15,12 +15,12 @@ if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 
 from live_fixtures import (  # noqa: E402
-    DELETE_ALLOW_ARGS,
     DELETE_BLOCK_ARGS,
+    DELETE_HOME_ARGS,
     PATCH_ALLOW_REPLACE_ARGS,
     PATCH_BLOCK_REPLACE_ARGS,
     PATCH_V4A_BLOCK_ARGS,
-    PATCH_V4A_MIXED_ALLOW_ARGS,
+    PATCH_V4A_MIXED_HOME_DELETE_ARGS,
     PROCESS_ALLOW_ARGS,
     PROCESS_BLOCK_ARGS,
     WRITE_ALLOW_ARGS,
@@ -71,7 +71,10 @@ class TestLiveHermesAdapter(unittest.TestCase):
             {"command": "sudo rm -rf /", "reason": "Should block"},
         )
         self.assertFalse(body["allowed"])
-        self.assertIn("agent_response", body)
+        agent_response = body["agent_response"]
+        self.assertIsInstance(agent_response, dict)
+        self.assertEqual(agent_response.get("exit_code"), -1)
+        self.assertEqual(agent_response.get("status"), "blocked")
 
     def test_allow_process(self) -> None:
         body = self._validate_tool("process", PROCESS_ALLOW_ARGS)
@@ -91,9 +94,10 @@ class TestLiveHermesAdapter(unittest.TestCase):
         self.assertFalse(body["allowed"])
         self.assertIn("agent_response", body)
 
-    def test_allow_delete_file(self) -> None:
-        body = self._validate_tool("delete_file", DELETE_ALLOW_ARGS)
-        self.assertTrue(body["allowed"])
+    def test_block_delete_file_home_guardian(self) -> None:
+        body = self._validate_tool("delete_file", DELETE_HOME_ARGS)
+        self.assertFalse(body["allowed"])
+        self.assertIn("agent_response", body)
 
     def test_block_delete_file(self) -> None:
         body = self._validate_tool("delete_file", DELETE_BLOCK_ARGS)
@@ -109,9 +113,10 @@ class TestLiveHermesAdapter(unittest.TestCase):
         self.assertFalse(body["allowed"])
         self.assertIn("agent_response", body)
 
-    def test_allow_patch_v4a_mixed(self) -> None:
-        body = self._validate_tool("patch", PATCH_V4A_MIXED_ALLOW_ARGS)
-        self.assertTrue(body["allowed"])
+    def test_block_patch_v4a_mixed_home_delete(self) -> None:
+        body = self._validate_tool("patch", PATCH_V4A_MIXED_HOME_DELETE_ARGS)
+        self.assertFalse(body["allowed"])
+        self.assertIn("agent_response", body)
 
     def test_block_patch_v4a_mixed_system_delete(self) -> None:
         body = self._validate_tool("patch", PATCH_V4A_BLOCK_ARGS)

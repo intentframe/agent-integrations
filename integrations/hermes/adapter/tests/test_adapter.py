@@ -168,6 +168,30 @@ class TestValidateService(unittest.TestCase):
         self.assertFalse(out["allowed"])
         self.assertIn("agent_response", out)
         self.assertEqual(out["agent_response"]["status"], "blocked")
+        self.assertEqual(out["agent_response"]["exit_code"], -1)
+
+    def test_block_write_file_uses_generic_json(self) -> None:
+        from hermes_adapter.service import ValidateService
+
+        bridge = FakeBridge({"allowed": False, "error": "blocked by policy"})
+        service = ValidateService(bridge=bridge)  # type: ignore[arg-type]
+        out = service.validate_tool(
+            "write_file",
+            {"path": "/etc/x", "content": "y", "reason": "Should block"},
+        )
+        self.assertFalse(out["allowed"])
+        agent_response = out["agent_response"]
+        self.assertEqual(agent_response["status"], "blocked")
+        self.assertNotIn("exit_code", agent_response)
+
+    def test_block_terminal_preflight_uses_terminal_json(self) -> None:
+        from hermes_adapter.service import ValidateService
+
+        service = ValidateService(bridge=FakeBridge({"allowed": True}))  # type: ignore[arg-type]
+        out = service.validate_tool("terminal", {"command": "echo hi"})
+        self.assertFalse(out["allowed"])
+        self.assertEqual(out["agent_response"]["exit_code"], -1)
+        self.assertEqual(out["agent_response"]["status"], "blocked")
 
     def test_multi_intent_blocks_on_second(self) -> None:
         from hermes_adapter.service import ValidateService
@@ -213,6 +237,7 @@ class TestValidateService(unittest.TestCase):
         out = service.validate_tool("terminal", {"command": "echo x", "reason": "Bridge test"})
         self.assertFalse(out["allowed"])
         self.assertEqual(out["agent_response"]["status"], "error")
+        self.assertEqual(out["agent_response"]["exit_code"], -1)
 
 
 class TestServer(unittest.TestCase):

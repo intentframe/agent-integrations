@@ -5,11 +5,18 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from hermes_governance import load_governed_tools
+
 from hermes_adapter.bridge_session import BridgeSession
 from hermes_adapter.mapper import ValidationError, map_tool
 from hermes_adapter.responses import validate_tool_response
 
 logger = logging.getLogger(__name__)
+
+
+def _blocked_response_for(tool: str) -> str:
+    spec = load_governed_tools().get(tool)
+    return spec.blocked_response if spec is not None else "generic_json"
 
 
 class ValidateService:
@@ -32,6 +39,7 @@ class ValidateService:
                 allowed=False,
                 error=str(exc),
                 tool=tool,
+                blocked_response=_blocked_response_for(tool),
             )
 
         for intent in intents:
@@ -53,6 +61,7 @@ class ValidateService:
                     error=str(exc),
                     status="error",
                     tool=tool,
+                    blocked_response=_blocked_response_for(tool),
                 )
             except Exception as exc:
                 logger.warning(
@@ -66,6 +75,7 @@ class ValidateService:
                     error=f"IntentFrame bridge error: {exc}",
                     status="error",
                     tool=tool,
+                    blocked_response=_blocked_response_for(tool),
                 )
 
             if result.get("allowed"):
@@ -97,6 +107,7 @@ class ValidateService:
                 error=message,
                 status="blocked",
                 tool=tool,
+                blocked_response=_blocked_response_for(tool),
             )
 
         return validate_tool_response(allowed=True, tool=tool)
