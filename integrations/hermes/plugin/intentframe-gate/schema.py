@@ -21,7 +21,6 @@ _REASON_SUFFIX = (
 
 def inject_reason(schema: dict[str, Any], *, tool_name: str) -> dict[str, Any]:
     """Return a deep copy of *schema* with required ``reason`` (idempotent)."""
-    del tool_name
     out = deepcopy(schema)
     params = out.setdefault("parameters", {})
     if not isinstance(params, dict):
@@ -34,7 +33,21 @@ def inject_reason(schema: dict[str, Any], *, tool_name: str) -> dict[str, Any]:
         props = {}
         params["properties"] = props
 
-    props["reason"] = deepcopy(_REASON_PROPERTY)
+    if tool_name == "terminal":
+        props["reason"] = {
+            "type": "string",
+            "description": (
+                "Why you are running this command and what outcome you expect. "
+                "Required for security policy review before execution."
+            ),
+        }
+        reason_suffix = (
+            "\n\nYou MUST provide `reason`: a short explanation of why this "
+            "command is needed and what it will do."
+        )
+    else:
+        props["reason"] = deepcopy(_REASON_PROPERTY)
+        reason_suffix = _REASON_SUFFIX
 
     required = list(params.get("required") or [])
     if "reason" not in required:
@@ -42,7 +55,7 @@ def inject_reason(schema: dict[str, Any], *, tool_name: str) -> dict[str, Any]:
     params["required"] = required
 
     description = out.get("description") or ""
-    if _REASON_SUFFIX not in description:
-        out["description"] = description + _REASON_SUFFIX
+    if reason_suffix not in description:
+        out["description"] = description + reason_suffix
 
     return out
