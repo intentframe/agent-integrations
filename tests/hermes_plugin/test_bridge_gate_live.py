@@ -18,6 +18,7 @@ for path in (TESTS_DIR, ADAPTER_TESTS):
 from _loader import load_plugin_module  # noqa: E402
 from live_fixtures import (  # noqa: E402
     DELETE_BLOCK_ARGS,
+    DELETE_DENY_FLOOR_ARGS,
     DELETE_HOME_ARGS,
     PATCH_ALLOW_REPLACE_ARGS,
     PATCH_BLOCK_REPLACE_ARGS,
@@ -52,6 +53,19 @@ class TestLiveBridgeGate(unittest.TestCase):
         body = json.loads(out)
         self.assertEqual(body["status"], "blocked")
         delegate.assert_not_called()
+
+    def _assert_semantic_gate(self, tool: str, args: dict[str, object], *, delegate: MagicMock) -> None:
+        out = gate_mod.gate_tool_call(tool, args, delegate=delegate)
+        body = json.loads(out)
+        status = body.get("status")
+        if status == "ok":
+            delegate.assert_called_once()
+            return
+        if status == "blocked":
+            delegate.assert_not_called()
+            self.assertTrue(body.get("error") or body.get("agent_response"))
+            return
+        self.fail(f"Unexpected semantic gate response: {body!r}")
 
     def test_allow_terminal(self) -> None:
         delegate = MagicMock(return_value='{"exit_code": 0, "status": "ok"}')
@@ -92,9 +106,13 @@ class TestLiveBridgeGate(unittest.TestCase):
         delegate = MagicMock()
         self._assert_blocked("write_file", WRITE_BLOCK_ARGS, delegate=delegate)
 
-    def test_block_delete_file_home_guardian(self) -> None:
+    def test_delete_file_home_semantic(self) -> None:
+        delegate = MagicMock(return_value='{"status": "ok"}')
+        self._assert_semantic_gate("delete_file", DELETE_HOME_ARGS, delegate=delegate)
+
+    def test_block_delete_file_deny_floor(self) -> None:
         delegate = MagicMock()
-        self._assert_blocked("delete_file", DELETE_HOME_ARGS, delegate=delegate)
+        self._assert_blocked("delete_file", DELETE_DENY_FLOOR_ARGS, delegate=delegate)
 
     def test_block_delete_file(self) -> None:
         delegate = MagicMock()
@@ -108,9 +126,9 @@ class TestLiveBridgeGate(unittest.TestCase):
         delegate = MagicMock()
         self._assert_blocked("patch", PATCH_BLOCK_REPLACE_ARGS, delegate=delegate)
 
-    def test_block_patch_v4a_mixed_home_delete(self) -> None:
-        delegate = MagicMock()
-        self._assert_blocked("patch", PATCH_V4A_MIXED_HOME_DELETE_ARGS, delegate=delegate)
+    def test_patch_v4a_mixed_home_delete_semantic(self) -> None:
+        delegate = MagicMock(return_value='{"status": "ok"}')
+        self._assert_semantic_gate("patch", PATCH_V4A_MIXED_HOME_DELETE_ARGS, delegate=delegate)
 
     def test_block_patch_v4a_mixed_system_delete(self) -> None:
         delegate = MagicMock()

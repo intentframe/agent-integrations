@@ -11,6 +11,7 @@ if str(TESTS_DIR) not in sys.path:
 
 from hermes_tool_probes import (  # noqa: E402
     delete_block_args,
+    delete_deny_floor_args,
     delete_home_args,
     patch_replace_allow_args,
     patch_replace_block_args,
@@ -29,6 +30,7 @@ PROCESS_BLOCK_ARGS = process_block_args()
 WRITE_ALLOW_ARGS = write_allow_args(marker=_LIVE_MARKER)
 WRITE_BLOCK_ARGS = write_block_args()
 DELETE_HOME_ARGS = delete_home_args(marker=_LIVE_MARKER)
+DELETE_DENY_FLOOR_ARGS = delete_deny_floor_args()
 DELETE_BLOCK_ARGS = delete_block_args()
 PATCH_ALLOW_REPLACE_ARGS = patch_replace_allow_args(marker=_LIVE_MARKER)
 PATCH_BLOCK_REPLACE_ARGS = patch_replace_block_args()

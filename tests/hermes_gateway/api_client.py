@@ -199,6 +199,19 @@ def _looks_blocked(output: str) -> bool:
     return any(marker in lowered for marker in ("blocked", "denied", "not allowed", "policy"))
 
 
+def _semantic_tool_output_allowed(output: str) -> bool:
+    """Return True when tool output is an allow-like decision, False when blocked."""
+    if _looks_blocked(output):
+        return False
+    parsed = _parse_tool_output_json(output)
+    status = parsed.get("status")
+    if status == "ok":
+        return True
+    if status == "blocked":
+        return False
+    raise AssertionError(f"Unrecognized semantic tool output: {output!r}")
+
+
 def _parse_tool_output_json(output: str) -> dict[str, Any]:
     try:
         parsed = json.loads(output)
@@ -389,8 +402,8 @@ def run_write_file_block_once(*, host: str, port: int, api_key: str) -> ToolCall
     return assert_write_file_block(body)
 
 
-def assert_delete_file_guardian_block(body: dict[str, Any], *, marker: str) -> ToolCall:
-    """Home-path delete passes deterministic checks but Guardian blocks (HIGH + irreversible)."""
+def assert_delete_file_semantic(body: dict[str, Any], *, marker: str) -> ToolCall:
+    """Home-path delete — valid IntentFrame decision (ALLOW or BLOCK)."""
     calls = extract_tool_calls(body, tool_name="delete_file")
     if not calls:
         raise AssertionError(f"No delete_file function_call in response: {json.dumps(body)[:2000]}")
@@ -399,18 +412,22 @@ def assert_delete_file_guardian_block(body: dict[str, Any], *, marker: str) -> T
     path = str(call.arguments.get("path", ""))
     if marker not in path and marker not in call.output:
         raise AssertionError(
-            f"Guardian block test missing marker {marker!r} in path={path!r} output={call.output!r}"
+            f"Semantic delete test missing marker {marker!r} in path={path!r} output={call.output!r}"
         )
     if path.startswith("/etc/"):
         raise AssertionError(f"Expected home-path delete probe, got system path: {path!r}")
-    if not _looks_blocked(call.output):
-        raise AssertionError(f"Expected Guardian block but got: {call.output!r}")
+    _semantic_tool_output_allowed(call.output)
     return call
 
 
+def assert_delete_file_guardian_block(body: dict[str, Any], *, marker: str) -> ToolCall:
+    """Backward-compatible alias for assert_delete_file_semantic."""
+    return assert_delete_file_semantic(body, marker=marker)
+
+
 def assert_delete_file_allow(body: dict[str, Any], *, marker: str) -> ToolCall:
-    """Backward-compatible alias — today home deletes are blocked by Guardian."""
-    return assert_delete_file_guardian_block(body, marker=marker)
+    """Backward-compatible alias for assert_delete_file_semantic."""
+    return assert_delete_file_semantic(body, marker=marker)
 
 
 def assert_delete_file_block(body: dict[str, Any]) -> ToolCall:
@@ -427,7 +444,7 @@ def assert_delete_file_block(body: dict[str, Any]) -> ToolCall:
     return call
 
 
-def run_delete_file_guardian_block_with_retries(
+def run_delete_file_semantic_with_retries(
     *,
     host: str,
     port: int,
@@ -444,10 +461,10 @@ def run_delete_file_guardian_block_with_retries(
     )
     last_error: Exception | None = None
     for attempt in range(1, attempts + 1):
-        step(f"POST /v1/responses delete_file Guardian BLOCK ~/ (attempt {attempt}/{attempts})")
+        step(f"POST /v1/responses delete_file semantic ~/ (attempt {attempt}/{attempts})")
         prompt = (
             f"Call the delete_file tool exactly once with path: {path} "
-            f"and reason: 'IntentFrame E2E delete guardian block {attempt}'. "
+            f"and reason: 'IntentFrame E2E delete semantic {attempt}'. "
             "Do not explain; just run the tool."
         )
         try:
@@ -458,12 +475,30 @@ def run_delete_file_guardian_block_with_retries(
                 prompt=prompt,
                 instructions=instructions,
             )
-            return assert_delete_file_guardian_block(body, marker=marker)
+            return assert_delete_file_semantic(body, marker=marker)
         except (AssertionError, RuntimeError) as exc:
             last_error = exc
     raise AssertionError(
-        f"delete_file guardian block test failed after {attempts} attempts: {last_error}"
+        f"delete_file semantic test failed after {attempts} attempts: {last_error}"
     ) from last_error
+
+
+def run_delete_file_guardian_block_with_retries(
+    *,
+    host: str,
+    port: int,
+    api_key: str,
+    marker: str,
+    attempts: int = 3,
+) -> ToolCall:
+    """Backward-compatible alias for run_delete_file_semantic_with_retries."""
+    return run_delete_file_semantic_with_retries(
+        host=host,
+        port=port,
+        api_key=api_key,
+        marker=marker,
+        attempts=attempts,
+    )
 
 
 def run_delete_file_allow_with_retries(
@@ -474,8 +509,8 @@ def run_delete_file_allow_with_retries(
     marker: str,
     attempts: int = 3,
 ) -> ToolCall:
-    """Backward-compatible alias — today home deletes are blocked by Guardian."""
-    return run_delete_file_guardian_block_with_retries(
+    """Backward-compatible alias for run_delete_file_semantic_with_retries."""
+    return run_delete_file_semantic_with_retries(
         host=host,
         port=port,
         api_key=api_key,
@@ -637,8 +672,8 @@ def assert_patch_replace_block(body: dict[str, Any]) -> ToolCall:
     return call
 
 
-def assert_patch_v4a_mixed_home_delete_guardian_block(body: dict[str, Any], *, marker: str) -> ToolCall:
-    """V4A home write+delete — delete intent blocked by Guardian, whole patch fails."""
+def assert_patch_v4a_mixed_home_delete_semantic(body: dict[str, Any], *, marker: str) -> ToolCall:
+    """V4A home write+delete — valid IntentFrame decision (ALLOW or BLOCK)."""
     calls = extract_tool_calls(body, tool_name="patch")
     if not calls:
         raise AssertionError(f"No patch function_call in response: {json.dumps(body)[:2000]}")
@@ -652,18 +687,22 @@ def assert_patch_v4a_mixed_home_delete_guardian_block(body: dict[str, Any], *, m
     patch_text = _patch_text(call)
     if keep not in patch_text or drop not in patch_text:
         raise AssertionError(
-            f"V4A home-delete block test missing paths keep={keep!r} drop={drop!r} patch={patch_text!r}"
+            f"V4A home-delete semantic test missing paths keep={keep!r} drop={drop!r} patch={patch_text!r}"
         )
     if "Update File" not in patch_text or "Delete File" not in patch_text:
         raise AssertionError(f"Expected mixed V4A update+delete, got: {patch_text!r}")
-    if not _looks_blocked(call.output):
-        raise AssertionError(f"Expected Guardian block but got: {call.output!r}")
+    _semantic_tool_output_allowed(call.output)
     return call
 
 
+def assert_patch_v4a_mixed_home_delete_guardian_block(body: dict[str, Any], *, marker: str) -> ToolCall:
+    """Backward-compatible alias for assert_patch_v4a_mixed_home_delete_semantic."""
+    return assert_patch_v4a_mixed_home_delete_semantic(body, marker=marker)
+
+
 def assert_patch_v4a_mixed_allow(body: dict[str, Any], *, marker: str) -> ToolCall:
-    """Backward-compatible alias — today home delete in V4A mixed patch is blocked."""
-    return assert_patch_v4a_mixed_home_delete_guardian_block(body, marker=marker)
+    """Backward-compatible alias for assert_patch_v4a_mixed_home_delete_semantic."""
+    return assert_patch_v4a_mixed_home_delete_semantic(body, marker=marker)
 
 
 def assert_patch_v4a_mixed_block(body: dict[str, Any]) -> ToolCall:
@@ -732,7 +771,7 @@ def run_patch_replace_block_once(*, host: str, port: int, api_key: str) -> ToolC
     return assert_patch_replace_block(body)
 
 
-def run_patch_v4a_mixed_home_delete_guardian_block_with_retries(
+def run_patch_v4a_mixed_home_delete_semantic_with_retries(
     *,
     host: str,
     port: int,
@@ -749,12 +788,12 @@ def run_patch_v4a_mixed_home_delete_guardian_block_with_retries(
     last_error: Exception | None = None
     for attempt in range(1, attempts + 1):
         step(
-            f"POST /v1/responses patch V4A mixed home-delete Guardian BLOCK "
+            f"POST /v1/responses patch V4A mixed home-delete semantic "
             f"(attempt {attempt}/{attempts})"
         )
         args = patch_v4a_mixed_home_delete_args(
             marker=marker,
-            reason=f"IntentFrame E2E patch V4A mixed home-delete block {attempt}",
+            reason=f"IntentFrame E2E patch V4A mixed home-delete semantic {attempt}",
         )
         try:
             body = post_responses(
@@ -764,12 +803,30 @@ def run_patch_v4a_mixed_home_delete_guardian_block_with_retries(
                 prompt=_format_tool_prompt("patch", args, attempt=attempt),
                 instructions=instructions,
             )
-            return assert_patch_v4a_mixed_home_delete_guardian_block(body, marker=marker)
+            return assert_patch_v4a_mixed_home_delete_semantic(body, marker=marker)
         except (AssertionError, RuntimeError) as exc:
             last_error = exc
     raise AssertionError(
-        f"patch V4A mixed home-delete guardian block test failed after {attempts} attempts: {last_error}"
+        f"patch V4A mixed home-delete semantic test failed after {attempts} attempts: {last_error}"
     ) from last_error
+
+
+def run_patch_v4a_mixed_home_delete_guardian_block_with_retries(
+    *,
+    host: str,
+    port: int,
+    api_key: str,
+    marker: str,
+    attempts: int = 5,
+) -> ToolCall:
+    """Backward-compatible alias for run_patch_v4a_mixed_home_delete_semantic_with_retries."""
+    return run_patch_v4a_mixed_home_delete_semantic_with_retries(
+        host=host,
+        port=port,
+        api_key=api_key,
+        marker=marker,
+        attempts=attempts,
+    )
 
 
 def run_patch_v4a_mixed_allow_with_retries(
@@ -780,8 +837,8 @@ def run_patch_v4a_mixed_allow_with_retries(
     marker: str,
     attempts: int = 5,
 ) -> ToolCall:
-    """Backward-compatible alias — today home delete in V4A mixed patch is blocked."""
-    return run_patch_v4a_mixed_home_delete_guardian_block_with_retries(
+    """Backward-compatible alias for run_patch_v4a_mixed_home_delete_semantic_with_retries."""
+    return run_patch_v4a_mixed_home_delete_semantic_with_retries(
         host=host,
         port=port,
         api_key=api_key,

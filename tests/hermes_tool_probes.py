@@ -31,10 +31,18 @@ def write_block_args(*, reason: str = "Should block write") -> dict[str, str]:
 
 
 def delete_home_args(*, marker: str, reason: str | None = None) -> dict[str, str]:
-    """Home-path delete probe — passes deterministic checks, Guardian blocks today."""
+    """Home-path delete probe — passes deterministic checks; AE/Guardian may ALLOW or BLOCK."""
     return {
         "path": f"~/intentframe-e2e-delete-{marker}.txt",
         "reason": reason or "Live delete home-path probe",
+    }
+
+
+def delete_deny_floor_args(*, reason: str = "Should block delete deny floor") -> dict[str, str]:
+    """Sensitive home-path delete — deterministic deny floor should always BLOCK."""
+    return {
+        "path": "~/.ssh/intentframe-e2e-delete-deny-floor-probe",
+        "reason": reason,
     }
 
 

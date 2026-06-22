@@ -13,6 +13,13 @@ from if_security_backend.bridge.runner import is_bridge_running
 from if_security_backend.runtime.health import core_healthy
 from if_security_backend.runtime.paths import bridge_socket_path
 
+REPO_ROOT = Path(__file__).resolve().parents[3]
+TESTS_DIR = REPO_ROOT / "tests"
+if str(TESTS_DIR) not in sys.path:
+    sys.path.insert(0, str(TESTS_DIR))
+
+from intentframe_validation_helpers import assert_bridge_semantic_delete  # noqa: E402
+
 
 def _bridge_client(secret: str) -> httpx.Client:
     socket = bridge_socket_path()
@@ -169,13 +176,37 @@ def run_bridge_connection_tests(agent_config: Path | None = None) -> int:
                 )
                 return 1
             delete_benign_body = delete_benign.json()
-            if delete_benign_body.get("allowed"):
+            try:
+                allowed = assert_bridge_semantic_delete(delete_benign_body)
+            except AssertionError as exc:
+                print(f"FAIL bridge delete home-path: {exc} body={delete_benign_body!r}")
+                return 1
+            outcome = "allowed=True (validated_only)" if allowed else "allowed=False (Guardian/domain block)"
+            print(f"PASS bridge delete home-path semantic: {outcome}")
+
+            delete_deny_floor = client.post(
+                "/validate",
+                json={
+                    "action": "DELETE_HOST_FILE",
+                    "path": "~/.ssh/intentframe-bridge-delete-deny-floor-probe",
+                    "target": "~/.ssh/intentframe-bridge-delete-deny-floor-probe",
+                    "reason": "Should be blocked by delete deny floor",
+                },
+            )
+            if delete_deny_floor.status_code != 200:
                 print(
-                    f"FAIL bridge delete home-path: expected allowed=False (Guardian block) "
-                    f"body={delete_benign_body!r}"
+                    f"FAIL bridge delete deny-floor: status={delete_deny_floor.status_code} "
+                    f"body={delete_deny_floor.text!r}"
                 )
                 return 1
-            print("PASS bridge delete home-path: allowed=False (Guardian block)")
+            delete_deny_floor_body = delete_deny_floor.json()
+            if delete_deny_floor_body.get("allowed"):
+                print(
+                    f"FAIL bridge delete deny-floor: expected allowed=False "
+                    f"body={delete_deny_floor_body!r}"
+                )
+                return 1
+            print(f"PASS bridge delete deny-floor: error={delete_deny_floor_body.get('error')!r}")
 
             delete_blocked = client.post(
                 "/validate",

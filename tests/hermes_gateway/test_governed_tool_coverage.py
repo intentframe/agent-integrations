@@ -41,12 +41,12 @@ class TestGovernedToolCoverage(unittest.TestCase):
                 self.assertIn("run_write_file_allow_with_retries", source)
                 self.assertIn("run_write_file_block_once", source)
             elif tool == "delete_file":
-                self.assertIn("run_delete_file_guardian_block_with_retries", source)
+                self.assertIn("run_delete_file_semantic_with_retries", source)
                 self.assertIn("run_delete_file_block_once", source)
             elif tool == "patch":
                 self.assertIn("run_patch_replace_allow_with_retries", source)
                 self.assertIn("run_patch_replace_block_once", source)
-                self.assertIn("run_patch_v4a_mixed_home_delete_guardian_block_with_retries", source)
+                self.assertIn("run_patch_v4a_mixed_home_delete_semantic_with_retries", source)
                 self.assertIn("run_patch_v4a_mixed_block_once", source)
 
     def test_live_adapter_covers_all_governed_tools(self) -> None:

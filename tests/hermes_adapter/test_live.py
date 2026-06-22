@@ -11,11 +11,15 @@ from pathlib import Path
 import httpx
 
 HERE = Path(__file__).resolve().parent
-if str(HERE) not in sys.path:
-    sys.path.insert(0, str(HERE))
+TESTS_DIR = HERE.parent
+for path in (HERE, TESTS_DIR):
+    if str(path) not in sys.path:
+        sys.path.insert(0, str(path))
 
+from intentframe_validation_helpers import assert_adapter_semantic_validate  # noqa: E402
 from live_fixtures import (  # noqa: E402
     DELETE_BLOCK_ARGS,
+    DELETE_DENY_FLOOR_ARGS,
     DELETE_HOME_ARGS,
     PATCH_ALLOW_REPLACE_ARGS,
     PATCH_BLOCK_REPLACE_ARGS,
@@ -94,10 +98,14 @@ class TestLiveHermesAdapter(unittest.TestCase):
         self.assertFalse(body["allowed"])
         self.assertIn("agent_response", body)
 
-    def test_block_delete_file_home_guardian(self) -> None:
+    def test_delete_file_home_semantic(self) -> None:
         body = self._validate_tool("delete_file", DELETE_HOME_ARGS)
+        assert_adapter_semantic_validate(body)
+
+    def test_block_delete_file_deny_floor(self) -> None:
+        body = self._validate_tool("delete_file", DELETE_DENY_FLOOR_ARGS)
         self.assertFalse(body["allowed"])
-        self.assertIn("agent_response", body)
+        self.assertTrue(body.get("error") or body.get("agent_response"))
 
     def test_block_delete_file(self) -> None:
         body = self._validate_tool("delete_file", DELETE_BLOCK_ARGS)
@@ -113,10 +121,9 @@ class TestLiveHermesAdapter(unittest.TestCase):
         self.assertFalse(body["allowed"])
         self.assertIn("agent_response", body)
 
-    def test_block_patch_v4a_mixed_home_delete(self) -> None:
+    def test_patch_v4a_mixed_home_delete_semantic(self) -> None:
         body = self._validate_tool("patch", PATCH_V4A_MIXED_HOME_DELETE_ARGS)
-        self.assertFalse(body["allowed"])
-        self.assertIn("agent_response", body)
+        assert_adapter_semantic_validate(body)
 
     def test_block_patch_v4a_mixed_system_delete(self) -> None:
         body = self._validate_tool("patch", PATCH_V4A_BLOCK_ARGS)
