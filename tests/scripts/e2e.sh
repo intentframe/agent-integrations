@@ -132,8 +132,16 @@ export IF_SECURITY_BRIDGE_SOCKET="$BRIDGE_SOCKET"
 step "Hermes adapter unit tests"
 (cd "$REPO_ROOT" && uv run --directory integrations/hermes/adapter python tests/test_adapter.py)
 
+step "Hermes governance unit tests"
+(cd "$REPO_ROOT" && uv run --directory integrations/hermes/shared python tests/test_governance.py)
+(cd "$REPO_ROOT" && uv run --directory integrations/hermes/shared python tests/test_governance_sync.py)
+
+step "Backend validate adapter unit tests"
+(cd "$REPO_ROOT" && uv run --package if-integration-backend python if-integration-backend/tests/test_validate_adapter.py)
+
 step "Hermes plugin unit tests"
-(cd "$REPO_ROOT" && uv run --with httpx --package intentframe-integrations-cli python tests/hermes_plugin/test_gate.py)
+(cd "$REPO_ROOT" && uv run --with httpx --with pyyaml --package intentframe-integrations-cli python tests/hermes_plugin/test_gate.py)
+(cd "$REPO_ROOT" && uv run --with httpx --with pyyaml --package intentframe-integrations-cli python tests/hermes_plugin/test_registry_hook.py)
 (cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/hermes_plugin/test_integrate.py)
 
 step "Integrations CLI unit tests"
@@ -145,6 +153,8 @@ step "Integrations CLI unit tests"
 
 step "Hermes gateway isolation unit tests"
 (cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_isolation.py)
+(cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_api_client.py)
+(cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_governed_tool_coverage.py)
 
 step "Hermes live integration (adapter + plugin gate)"
 bash "${SCRIPT_DIR}/test-hermes-integration.sh"

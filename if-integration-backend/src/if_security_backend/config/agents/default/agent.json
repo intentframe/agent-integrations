@@ -2,7 +2,7 @@
   "agent_id": "bridge_test",
   "user_id": "test_user",
   "agent_type": "test",
-  "action_types": ["RUN_COMMAND"],
+  "action_types": ["RUN_COMMAND", "WRITE_HOST_FILE", "DELETE_HOST_FILE"],
   "bridge_secret": "test-bridge-secret-dev-only",
   "policy_file": "policy.yaml",
   "env": {

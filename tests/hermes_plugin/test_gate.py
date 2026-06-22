@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Unit tests for intentframe-terminal plugin gate (adapter client injected)."""
+"""Unit tests for intentframe-gate plugin (adapter client injected)."""
 
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from _loader import load_plugin_module  # noqa: E402
 
 schema_mod = load_plugin_module("schema")
 gate_mod = load_plugin_module("gate")
+governance_mod = load_plugin_module("governance_loader")
 
 
 class FakeValidator:
@@ -36,14 +37,50 @@ class FakeValidator:
 
 
 class TestSchema(unittest.TestCase):
-    def test_fallback_schema_requires_reason(self) -> None:
-        built = schema_mod.build_terminal_schema()
+    def test_inject_reason_adds_required_field(self) -> None:
+        built = schema_mod.inject_reason(
+            {
+                "name": "write_file",
+                "description": "Write a file",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"path": {"type": "string"}},
+                    "required": ["path"],
+                },
+            },
+            tool_name="write_file",
+        )
         required = built["parameters"]["required"]
-        self.assertIn("command", required)
+        self.assertIn("path", required)
         self.assertIn("reason", required)
+        self.assertIn("reason", built["parameters"]["properties"])
+
+    def test_inject_reason_idempotent(self) -> None:
+        schema = {
+            "parameters": {
+                "type": "object",
+                "properties": {"reason": {"type": "string"}},
+                "required": ["reason"],
+            }
+        }
+        once = schema_mod.inject_reason(schema, tool_name="terminal")
+        twice = schema_mod.inject_reason(once, tool_name="terminal")
+        self.assertEqual(
+            twice["parameters"]["required"].count("reason"),
+            1,
+        )
 
 
-class TestGateTerminalCall(unittest.TestCase):
+class TestGovernanceLoader(unittest.TestCase):
+    def test_load_governed_tools(self) -> None:
+        governance_mod.load_governed_tools.cache_clear()
+        tools = governance_mod.load_governed_tools()
+        self.assertIn("terminal", tools)
+        self.assertIn("write_file", tools)
+        self.assertEqual(tools["write_file"].action, "WRITE_HOST_FILE")
+
+
+class TestGateToolCall(unittest.TestCase):
     def setUp(self) -> None:
         gate_mod.reset_session_client()
 
@@ -65,12 +102,13 @@ class TestGateTerminalCall(unittest.TestCase):
         class Delegate:
             called = False
 
-            def __call__(self, **kwargs: Any) -> str:
+            def __call__(self, args: dict[str, Any], **kwargs: Any) -> str:
                 Delegate.called = True
                 return "{}"
 
         delegate = Delegate()
-        out = gate_mod.gate_terminal_call(
+        out = gate_mod.gate_tool_call(
+            "terminal",
             {"command": "sudo x", "reason": "Should block"},
             delegate=delegate,
             validator=validator,
@@ -82,45 +120,50 @@ class TestGateTerminalCall(unittest.TestCase):
     def test_allows_and_strips_reason(self) -> None:
         validator = FakeValidator({"allowed": True})
 
-        def delegate(**kwargs: Any) -> str:
-            self.assertNotIn("reason", kwargs)
-            return '{"exit_code": 0}'
+        def delegate(args: dict[str, Any], **kwargs: Any) -> str:
+            self.assertNotIn("reason", args)
+            return '{"status": "ok"}'
 
-        out = gate_mod.gate_terminal_call(
-            {"command": "echo ok", "reason": "Smoke test", "background": True},
+        out = gate_mod.gate_tool_call(
+            "write_file",
+            {"path": "~/x.txt", "content": "hi", "reason": "Save file"},
             delegate=delegate,
             validator=validator,
         )
-        self.assertEqual(out, '{"exit_code": 0}')
-        self.assertEqual(validator.calls[0][0], "terminal")
+        self.assertEqual(out, '{"status": "ok"}')
+        self.assertEqual(validator.calls[0][0], "write_file")
 
-    def test_infrastructure_error_status(self) -> None:
+    def test_generic_blocked_response(self) -> None:
         validator = FakeValidator(
             {
                 "allowed": False,
-                "error": "Adapter socket missing",
-                "agent_response": {
-                    "exit_code": -1,
-                    "status": "error",
-                    "error": "Adapter socket missing",
-                },
+                "error": "blocked",
+                "agent_response": {"status": "blocked", "error": "blocked"},
             }
         )
 
         class Delegate:
-            called = False
-
-            def __call__(self, **kwargs: Any) -> str:
-                Delegate.called = True
+            def __call__(self, args: dict[str, Any], **kwargs: Any) -> str:
                 return "{}"
 
-        out = gate_mod.gate_terminal_call(
-            {"command": "echo ok", "reason": "Should fail closed"},
+        out = gate_mod.gate_tool_call(
+            "write_file",
+            {"path": "~/x", "content": "y", "reason": "Test"},
             delegate=Delegate(),
             validator=validator,
         )
         body = json.loads(out)
-        self.assertEqual(body["status"], "error")
+        self.assertEqual(body["status"], "blocked")
+        self.assertNotIn("exit_code", body)
+
+    def test_wrap_handler_marks_gated(self) -> None:
+        def original(args: dict[str, Any], **kw: Any) -> str:
+            return "ok"
+
+        wrapped = gate_mod.wrap_handler("terminal", original, is_async=False)
+        self.assertTrue(getattr(wrapped, gate_mod.GATED_MARKER, False))
+        wrapped_again = gate_mod.wrap_handler("terminal", wrapped, is_async=False)
+        self.assertIs(wrapped, wrapped_again)
 
 
 def main() -> int:

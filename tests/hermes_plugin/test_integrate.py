@@ -49,6 +49,18 @@ class TestIntegrateHermes(unittest.TestCase):
             self.assertFalse(merge_plugin_enabled(cfg))
             self.assertTrue(is_plugin_enabled(cfg))
 
+    def test_merge_removes_removed_plugin_keys(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Path(tmp) / "config.yaml"
+            cfg.write_text(
+                "plugins:\n  enabled:\n    - intentframe-terminal\n    - intentframe-gate\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(merge_plugin_enabled(cfg))
+            text = cfg.read_text(encoding="utf-8")
+            self.assertNotIn("intentframe-terminal", text)
+            self.assertIn("intentframe-gate", text)
+
     def test_merge_preserves_existing_config_comments(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             cfg = Path(tmp) / "config.yaml"

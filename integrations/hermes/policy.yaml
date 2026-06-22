@@ -2,7 +2,7 @@ intentframe_schema_version: 1
 agent_id: hermes
 
 metadata:
-  note: Hermes validate-only RUN_COMMAND policy (integrations/hermes)
+  note: Hermes validate-only policy (integrations/hermes)
 
 allowed_actions:
   RUN_COMMAND:
@@ -89,3 +89,24 @@ allowed_actions:
         - "capability:system_mutate:tcc_privacy"
         - "capability:system_mutate:time_sync"
         - "capability:system_mutate:user_account"
+
+  WRITE_HOST_FILE:
+    safe: false
+    constraints:
+      allowed_host_paths:
+        - "~/*"
+
+  DELETE_HOST_FILE:
+    safe: false
+    constraints:
+      allowed_host_paths:
+        - "~/*"
+
+domain_constraints:
+  deletion:
+    # Structural deletion guards (deterministic). Path scope also in DELETE_HOST_FILE.
+    # require_confirmation is describe-only today; keep false until IF supports it.
+    require_confirmation: false
+    block_irreversible: false
+    allowed_paths:
+      - "~/*"

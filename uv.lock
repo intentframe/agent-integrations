@@ -6,6 +6,7 @@ requires-python = ">=3.14"
 members = [
     "agent-integrations",
     "hermes-adapter",
+    "hermes-governance",
     "if-integration-backend",
     "if-integration-bridge-client",
     "intentframe-integrations-cli",
@@ -289,6 +290,7 @@ name = "hermes-adapter"
 version = "0.1.0"
 source = { editable = "integrations/hermes/adapter" }
 dependencies = [
+    { name = "hermes-governance" },
     { name = "if-integration-bridge-client" },
     { name = "starlette" },
     { name = "uvicorn" },
@@ -296,10 +298,22 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "hermes-governance", editable = "integrations/hermes/shared" },
     { name = "if-integration-bridge-client", editable = "if-integration-clients/python" },
     { name = "starlette", specifier = ">=0.37.2" },
     { name = "uvicorn", specifier = ">=0.24.0" },
 ]
+
+[[package]]
+name = "hermes-governance"
+version = "0.1.0"
+source = { editable = "integrations/hermes/shared" }
+dependencies = [
+    { name = "pyyaml" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "pyyaml", specifier = ">=6.0" }]
 
 [[package]]
 name = "httpcore"

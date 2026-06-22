@@ -35,10 +35,20 @@ RUN_HERMES_GATEWAY_E2E=1 ./scripts/e2e.sh
 | **2a** | Reuse managed install from pass 1 (idempotent `integrate`, gateway restart) |
 | **2b** | External Hermes via `HERMES_BIN`, then `integrate` and gateway E2E |
 
-Each pass runs two HTTP assertions against the gateway API:
+Each pass runs HTTP assertions against the gateway API for **every governed tool**
+(`terminal`, `process`, `write_file`, `delete_file`, `patch`):
 
-- **ALLOW** — LLM issues a `terminal` tool call for `printf '<marker>'` with a reason; IntentFrame policy allows it.
-- **BLOCK** — LLM issues `terminal` for `sudo echo intentframe-e2e-block-probe`; policy blocks via the `sudo` pattern.
+| Tool | ALLOW probe | BLOCK probe |
+|------|-------------|-------------|
+| `terminal` | `printf '<marker>'` | `sudo echo …` |
+| `process` | `action: list` | `action: run`, `data` contains `sudo` |
+| `write_file` | path under `~/…` | path under `/etc/…` |
+| `delete_file` | path under `~/…` | path under `/etc/…` |
+| `patch` (replace) | replace under `~/…` | replace under `/etc/…` |
+| `patch` (V4A mixed) | Update `~/…` + Delete `~/…` in one call | Update `~/…` + Delete `/etc/…` (multi-intent block) |
+
+Multi-intent `patch` calls map to multiple IntentFrame `/validate` requests inside the adapter;
+the plugin still sees one allow/block for the single Hermes tool call.
 
 ## Sandbox isolation
 
@@ -135,4 +145,6 @@ Hermes gateway before trusting stale PID files.
 uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_isolation.py
 uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_cli_runner.py
 uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_hermes_reference_contract.py
+uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_api_client.py
+uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_governed_tool_coverage.py
 ```

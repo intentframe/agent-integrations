@@ -110,4 +110,95 @@ def run_bridge_connection_tests(agent_config: Path | None = None) -> int:
             return 1
         print(f"PASS bridge blocked: error={blocked_body.get('error')!r}")
 
+        if "WRITE_HOST_FILE" in pack.action_types:
+            write_ok = client.post(
+                "/validate",
+                json={
+                    "action": "WRITE_HOST_FILE",
+                    "path": "~/bridge-test.txt",
+                    "content": "hello",
+                    "target": "~/bridge-test.txt",
+                    "reason": "Bridge connection benign write",
+                },
+            )
+            if write_ok.status_code != 200:
+                print(f"FAIL bridge write benign: status={write_ok.status_code} body={write_ok.text!r}")
+                return 1
+            write_body = write_ok.json()
+            if not write_body.get("allowed"):
+                print(f"FAIL bridge write benign: expected allowed=True body={write_body!r}")
+                return 1
+            print("PASS bridge write benign: allowed=True")
+
+            write_blocked = client.post(
+                "/validate",
+                json={
+                    "action": "WRITE_HOST_FILE",
+                    "path": "/etc/bridge-test-denied",
+                    "content": "nope",
+                    "target": "/etc/bridge-test-denied",
+                    "reason": "Should be blocked by host path policy",
+                },
+            )
+            if write_blocked.status_code != 200:
+                print(
+                    f"FAIL bridge write blocked: status={write_blocked.status_code} "
+                    f"body={write_blocked.text!r}"
+                )
+                return 1
+            write_blocked_body = write_blocked.json()
+            if write_blocked_body.get("allowed"):
+                print(f"FAIL bridge write blocked: expected allowed=False body={write_blocked_body!r}")
+                return 1
+            print(f"PASS bridge write blocked: error={write_blocked_body.get('error')!r}")
+
+        if "DELETE_HOST_FILE" in pack.action_types:
+            delete_benign = client.post(
+                "/validate",
+                json={
+                    "action": "DELETE_HOST_FILE",
+                    "path": "~/intentframe-bridge-delete-ok.txt",
+                    "target": "~/intentframe-bridge-delete-ok.txt",
+                    "reason": "Bridge delete allow probe",
+                },
+            )
+            if delete_benign.status_code != 200:
+                print(
+                    f"FAIL bridge delete benign: status={delete_benign.status_code} "
+                    f"body={delete_benign.text!r}"
+                )
+                return 1
+            delete_benign_body = delete_benign.json()
+            if not delete_benign_body.get("allowed"):
+                print(
+                    f"FAIL bridge delete benign: expected allowed=True "
+                    f"body={delete_benign_body!r}"
+                )
+                return 1
+            print("PASS bridge delete benign: allowed=True")
+
+            delete_blocked = client.post(
+                "/validate",
+                json={
+                    "action": "DELETE_HOST_FILE",
+                    "path": "/etc/sudoers",
+                    "target": "/etc/sudoers",
+                    "reason": "Should be blocked by delete floor",
+                },
+            )
+            if delete_blocked.status_code != 200:
+                print(
+                    f"FAIL bridge delete blocked: status={delete_blocked.status_code} "
+                    f"body={delete_blocked.text!r}"
+                )
+                return 1
+            delete_blocked_body = delete_blocked.json()
+            if delete_blocked_body.get("allowed"):
+                print(
+                    f"FAIL bridge delete blocked: expected allowed=False "
+                    f"body={delete_blocked_body!r}"
+                )
+                return 1
+            print(f"PASS bridge delete blocked: error={delete_blocked_body.get('error')!r}")
+
     return 0

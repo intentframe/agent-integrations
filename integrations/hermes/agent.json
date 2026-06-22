@@ -2,7 +2,7 @@
   "agent_id": "hermes",
   "user_id": "dev_user",
   "agent_type": "hermes",
-  "action_types": ["RUN_COMMAND"],
+  "action_types": ["RUN_COMMAND", "WRITE_HOST_FILE", "DELETE_HOST_FILE"],
   "bridge_secret": "change-me-hermes-dev-only",
   "policy_file": "policy.yaml",
   "adapter": {

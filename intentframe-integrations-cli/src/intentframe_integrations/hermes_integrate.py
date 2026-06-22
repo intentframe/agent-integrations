@@ -27,8 +27,9 @@ from intentframe_integrations.hermes_paths import (
 from intentframe_integrations.integration_pack import IntegrationPack, load_integration_pack
 from intentframe_integrations.paths import agent_config_path, repo_root
 
-PLUGIN_KEY = "intentframe-terminal"
-PLUGIN_DIR_NAME = "intentframe-terminal"
+PLUGIN_KEY = "intentframe-gate"
+PLUGIN_DIR_NAME = "intentframe-gate"
+REMOVED_PLUGIN_KEYS = frozenset({"intentframe-terminal"})
 
 
 def plugin_source_dir() -> Path:
@@ -146,11 +147,46 @@ def is_plugin_enabled(config_path: Path | None = None) -> bool:
     return PLUGIN_KEY in enabled
 
 
-def merge_plugin_enabled(config_path: Path | None = None) -> bool:
-    """Ensure ``intentframe-terminal`` is in ``plugins.enabled``. Returns True if changed."""
-    path = config_path or hermes_config_path()
-    if is_plugin_enabled(path):
+def _sanitize_plugin_enabled(cfg: dict[str, Any]) -> bool:
+    plugins = cfg.get("plugins")
+    if not isinstance(plugins, dict):
         return False
+    enabled = plugins.get("enabled")
+    if not isinstance(enabled, list):
+        return False
+
+    changed = False
+    cleaned: list[str] = []
+    for item in enabled:
+        if not isinstance(item, str):
+            changed = True
+            continue
+        if item in REMOVED_PLUGIN_KEYS:
+            changed = True
+            continue
+        if item not in cleaned:
+            cleaned.append(item)
+        else:
+            changed = True
+    if cleaned != enabled:
+        plugins["enabled"] = cleaned
+        changed = True
+    return changed
+
+
+def merge_plugin_enabled(config_path: Path | None = None) -> bool:
+    """Ensure ``intentframe-gate`` is in ``plugins.enabled``. Returns True if changed."""
+    path = config_path or hermes_config_path()
+    changed = False
+    if path.is_file():
+        cfg = _load_yaml(path)
+        if _sanitize_plugin_enabled(cfg):
+            _backup_config(path)
+            path.write_text(_dump_yaml(cfg), encoding="utf-8")
+            changed = True
+
+    if is_plugin_enabled(path):
+        return changed
 
     path.parent.mkdir(parents=True, exist_ok=True)
     if not path.is_file():
@@ -275,6 +311,88 @@ class DoctorReport:
     lines: tuple[str, ...]
 
 
+def _governance_yaml_path() -> Path:
+    return repo_root() / "integrations" / "hermes" / "governance" / "tools.yaml"
+
+
+def _load_governance_contract() -> dict[str, dict[str, str | list[str]]]:
+    path = _governance_yaml_path()
+    if not path.is_file():
+        raise FileNotFoundError(f"Governance contract missing: {path}")
+    raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    tools = raw.get("tools")
+    if not isinstance(tools, dict) or not tools:
+        raise ValueError(f"Governance contract has no tools: {path}")
+    out: dict[str, dict[str, str | list[str]]] = {}
+    for name, spec in tools.items():
+        if not isinstance(name, str) or not isinstance(spec, dict):
+            continue
+        action = spec.get("action")
+        mapper = spec.get("mapper")
+        actions = spec.get("actions")
+        if not isinstance(action, str) or not isinstance(mapper, str):
+            continue
+        entry: dict[str, str | list[str]] = {"action": action, "mapper": mapper}
+        if isinstance(actions, list):
+            entry["actions"] = [str(item) for item in actions]
+        out[name] = entry
+    return out
+
+
+def governance_doctor_lines(pack: IntegrationPack) -> tuple[list[str], bool]:
+    lines: list[str] = []
+    ok = True
+    try:
+        contract = _load_governance_contract()
+    except (OSError, ValueError) as exc:
+        return [f"  governance: ERROR — {exc}"], False
+
+    governed_actions: set[str] = set()
+    for spec in contract.values():
+        governed_actions.add(str(spec["action"]))
+        extra = spec.get("actions")
+        if isinstance(extra, list):
+            governed_actions.update(str(action) for action in extra)
+    agent_actions = set(pack.agent.action_types)
+    missing_agent = sorted(governed_actions - agent_actions)
+    if missing_agent:
+        ok = False
+        lines.append(
+            f"  governance: action_types missing from agent.json: {missing_agent}"
+        )
+    else:
+        lines.append(
+            f"  governance: {len(contract)} governed tools; "
+            f"agent.json covers {len(governed_actions)} action(s)"
+        )
+
+    policy_path = pack.agent.policy_file
+    if policy_path is not None and policy_path.is_file():
+        policy_raw = yaml.safe_load(policy_path.read_text(encoding="utf-8")) or {}
+        allowed = policy_raw.get("allowed_actions")
+        if isinstance(allowed, dict):
+            missing_policy = sorted(
+                action for action in governed_actions if action not in allowed
+            )
+            if missing_policy:
+                ok = False
+                lines.append(
+                    f"  governance: policy.yaml missing allowed_actions: {missing_policy}"
+                )
+            else:
+                lines.append("  governance: policy.yaml covers all governed actions")
+        else:
+            ok = False
+            lines.append("  governance: policy.yaml has no allowed_actions mapping")
+    else:
+        ok = False
+        lines.append("  governance: policy file missing from agent pack")
+
+    tool_names = ", ".join(sorted(contract))
+    lines.append(f"  governance tools: {tool_names}")
+    return lines, ok
+
+
 def doctor_hermes(
     pack: IntegrationPack,
     *,
@@ -325,7 +443,13 @@ def doctor_hermes(
         lines.append(f"  plugin install: not installed ({dest})")
 
     hcfg = hermes_config_path()
-    if is_plugin_enabled(hcfg):
+    cfg = _load_yaml(hcfg) if hcfg.is_file() else {}
+    plugins = cfg.get("plugins") if isinstance(cfg, dict) else None
+    enabled = plugins.get("enabled") if isinstance(plugins, dict) else None
+    has_gate = isinstance(enabled, list) and PLUGIN_KEY in enabled
+    if has_gate:
+        lines.append(f"  hermes config: {PLUGIN_KEY} enabled in {hcfg}")
+    elif is_plugin_enabled(hcfg):
         lines.append(f"  hermes config: {PLUGIN_KEY} enabled in {hcfg}")
     elif require_integration:
         if hcfg.is_file():
@@ -370,6 +494,11 @@ def doctor_hermes(
         lines.append(f"  {adapter_status_line(pack)}")
 
     if require_hermes and resolve_hermes_bin() is None:
+        ok = False
+
+    gov_lines, gov_ok = governance_doctor_lines(pack)
+    lines.extend(gov_lines)
+    if not gov_ok and require_integration:
         ok = False
 
     return DoctorReport(ok=ok, lines=tuple(lines))

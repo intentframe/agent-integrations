@@ -41,9 +41,18 @@ jobs:
       - name: Hermes adapter unit tests
         run: uv run --directory integrations/hermes/adapter python tests/test_adapter.py
 
+      - name: Hermes governance unit tests
+        run: |
+          uv run --directory integrations/hermes/shared python tests/test_governance.py
+          uv run --directory integrations/hermes/shared python tests/test_governance_sync.py
+
+      - name: Backend validate adapter unit tests
+        run: uv run --package if-integration-backend python if-integration-backend/tests/test_validate_adapter.py
+
       - name: Hermes plugin unit tests
         run: |
-          uv run --with httpx --package intentframe-integrations-cli python tests/hermes_plugin/test_gate.py
+          uv run --with httpx --with pyyaml --package intentframe-integrations-cli python tests/hermes_plugin/test_gate.py
+          uv run --with httpx --with pyyaml --package intentframe-integrations-cli python tests/hermes_plugin/test_registry_hook.py
           uv run --package intentframe-integrations-cli python tests/hermes_plugin/test_integrate.py
 
       - name: Integrations CLI unit tests
@@ -59,6 +68,8 @@ jobs:
           uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_isolation.py
           uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_cli_runner.py
           uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_hermes_reference_contract.py
+          uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_api_client.py
+          uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_governed_tool_coverage.py
 
   typescript:
     name: TypeScript build

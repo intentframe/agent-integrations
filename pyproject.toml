@@ -11,4 +11,5 @@ members = [
   "if-integration-clients/python",
   "intentframe-integrations-cli",
   "integrations/hermes/adapter",
+  "integrations/hermes/shared",
 ]

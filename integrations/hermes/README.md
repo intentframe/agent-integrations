@@ -5,9 +5,11 @@ Hermes does **not** ship an IntentFrame executor pack or runtime. This folder pr
 | Path | Purpose |
 |------|---------|
 | `agent.json` | Agent profile, adapter socket, exported `env` for Hermes plugin |
-| `policy.yaml` | RUN_COMMAND rules seeded into policy-registry |
+| `policy.yaml` | RUN_COMMAND + host-file + deletion domain rules seeded into policy-registry |
+| `governance/tools.yaml` | Governed-tool contract (single source of truth) |
+| `shared/` | `hermes-governance` package — contract loader for adapter |
 | `adapter/` | Hermes adapter sidecar (bridge client, tool mapping, HTTP/UDS server) |
-| `plugin/intentframe-terminal/` | Thin Hermes plugin — schema override + adapter gate |
+| `plugin/intentframe-gate/` | Hermes plugin — selective schema override + adapter gate |
 
 ## Quick start
 
@@ -31,6 +33,18 @@ bin/intentframe-integrations doctor hermes
 bin/intentframe-integrations gateway start hermes --api-server
 ```
 
+## Governed tools (v1)
+
+Configured in `governance/tools.yaml`:
+
+| Hermes tool | IntentFrame action |
+|-------------|-------------------|
+| `terminal`, `process` | `RUN_COMMAND` |
+| `write_file`, `patch` (update/add) | `WRITE_HOST_FILE` |
+| `delete_file`, `patch` (V4A delete) | `DELETE_HOST_FILE` |
+
+Reads (`read_file`, `search_files`, …) stay ungoverned unless explicitly added.
+
 ## Commands
 
 ```bash
@@ -44,32 +58,30 @@ bin/intentframe-integrations run hermes
 bin/intentframe-integrations stop
 ```
 
-`install hermes` installs Hermes Agent into the orchestrator-managed venv.
-`integrate hermes` symlinks the plugin to `$HERMES_HOME/plugins/intentframe-terminal`, merges
+`integrate hermes` symlinks the plugin to `$HERMES_HOME/plugins/intentframe-gate`, merges
 `plugins.enabled` in `$HERMES_HOME/config.yaml`, and syncs the adapter venv at
 `~/.intentframe/integrations/hermes/.venv`.
 
 ## Architecture
 
 ```
-LLM → terminal(command, reason)
-  → intentframe-terminal plugin (Hermes process, httpx)
+LLM → governed tool(args + reason)
+  → intentframe-gate plugin (Hermes process, httpx)
   → POST /validate-tool on ~/.intentframe/integrations/hermes/adapter.sock
   → hermes-adapter sidecar (own venv, if-integration-bridge-client)
   → POST /validate on ~/.intentframe/backend/bridge.sock
   → IntentFrame runtime + validate_only executor
-  → ALLOW → Hermes terminal_tool executes locally
-  → BLOCK → JSON error, no shell
+  → ALLOW → Hermes original handler executes locally
+  → BLOCK → JSON error, no side effect
 ```
 
-The plugin never holds the bridge secret. Only the adapter sidecar talks to the generic
-IntentFrame backend bridge.
+The plugin hooks `registry.register` so MCP refresh cannot silently reinstall unwrapped handlers.
 
 ## Manual install
 
 ```bash
-ln -sf "$(pwd)/integrations/hermes/plugin/intentframe-terminal" \
-  ~/.hermes/plugins/intentframe-terminal
+ln -sf "$(pwd)/integrations/hermes/plugin/intentframe-gate" \
+  ~/.hermes/plugins/intentframe-gate
 ```
 
 Enable in `~/.hermes/config.yaml`:
@@ -77,20 +89,22 @@ Enable in `~/.hermes/config.yaml`:
 ```yaml
 plugins:
   enabled:
-    - intentframe-terminal
+    - intentframe-gate
 ```
 
 Export env from `agent.json`:
 
 - `IF_AGENT_ADAPTER_SOCKET=~/.intentframe/integrations/hermes/adapter.sock`
 
-Start the runtime and adapter:
+## Adding a governed tool
 
-```bash
-bin/intentframe-integrations start hermes
-```
+1. Add an entry to `governance/tools.yaml` (and sync the bundled plugin copy).
+2. Add a mapper in `adapter/src/hermes_adapter/mapper.py` (or reuse a mapper kind).
+3. Add the IntentFrame action to `agent.json` `action_types` if new.
+4. Add policy constraints in `policy.yaml`.
+5. Add mapper unit test + optional E2E probe.
 
-Then restart your Hermes gateway.
+No plugin code changes are required when the mapper kind already exists.
 
 ## Manual acceptance checklist
 
@@ -101,49 +115,31 @@ Then restart your Hermes gateway.
 5. `bin/intentframe-integrations gateway start hermes --api-server`
 6. Ask LLM to run `echo ok` with a reason → executes
 7. Ask LLM to run `sudo echo intentframe-e2e-block-probe` → blocked by IntentFrame policy (`sudo` pattern)
+8. Ask LLM to `write_file` under `~/…` with a reason → executes
+9. Ask LLM to `write_file` to `/etc/…` → blocked by host-path policy
+10. Ask LLM to `delete_file` under `~/…` with a reason → executes
+11. Ask LLM to `delete_file` on `/etc/…` → blocked by host-path policy
 
-## What the CLI configures (and what it does not)
+## Live integration tests (all governed tools)
 
-| Step | Configures |
-|------|------------|
-| `install hermes` | Managed Hermes venv under `~/.intentframe/integrations/hermes/` |
-| `start hermes` | IntentFrame backend + adapter sidecar |
-| `integrate hermes` | Plugin symlink, `plugins.enabled` merge (with `config.yaml.intentframe.bak`), adapter venv sync |
-| `gateway start hermes` | Launches `hermes gateway run` (+ optional API server); does **not** set LLM model/provider |
+Deterministic adapter + plugin gate probes (no LLM) against a running Hermes stack:
 
-Hermes LLM settings (`model.provider`, `model.name`, `model.api_mode`) remain the user's
-responsibility in `$HERMES_HOME/config.yaml` / `.env`. Only the opt-in gateway E2E test
-seeds OpenAI defaults in an isolated sandbox — see below.
+```bash
+./tests/scripts/test-hermes-integration.sh
+```
 
-`integrate hermes` merges `plugins.enabled` in place when possible instead of rewriting the
-full config file.
+Covers all five governed tools (`terminal`, `process`, `write_file`, `delete_file`, `patch`)
+including V4A `patch` multi-intent write+delete. Requires `OPENAI_API_KEY` (backend startup).
 
 ## Gateway E2E test (opt-in)
 
-Full production journey with isolated `HOME` / `HERMES_HOME` (does not touch real
-`~/.hermes` or `~/.intentframe/integrations/hermes`).
-
-**Detailed guide:** [`tests/hermes_gateway/README.md`](../../tests/hermes_gateway/README.md)
-(log paths, troubleshooting, ALLOW/BLOCK semantics).
-
-Quick run:
+See [`tests/hermes_gateway/README.md`](../../tests/hermes_gateway/README.md).
 
 ```bash
 RUN_HERMES_GATEWAY_E2E=1 \
   uv run --with httpx --package intentframe-integrations-cli \
   python tests/hermes_gateway/test_gateway_e2e.py
-
-RUN_HERMES_GATEWAY_E2E=1 ./tests/scripts/test-hermes-gateway-e2e.sh
 ```
 
-Requires `OPENAI_API_KEY` (IntentFrame backend + Hermes gateway LLM). E2E seeds isolated
-`$HERMES_HOME` with `openai-api`, `api_mode: chat_completions`, and `gpt-4o-mini` (override:
-`INTENTFRAME_HERMES_E2E_MODEL`). Hermes 0.17 otherwise auto-picks OpenAI Responses API for
-`api.openai.com`, which breaks `gpt-4o-mini`.
-
-The test prints **sandbox log paths** at activation and before `/v1/responses` — tail those
-files, not real `~/.intentframe`, while debugging.
-
-Covers pass 1 (greenfield), pass 2a (reuse managed install), pass 2b (external Hermes via
-`HERMES_BIN`), and `/v1/responses` ALLOW/BLOCK. Each sandbox lives under `/tmp/hg*` and is
-removed after that run only.
+Requires `OPENAI_API_KEY`. Covers ALLOW/BLOCK for all five governed tools (`terminal`, `process`,
+`write_file`, `delete_file`, `patch`), including V4A mixed write+delete multi-intent `patch` probes.

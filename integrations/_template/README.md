@@ -7,7 +7,7 @@ Copy this folder to `integrations/<agent>/` and customize:
 | `agent.json` | Agent profile, adapter sidecar config, plugin env exports |
 | `policy.yaml` | RUN_COMMAND rules seeded into policy-registry |
 | `adapter/` | Agent adapter sidecar (bridge client, tool mapping, HTTP/UDS server) |
-| `plugin/` | Thin agent plugin (Hermes uses `plugin/intentframe-terminal/`) |
+| `plugin/` | Thin agent plugin (Hermes uses `plugin/intentframe-gate/`) |
 
 Register the profile in `intentframe-integrations-cli/src/intentframe_integrations/paths.py`:
 

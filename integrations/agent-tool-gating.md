@@ -208,13 +208,14 @@ Hermes internals — so enumerating the registry is no new coupling.
 
 The shipped plugin gates exactly one tool:
 
-- [`plugin/intentframe-terminal/schema.py`](hermes/plugin/intentframe-terminal/schema.py)
-  injects a required `reason` into the `terminal` schema (layer 1).
-- [`plugin/intentframe-terminal/gate.py`](hermes/plugin/intentframe-terminal/gate.py)
-  validates via the adapter, strips `reason`, delegates to the real
-  `terminal_tool` (layer 2).
-- [`plugin/intentframe-terminal/__init__.py`](hermes/plugin/intentframe-terminal/__init__.py)
-  registers it with `override=True`.
+The shipped plugin gates governed tools via `intentframe-gate`:
+
+- [`plugin/intentframe-gate/schema.py`](hermes/plugin/intentframe-gate/schema.py)
+  injects a required `reason` into governed tool schemas (layer 1).
+- [`plugin/intentframe-gate/gate.py`](hermes/plugin/intentframe-gate/gate.py)
+  validates via the adapter, strips `reason`, delegates to the real handler (layer 2).
+- [`plugin/intentframe-gate/__init__.py`](hermes/plugin/intentframe-gate/__init__.py)
+  registers governed tools with `override=True` and hooks `registry.register`.
 
 ### Generalizing it
 
@@ -462,7 +463,7 @@ incrementally with policy review each time.
 - IntentFrame adoption guidance:
   [`do-i-have-to-rewrite-tools.md`](../external-reference-only-libs/intentframe/docs/executor/do-i-have-to-rewrite-tools.md)
 - Hermes roadmap: [`hermes/TODO.md`](hermes/TODO.md)
-- Current plugin: [`hermes/plugin/intentframe-terminal/`](hermes/plugin/intentframe-terminal/)
+- Current plugin: [`hermes/plugin/intentframe-gate/`](hermes/plugin/intentframe-gate/)
 - Mapper bottleneck:
   [`hermes/adapter/src/hermes_adapter/mapper.py`](hermes/adapter/src/hermes_adapter/mapper.py)
 - Hermes tool registry:

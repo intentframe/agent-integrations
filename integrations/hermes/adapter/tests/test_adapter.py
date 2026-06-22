@@ -25,10 +25,106 @@ class TestMapper(unittest.TestCase):
     def test_map_terminal(self) -> None:
         from hermes_adapter.mapper import map_terminal
 
-        req = map_terminal({"command": "echo hi", "reason": "List files"})
-        self.assertEqual(req["action"], "RUN_COMMAND")
-        self.assertEqual(req["command"], "echo hi")
-        self.assertEqual(req["reason"], "List files")
+        intents = map_terminal({"command": "echo hi", "reason": "List files"})
+        self.assertEqual(len(intents), 1)
+        self.assertEqual(intents[0]["action"], "RUN_COMMAND")
+        self.assertEqual(intents[0]["command"], "echo hi")
+        self.assertEqual(intents[0]["reason"], "List files")
+
+    def test_map_process(self) -> None:
+        from hermes_adapter.mapper import map_process
+
+        intents = map_process(
+            {"action": "kill", "session_id": "abc", "reason": "Stop runaway"}
+        )
+        self.assertEqual(intents[0]["action"], "RUN_COMMAND")
+        self.assertIn("process:kill", intents[0]["command"])
+
+    def test_map_write_file(self) -> None:
+        from hermes_adapter.mapper import map_write_file
+
+        intents = map_write_file(
+            {"path": "~/notes.txt", "content": "hello", "reason": "Save notes"}
+        )
+        self.assertEqual(intents[0]["action"], "WRITE_HOST_FILE")
+        self.assertEqual(intents[0]["path"], "~/notes.txt")
+        self.assertEqual(intents[0]["content"], "hello")
+
+    def test_map_delete_file(self) -> None:
+        from hermes_adapter.mapper import map_delete_file
+
+        intents = map_delete_file({"path": "~/notes.txt", "reason": "Remove notes"})
+        self.assertEqual(intents[0]["action"], "DELETE_HOST_FILE")
+        self.assertEqual(intents[0]["path"], "~/notes.txt")
+        self.assertNotIn("content", intents[0])
+        self.assertTrue(intents[0]["irreversible"])
+
+    def test_map_patch_replace(self) -> None:
+        from hermes_adapter.mapper import map_patch
+
+        intents = map_patch(
+            {
+                "mode": "replace",
+                "path": "~/x.py",
+                "old_string": "a",
+                "new_string": "b",
+                "reason": "Fix typo",
+            }
+        )
+        self.assertEqual(len(intents), 1)
+        self.assertEqual(intents[0]["action"], "WRITE_HOST_FILE")
+        self.assertEqual(intents[0]["path"], "~/x.py")
+
+    def test_map_patch_v4a_multi_file(self) -> None:
+        from hermes_adapter.mapper import map_patch
+
+        patch = (
+            "*** Begin Patch\n"
+            "*** Update File: ~/a.py\n"
+            "@@\n"
+            "-old\n"
+            "+new\n"
+            "*** Update File: ~/b.py\n"
+            "@@\n"
+            "-x\n"
+            "+y\n"
+            "*** End Patch"
+        )
+        intents = map_patch({"mode": "patch", "patch": patch, "reason": "Bulk edit"})
+        self.assertEqual(len(intents), 2)
+        paths = {intent["path"] for intent in intents}
+        self.assertEqual(paths, {"~/a.py", "~/b.py"})
+
+    def test_map_patch_v4a_delete(self) -> None:
+        from hermes_adapter.mapper import map_patch
+
+        patch = (
+            "*** Begin Patch\n"
+            "*** Delete File: ~/old.txt\n"
+            "*** End Patch"
+        )
+        intents = map_patch({"mode": "patch", "patch": patch, "reason": "Remove file"})
+        self.assertEqual(len(intents), 1)
+        self.assertEqual(intents[0]["action"], "DELETE_HOST_FILE")
+        self.assertEqual(intents[0]["path"], "~/old.txt")
+        self.assertTrue(intents[0]["irreversible"])
+
+    def test_map_patch_v4a_mixed_write_delete(self) -> None:
+        from hermes_adapter.mapper import map_patch
+
+        patch = (
+            "*** Begin Patch\n"
+            "*** Update File: ~/keep.py\n"
+            "@@\n"
+            "-old\n"
+            "+new\n"
+            "*** Delete File: ~/drop.py\n"
+            "*** End Patch"
+        )
+        intents = map_patch({"mode": "patch", "patch": patch, "reason": "Mixed edit"})
+        self.assertEqual(len(intents), 2)
+        self.assertEqual(intents[0]["action"], "WRITE_HOST_FILE")
+        self.assertEqual(intents[1]["action"], "DELETE_HOST_FILE")
 
     def test_missing_reason(self) -> None:
         from hermes_adapter.mapper import ValidationError, map_terminal
@@ -36,10 +132,25 @@ class TestMapper(unittest.TestCase):
         with self.assertRaises(ValidationError):
             map_terminal({"command": "echo hi"})
 
+    def test_supported_tools(self) -> None:
+        from hermes_adapter.mapper import supported_tools
+
+        tools = supported_tools()
+        self.assertIn("terminal", tools)
+        self.assertIn("write_file", tools)
+        self.assertIn("delete_file", tools)
+        self.assertEqual(tools["write_file"], "WRITE_HOST_FILE")
+        self.assertEqual(tools["delete_file"], "DELETE_HOST_FILE")
+
+    def test_unknown_tool(self) -> None:
+        from hermes_adapter.mapper import ValidationError, map_tool
+
+        with self.assertRaises(ValidationError):
+            map_tool("read_file", {"reason": "noop"})
+
 
 class TestValidateService(unittest.TestCase):
     def test_allow(self) -> None:
-        from hermes_adapter.bridge_session import BridgeSession
         from hermes_adapter.service import ValidateService
 
         bridge = FakeBridge({"allowed": True, "success": True, "validated_only": True})
@@ -57,6 +168,36 @@ class TestValidateService(unittest.TestCase):
         self.assertFalse(out["allowed"])
         self.assertIn("agent_response", out)
         self.assertEqual(out["agent_response"]["status"], "blocked")
+
+    def test_multi_intent_blocks_on_second(self) -> None:
+        from hermes_adapter.service import ValidateService
+
+        class TwoStepBridge:
+            def __init__(self) -> None:
+                self.requests: list[dict[str, Any]] = []
+                self._count = 0
+
+            def validate(self, request: dict[str, Any]) -> dict[str, Any]:
+                self.requests.append(request)
+                self._count += 1
+                if self._count == 1:
+                    return {"allowed": True}
+                return {"allowed": False, "error": "blocked path"}
+
+            def close(self) -> None:
+                return None
+
+        patch = (
+            "*** Begin Patch\n"
+            "*** Update File: ~/ok.py\n"
+            "*** Update File: /etc/bad\n"
+            "*** End Patch"
+        )
+        bridge = TwoStepBridge()
+        service = ValidateService(bridge=bridge)  # type: ignore[arg-type]
+        out = service.validate_tool("patch", {"mode": "patch", "patch": patch, "reason": "Test"})
+        self.assertFalse(out["allowed"])
+        self.assertEqual(len(bridge.requests), 2)
 
     def test_bridge_error_uses_error_status(self) -> None:
         from hermes_adapter.service import ValidateService

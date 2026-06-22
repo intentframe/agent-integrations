@@ -53,7 +53,7 @@ class IsolatedEnv:
 
     @property
     def plugin_install_path(self) -> Path:
-        return self.hermes_home / "plugins" / "intentframe-terminal"
+        return self.hermes_home / "plugins" / "intentframe-gate"
 
     @property
     def hermes_config_path(self) -> Path:

@@ -6,8 +6,26 @@ from __future__ import annotations
 import os
 import sys
 import unittest
+from pathlib import Path
 
 import httpx
+
+HERE = Path(__file__).resolve().parent
+if str(HERE) not in sys.path:
+    sys.path.insert(0, str(HERE))
+
+from live_fixtures import (  # noqa: E402
+    DELETE_ALLOW_ARGS,
+    DELETE_BLOCK_ARGS,
+    PATCH_ALLOW_REPLACE_ARGS,
+    PATCH_BLOCK_REPLACE_ARGS,
+    PATCH_V4A_BLOCK_ARGS,
+    PATCH_V4A_MIXED_ALLOW_ARGS,
+    PROCESS_ALLOW_ARGS,
+    PROCESS_BLOCK_ARGS,
+    WRITE_ALLOW_ARGS,
+    WRITE_BLOCK_ARGS,
+)
 
 
 class TestLiveHermesAdapter(unittest.TestCase):
@@ -28,32 +46,75 @@ class TestLiveHermesAdapter(unittest.TestCase):
     def tearDown(self) -> None:
         self.client.close()
 
+    def _validate_tool(self, tool: str, args: dict[str, object]) -> dict[str, object]:
+        resp = self.client.post("/validate-tool", json={"tool": tool, "args": args})
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertIsInstance(body, dict)
+        return body
+
     def test_health(self) -> None:
         resp = self.client.get("/health")
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json().get("adapter"), "hermes")
 
-    def test_allow_benign(self) -> None:
-        resp = self.client.post(
-            "/validate-tool",
-            json={
-                "tool": "terminal",
-                "args": {"command": "echo hermes-adapter-ok", "reason": "Live allow test"},
-            },
+    def test_allow_terminal(self) -> None:
+        body = self._validate_tool(
+            "terminal",
+            {"command": "echo hermes-adapter-ok", "reason": "Live allow test"},
         )
-        self.assertEqual(resp.status_code, 200)
-        self.assertTrue(resp.json()["allowed"])
+        self.assertTrue(body["allowed"])
 
-    def test_block_dangerous(self) -> None:
-        resp = self.client.post(
-            "/validate-tool",
-            json={
-                "tool": "terminal",
-                "args": {"command": "sudo rm -rf /", "reason": "Should block"},
-            },
+    def test_block_terminal(self) -> None:
+        body = self._validate_tool(
+            "terminal",
+            {"command": "sudo rm -rf /", "reason": "Should block"},
         )
-        body = resp.json()
-        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(body["allowed"])
+        self.assertIn("agent_response", body)
+
+    def test_allow_process(self) -> None:
+        body = self._validate_tool("process", PROCESS_ALLOW_ARGS)
+        self.assertTrue(body["allowed"])
+
+    def test_block_process(self) -> None:
+        body = self._validate_tool("process", PROCESS_BLOCK_ARGS)
+        self.assertFalse(body["allowed"])
+        self.assertIn("agent_response", body)
+
+    def test_allow_write_file(self) -> None:
+        body = self._validate_tool("write_file", WRITE_ALLOW_ARGS)
+        self.assertTrue(body["allowed"])
+
+    def test_block_write_file(self) -> None:
+        body = self._validate_tool("write_file", WRITE_BLOCK_ARGS)
+        self.assertFalse(body["allowed"])
+        self.assertIn("agent_response", body)
+
+    def test_allow_delete_file(self) -> None:
+        body = self._validate_tool("delete_file", DELETE_ALLOW_ARGS)
+        self.assertTrue(body["allowed"])
+
+    def test_block_delete_file(self) -> None:
+        body = self._validate_tool("delete_file", DELETE_BLOCK_ARGS)
+        self.assertFalse(body["allowed"])
+        self.assertIn("agent_response", body)
+
+    def test_allow_patch_replace(self) -> None:
+        body = self._validate_tool("patch", PATCH_ALLOW_REPLACE_ARGS)
+        self.assertTrue(body["allowed"])
+
+    def test_block_patch_replace(self) -> None:
+        body = self._validate_tool("patch", PATCH_BLOCK_REPLACE_ARGS)
+        self.assertFalse(body["allowed"])
+        self.assertIn("agent_response", body)
+
+    def test_allow_patch_v4a_mixed(self) -> None:
+        body = self._validate_tool("patch", PATCH_V4A_MIXED_ALLOW_ARGS)
+        self.assertTrue(body["allowed"])
+
+    def test_block_patch_v4a_mixed_system_delete(self) -> None:
+        body = self._validate_tool("patch", PATCH_V4A_BLOCK_ARGS)
         self.assertFalse(body["allowed"])
         self.assertIn("agent_response", body)
 

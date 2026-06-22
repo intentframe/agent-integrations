@@ -8,8 +8,8 @@ import types
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PLUGIN_DIR = REPO_ROOT / "integrations" / "hermes" / "plugin" / "intentframe-terminal"
-PKG_NAME = "intentframe_terminal_plugin"
+PLUGIN_DIR = REPO_ROOT / "integrations" / "hermes" / "plugin" / "intentframe-gate"
+PKG_NAME = "intentframe_gate_plugin"
 
 
 def _ensure_package() -> types.ModuleType:

@@ -2,7 +2,7 @@ intentframe_schema_version: 1
 agent_id: bridge_test
 
 metadata:
-  note: Internal bridge test RUN_COMMAND policy (if-integration-backend)
+  note: Internal bridge test policy (if-integration-backend)
 
 allowed_actions:
   RUN_COMMAND:
@@ -89,3 +89,22 @@ allowed_actions:
         - "capability:system_mutate:tcc_privacy"
         - "capability:system_mutate:time_sync"
         - "capability:system_mutate:user_account"
+
+  WRITE_HOST_FILE:
+    safe: false
+    constraints:
+      allowed_host_paths:
+        - "~/*"
+
+  DELETE_HOST_FILE:
+    safe: false
+    constraints:
+      allowed_host_paths:
+        - "~/*"
+
+domain_constraints:
+  deletion:
+    require_confirmation: false
+    block_irreversible: false
+    allowed_paths:
+      - "~/*"

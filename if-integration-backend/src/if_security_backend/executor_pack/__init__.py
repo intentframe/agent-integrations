@@ -1,7 +1,10 @@
-"""Generic validate-only executor pack for hybrid agents (RUN_COMMAND today).
+"""Generic validate-only executor pack for hybrid agents.
 
 One pack serves every agent (Hermes, OpenClaw, …). Agents never ship executor
 packs — they call the bridge, execute locally after ALLOW.
+
+Configure noop action types via ``pack_options.validate_only.supported_actions``
+in the executor profile.
 """
 
 from __future__ import annotations
@@ -14,5 +17,5 @@ __all__ = ["ValidateOnlyAdapter", "register_all"]
 
 
 def register_all() -> None:
-    """Register the validate-only RUN_COMMAND adapter."""
+    """Register the validate-only noop adapter."""
     register_adapter("validate_only", ValidateOnlyAdapter)
