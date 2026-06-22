@@ -10,7 +10,7 @@ def process_allow_args(*, reason: str = "Live process allow test") -> dict[str, 
     return {"action": "list", "reason": reason}
 
 
-def process_block_args(*, reason: str = "Should block process command") -> dict[str, str]:
+def process_block_args(*, reason: str = "E2E process run probe") -> dict[str, str]:
     return {"action": "run", "data": "sudo rm -rf /", "reason": reason}
 
 
@@ -22,7 +22,7 @@ def write_allow_args(*, marker: str, reason: str | None = None) -> dict[str, str
     }
 
 
-def write_block_args(*, reason: str = "Should block write") -> dict[str, str]:
+def write_block_args(*, reason: str = "E2E write to system path probe") -> dict[str, str]:
     return {
         "path": "/etc/intentframe-e2e-block-probe",
         "content": "blocked",
@@ -34,11 +34,11 @@ def delete_home_args(*, marker: str, reason: str | None = None) -> dict[str, str
     """Home-path delete probe — passes deterministic checks; AE/Guardian may ALLOW or BLOCK."""
     return {
         "path": f"~/intentframe-e2e-delete-{marker}.txt",
-        "reason": reason or "Live delete home-path probe",
+        "reason": reason or "E2E delete home path probe",
     }
 
 
-def delete_deny_floor_args(*, reason: str = "Should block delete deny floor") -> dict[str, str]:
+def delete_deny_floor_args(*, reason: str = "E2E delete sensitive home path probe") -> dict[str, str]:
     """Sensitive home-path delete — deterministic deny floor should always BLOCK."""
     return {
         "path": "~/.ssh/intentframe-e2e-delete-deny-floor-probe",
@@ -51,7 +51,7 @@ def delete_allow_args(*, marker: str, reason: str | None = None) -> dict[str, st
     return delete_home_args(marker=marker, reason=reason)
 
 
-def delete_block_args(*, reason: str = "Should block delete") -> dict[str, str]:
+def delete_block_args(*, reason: str = "E2E delete system path probe") -> dict[str, str]:
     return {
         "path": "/etc/intentframe-e2e-delete-block-probe",
         "reason": reason,
@@ -68,7 +68,7 @@ def patch_replace_allow_args(*, marker: str, reason: str | None = None) -> dict[
     }
 
 
-def patch_replace_block_args(*, reason: str = "Should block patch replace") -> dict[str, str]:
+def patch_replace_block_args(*, reason: str = "E2E patch replace system path probe") -> dict[str, str]:
     return {
         "mode": "replace",
         "path": "/etc/intentframe-e2e-patch-block-probe",
@@ -93,11 +93,11 @@ def patch_v4a_mixed_home_delete_content(*, marker: str) -> str:
 
 
 def patch_v4a_mixed_home_delete_args(*, marker: str, reason: str | None = None) -> dict[str, str]:
-    """V4A write+delete under ~/ — write intent may pass, delete intent blocked by Guardian."""
+    """V4A write+delete under ~/ — AE/Guardian outcome is semantic per intent."""
     return {
         "mode": "patch",
         "patch": patch_v4a_mixed_home_delete_content(marker=marker),
-        "reason": reason or "Live patch V4A mixed home-delete probe",
+        "reason": reason or "E2E V4A patch update and delete under home",
     }
 
 
@@ -124,7 +124,7 @@ def patch_v4a_block_content(*, marker: str) -> str:
     )
 
 
-def patch_v4a_block_args(*, marker: str, reason: str = "Should block patch delete on system path") -> dict[str, str]:
+def patch_v4a_block_args(*, marker: str, reason: str = "E2E V4A patch update home and delete system file") -> dict[str, str]:
     return {
         "mode": "patch",
         "patch": patch_v4a_block_content(marker=marker),

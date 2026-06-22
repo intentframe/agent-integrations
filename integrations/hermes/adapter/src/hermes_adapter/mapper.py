@@ -15,6 +15,7 @@ _V4A_OP_RE = re.compile(
     r"^\*\*\*\s+(Update|Add|Delete)\s+File:\s*(.+)$",
     re.MULTILINE,
 )
+_V4A_END_PATCH_RE = re.compile(r"\s*\*\*\* End Patch\s*\Z", re.MULTILINE)
 
 PatchOpKind = Literal["update", "add", "delete"]
 
@@ -23,6 +24,7 @@ PatchOpKind = Literal["update", "add", "delete"]
 class PatchOperation:
     kind: PatchOpKind
     path: str
+    body: str = ""
 
 
 class ValidationError(ValueError):
@@ -56,6 +58,9 @@ def _host_file_intent(
     reason: str,
     content: str | None = None,
     irreversible: bool | None = None,
+    patch_op_index: int | None = None,
+    patch_op_count: int | None = None,
+    patch_operations: list[dict[str, str]] | None = None,
 ) -> IntentDict:
     intent: IntentDict = {
         "action": action,
@@ -67,6 +72,12 @@ def _host_file_intent(
         intent["content"] = content
     if irreversible is not None:
         intent["irreversible"] = irreversible
+    if patch_op_index is not None:
+        intent["patch_op_index"] = patch_op_index
+    if patch_op_count is not None:
+        intent["patch_op_count"] = patch_op_count
+    if patch_operations is not None:
+        intent["patch_operations"] = patch_operations
     return intent
 
 
@@ -131,17 +142,27 @@ def map_delete_file(args: dict[str, Any]) -> list[IntentDict]:
 
 
 def _parse_v4a_operations(patch_content: str) -> list[PatchOperation]:
+    matches = list(_V4A_OP_RE.finditer(patch_content))
+    if not matches:
+        raise ValidationError("Could not extract file operations from V4A patch content")
+
     operations: list[PatchOperation] = []
-    for match in _V4A_OP_RE.finditer(patch_content):
+    for index, match in enumerate(matches):
         kind_raw = match.group(1).lower()
         path = match.group(2).strip()
         if not path:
             raise ValidationError("V4A patch contains empty file path")
         if kind_raw not in {"update", "add", "delete"}:
             raise ValidationError(f"Unsupported V4A operation: {kind_raw!r}")
-        operations.append(PatchOperation(kind=kind_raw, path=path))  # type: ignore[arg-type]
-    if not operations:
-        raise ValidationError("Could not extract file operations from V4A patch content")
+
+        body_start = match.end()
+        body_end = matches[index + 1].start() if index + 1 < len(matches) else len(patch_content)
+        body = patch_content[body_start:body_end]
+        if index + 1 == len(matches):
+            body = _V4A_END_PATCH_RE.sub("", body)
+        operations.append(
+            PatchOperation(kind=kind_raw, path=path, body=body.strip("\n"))  # type: ignore[arg-type]
+        )
     return operations
 
 
@@ -165,6 +186,31 @@ def _extract_patch_operations(args: dict[str, Any]) -> list[PatchOperation]:
     raise ValidationError(f"Unsupported patch mode: {mode!r}")
 
 
+def _v4a_op_header(kind: PatchOpKind, path: str) -> str:
+    label = {"update": "Update", "add": "Add", "delete": "Delete"}[kind]
+    return f"*** {label} File: {path}"
+
+
+def _scoped_v4a_fragment(operation: PatchOperation) -> str:
+    header = _v4a_op_header(operation.kind, operation.path)
+    if operation.kind == "delete":
+        return f"*** Begin Patch\n{header}\n*** End Patch"
+    inner = header
+    if operation.body:
+        inner = f"{inner}\n{operation.body}"
+    return f"*** Begin Patch\n{inner}\n*** End Patch"
+
+
+def _patch_op_reason(
+    base_reason: str,
+    *,
+    index: int,
+    total: int,
+    operation: PatchOperation,
+) -> str:
+    return f"{base_reason} [patch op {index}/{total}: {operation.kind} {operation.path}]"
+
+
 def _patch_content_for_operation(args: dict[str, Any], operation: PatchOperation) -> str | None:
     mode = args.get("mode", "replace")
     if mode == "replace":
@@ -176,24 +222,46 @@ def _patch_content_for_operation(args: dict[str, Any], operation: PatchOperation
             raise ValidationError("Missing or invalid new_string for patch replace mode")
         return f"--- {operation.path}\n-old\n+{new_string}\n(replace {old_string!r})"
 
-    patch_content = args.get("patch")
-    if not isinstance(patch_content, str):
-        raise ValidationError("Missing or invalid patch content")
-    return patch_content if operation.kind != "delete" else None
+    if operation.kind == "delete":
+        return None
+    return _scoped_v4a_fragment(operation)
+
+
+def _patch_operations_manifest(operations: list[PatchOperation]) -> list[dict[str, str]]:
+    """Fresh manifest list per intent (no shared references across sub-intents)."""
+    return [{"kind": op.kind, "path": op.path} for op in operations]
 
 
 def map_patch(args: dict[str, Any]) -> list[IntentDict]:
     reason = validate_reason(args.get("reason"))
+    mode = args.get("mode", "replace")
     operations = _extract_patch_operations(args)
+    total = len(operations)
+    is_v4a = mode == "patch"
+
     intents: list[IntentDict] = []
-    for operation in operations:
+    for index, operation in enumerate(operations, start=1):
+        op_reason = (
+            _patch_op_reason(reason, index=index, total=total, operation=operation)
+            if is_v4a
+            else reason
+        )
+        patch_context: dict[str, Any] = {}
+        if is_v4a:
+            patch_context = {
+                "patch_op_index": index,
+                "patch_op_count": total,
+                "patch_operations": _patch_operations_manifest(operations),
+            }
+
         if operation.kind == "delete":
             intents.append(
                 _host_file_intent(
                     action="DELETE_HOST_FILE",
                     path=operation.path,
-                    reason=reason,
+                    reason=op_reason,
                     irreversible=True,
+                    **patch_context,
                 )
             )
             continue
@@ -202,8 +270,9 @@ def map_patch(args: dict[str, Any]) -> list[IntentDict]:
             _host_file_intent(
                 action="WRITE_HOST_FILE",
                 path=operation.path,
-                reason=reason,
+                reason=op_reason,
                 content=_patch_content_for_operation(args, operation),
+                **patch_context,
             )
         )
     return intents

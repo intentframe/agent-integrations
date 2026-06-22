@@ -74,6 +74,8 @@ class TestMapper(unittest.TestCase):
         self.assertEqual(len(intents), 1)
         self.assertEqual(intents[0]["action"], "WRITE_HOST_FILE")
         self.assertEqual(intents[0]["path"], "~/x.py")
+        self.assertNotIn("patch_op_index", intents[0])
+        self.assertNotIn("patch_operations", intents[0])
 
     def test_map_patch_v4a_multi_file(self) -> None:
         from hermes_adapter.mapper import map_patch
@@ -94,6 +96,40 @@ class TestMapper(unittest.TestCase):
         self.assertEqual(len(intents), 2)
         paths = {intent["path"] for intent in intents}
         self.assertEqual(paths, {"~/a.py", "~/b.py"})
+        self.assertEqual(intents[0]["reason"], "Bulk edit [patch op 1/2: update ~/a.py]")
+        self.assertEqual(intents[1]["reason"], "Bulk edit [patch op 2/2: update ~/b.py]")
+        self.assertEqual(intents[0]["patch_op_index"], 1)
+        self.assertEqual(intents[0]["patch_op_count"], 2)
+        self.assertEqual(
+            intents[0]["patch_operations"],
+            [{"kind": "update", "path": "~/a.py"}, {"kind": "update", "path": "~/b.py"}],
+        )
+        self.assertIn("~/a.py", intents[0]["content"])
+        self.assertNotIn("~/b.py", intents[0]["content"])
+        self.assertIn("~/b.py", intents[1]["content"])
+        self.assertNotIn("~/a.py", intents[1]["content"])
+        self.assertIsNot(intents[0]["patch_operations"], intents[1]["patch_operations"])
+
+    def test_map_patch_v4a_scoped_content_excludes_siblings(self) -> None:
+        from hermes_adapter.mapper import map_patch
+
+        patch = (
+            "*** Begin Patch\n"
+            "*** Update File: ~/keep.py\n"
+            "@@\n"
+            "-old\n"
+            "+new\n"
+            "*** Delete File: /etc/system-probe\n"
+            "*** End Patch"
+        )
+        intents = map_patch({"mode": "patch", "patch": patch, "reason": "Mixed patch"})
+        write_intent = intents[0]
+        delete_intent = intents[1]
+        self.assertEqual(write_intent["action"], "WRITE_HOST_FILE")
+        self.assertEqual(delete_intent["action"], "DELETE_HOST_FILE")
+        self.assertIn("~/keep.py", write_intent["content"])
+        self.assertNotIn("/etc/system-probe", write_intent["content"])
+        self.assertEqual(delete_intent["reason"], "Mixed patch [patch op 2/2: delete /etc/system-probe]")
 
     def test_map_patch_v4a_delete(self) -> None:
         from hermes_adapter.mapper import map_patch
@@ -108,6 +144,8 @@ class TestMapper(unittest.TestCase):
         self.assertEqual(intents[0]["action"], "DELETE_HOST_FILE")
         self.assertEqual(intents[0]["path"], "~/old.txt")
         self.assertTrue(intents[0]["irreversible"])
+        self.assertEqual(intents[0]["reason"], "Remove file [patch op 1/1: delete ~/old.txt]")
+        self.assertEqual(intents[0]["patch_op_count"], 1)
 
     def test_map_patch_v4a_mixed_write_delete(self) -> None:
         from hermes_adapter.mapper import map_patch
@@ -125,6 +163,9 @@ class TestMapper(unittest.TestCase):
         self.assertEqual(len(intents), 2)
         self.assertEqual(intents[0]["action"], "WRITE_HOST_FILE")
         self.assertEqual(intents[1]["action"], "DELETE_HOST_FILE")
+        self.assertNotIn("~/drop.py", intents[0]["content"])
+        self.assertEqual(intents[0]["reason"], "Mixed edit [patch op 1/2: update ~/keep.py]")
+        self.assertEqual(intents[1]["reason"], "Mixed edit [patch op 2/2: delete ~/drop.py]")
 
     def test_missing_reason(self) -> None:
         from hermes_adapter.mapper import ValidationError, map_terminal
