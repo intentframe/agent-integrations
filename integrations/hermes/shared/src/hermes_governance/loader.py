@@ -152,7 +152,10 @@ def load_tool_catalog(yaml_path: str | None = None) -> dict[str, ToolSpec]:
 
 
 def load_governed_tools(yaml_path: str | None = None) -> dict[str, ToolSpec]:
-    """Enabled tools only — runtime governed set for plugin and adapter."""
+    """IntentFrame-governed tools only (yaml ``enabled: true``).
+
+    Runtime governed set for plugin and adapter. Not Hermes /v1/toolsets enablement.
+    """
     catalog = load_tool_catalog(yaml_path)
     enabled = {name: spec for name, spec in catalog.items() if spec.enabled}
     if not enabled:

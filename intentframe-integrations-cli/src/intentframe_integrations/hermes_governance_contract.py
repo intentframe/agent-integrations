@@ -61,8 +61,17 @@ def reset_runtime_governance_yaml(agent_id: str = HERMES_AGENT_ID) -> Path:
     return dest
 
 
-def write_catalog_enabled_yaml(dest: Path | None = None) -> Path:
-    """Write governance yaml with every catalog tool enabled."""
+def write_scoped_governance_yaml(
+    *,
+    governed_tools: frozenset[str] | None = None,
+    dest: Path | None = None,
+) -> Path:
+    """Write throwaway governance yaml with a chosen IntentFrame-governed tool subset.
+
+    ``governed_tools=None`` marks every tool in the default template catalog as
+    governed (yaml ``enabled: true``). This controls the plugin gate only — not
+    which tools Hermes exposes on ``/v1/toolsets``.
+    """
     template = default_governance_template_path()
     if not template.is_file():
         raise FileNotFoundError(f"Default governance template missing: {template}")
@@ -72,12 +81,31 @@ def write_catalog_enabled_yaml(dest: Path | None = None) -> Path:
     if not isinstance(tools, dict) or not tools:
         raise ValueError(f"Default governance template has no tools mapping: {template}")
 
-    for spec in tools.values():
+    catalog = frozenset(str(name) for name in tools)
+    if governed_tools is None:
+        governed_set = catalog
+    else:
+        if not governed_tools:
+            raise ValueError("At least one tool must be IntentFrame-governed")
+        unknown = governed_tools - catalog
+        if unknown:
+            raise ValueError(
+                f"Unknown governed tool(s) {sorted(unknown)!r}; "
+                f"catalog: {sorted(catalog)!r}"
+            )
+        governed_set = governed_tools
+
+    for name, spec in tools.items():
         if isinstance(spec, dict):
-            spec["enabled"] = True
+            spec["enabled"] = str(name) in governed_set
 
     if dest is None:
-        dest = Path(tempfile.mkdtemp(prefix="hermes-governance-catalog-")) / "tools.yaml"
+        prefix = (
+            "hermes-governance-scoped-"
+            if governed_tools is not None
+            else "hermes-governance-catalog-"
+        )
+        dest = Path(tempfile.mkdtemp(prefix=prefix)) / "tools.yaml"
 
     dest = dest.expanduser()
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -86,3 +114,12 @@ def write_catalog_enabled_yaml(dest: Path | None = None) -> Path:
         encoding="utf-8",
     )
     return dest
+
+
+def write_catalog_all_governed_yaml(dest: Path | None = None) -> Path:
+    """Write governance yaml with every catalog tool IntentFrame-governed."""
+    return write_scoped_governance_yaml(governed_tools=None, dest=dest)
+
+
+# Backward-compatible alias (prefer write_catalog_all_governed_yaml).
+write_catalog_enabled_yaml = write_catalog_all_governed_yaml

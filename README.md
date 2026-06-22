@@ -22,7 +22,8 @@ bin/intentframe-integrations doctor hermes
 bin/intentframe-integrations gateway start hermes --api-server
 ```
 
-See `integrations/hermes/README.md` for details.
+See `integrations/hermes/README.md` for details. Governed-tool terminology:
+[`docs/agent-tool-gating.md`](docs/agent-tool-gating.md#terminology-what-governed-means).
 
 ## Quick start (e2e)
 

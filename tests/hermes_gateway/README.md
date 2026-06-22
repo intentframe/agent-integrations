@@ -21,6 +21,37 @@ Or via the shell wrapper:
 RUN_HERMES_GATEWAY_E2E=1 ./tests/scripts/test-hermes-gateway-e2e.sh
 ```
 
+### Governance / scoped LLM probes
+
+**Governed tools** = IntentFrame plugin gate active (see
+[`docs/agent-tool-gating.md`](../../docs/agent-tool-gating.md#terminology-what-governed-means)).
+This E2E harness does **not** toggle Hermes `/v1/toolsets`.
+
+By default the test writes a **throwaway all-governed** governance yaml and sets
+`HERMES_GOVERNANCE_YAML` before `integrate` / `gateway start` (same idea as catalog
+live tests). Real `~/.intentframe` runtime config is not used.
+
+This controls **IntentFrame plugin governance** (which Hermes tools pass through
+the validate-only gate). It does **not** enable/disable Hermes native tools on
+`/v1/toolsets` — ungoverned tools may still appear there and run without the gate.
+
+| Variable | Effect |
+|----------|--------|
+| *(unset)* | Temp yaml with **all** catalog tools IntentFrame-governed |
+| `HERMES_E2E_GOVERNED_TOOLS=terminal,process` | Temp yaml with only those tools governed; LLM probes run for that subset |
+| `HERMES_GOVERNANCE_YAML=/path/to/tools.yaml` | Use your yaml as-is; skip auto-generation |
+
+Examples:
+
+```bash
+# All governed tools (default)
+RUN_HERMES_GATEWAY_E2E=1 ./tests/scripts/test-hermes-gateway-e2e.sh
+
+# Only terminal + process LLM probes (IntentFrame-governed subset)
+HERMES_E2E_GOVERNED_TOOLS=terminal,process \
+  RUN_HERMES_GATEWAY_E2E=1 ./tests/scripts/test-hermes-gateway-e2e.sh
+```
+
 Included in the main pipeline when opted in:
 
 ```bash
@@ -35,8 +66,10 @@ RUN_HERMES_GATEWAY_E2E=1 ./scripts/e2e.sh
 | **2a** | Reuse managed install from pass 1 (idempotent `integrate`, gateway restart) |
 | **2b** | External Hermes via `HERMES_BIN`, then `integrate` and gateway E2E |
 
-Each pass runs HTTP assertions against the gateway API for **every governed tool**
-(`terminal`, `process`, `write_file`, `delete_file`, `patch`):
+Each pass runs HTTP assertions against the gateway API for **IntentFrame-governed**
+tools only (see `runtime_governed_tool_names()` in `_run_api_allow_block`). With
+the default temp yaml that is all catalog tools; use `HERMES_E2E_GOVERNED_TOOLS`
+to scope LLM probes.
 
 | Tool | Deterministic ALLOW probe | Deterministic BLOCK probe | Semantic (ALLOW or BLOCK) |
 |------|---------------------------|---------------------------|---------------------------|

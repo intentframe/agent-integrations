@@ -40,11 +40,28 @@ LLM → governed tool(args + reason)
 **Key insight:** validation bundles and policy are **cross-platform**. macOS-only
 *executor* packs are not loaded in this integration profile.
 
+### Terminology: governed vs Hermes-enabled
+
+**Governed** = IntentFrame validate-only gate active for a Hermes tool name.
+**Not** the same as Hermes exposing or enabling a tool on `/v1/toolsets`.
+
+| | Governed (`enabled: true` in yaml) | Ungoverned |
+|---|-----------------------------------|------------|
+| Plugin wraps handler | yes | no |
+| Schema requires `reason` | yes | no |
+| Adapter `/validate` before side effect | yes | no |
+| Hermes may still show tool to LLM | often yes | yes |
+
+Full terminology table: [`agent-tool-gating.md`](./agent-tool-gating.md#terminology-what-governed-means).
+
 ---
 
 ## 2. Current repo state (v1)
 
 ### Governed Hermes tools
+
+**Governed** here means the **intentframe-gate plugin** wraps the tool and the
+adapter validates before Hermes executes. See [`agent-tool-gating.md`](../../docs/agent-tool-gating.md#terminology-what-governed-means).
 
 Configured in [`governance/tools.yaml`](../integrations/hermes/governance/tools.yaml):
 
@@ -412,7 +429,8 @@ Add tests that simulate re-registration clobber.
 
 ### Per-deployment overrides
 
-- `HERMES_GOVERNANCE_YAML` — alternate governed-tool set
+- `HERMES_GOVERNANCE_YAML` — alternate governance yaml (which tools are **IntentFrame-governed**)
+- `HERMES_E2E_GOVERNED_TOOLS` — gateway E2E only; comma-separated subset for LLM probes (not Hermes toolsets)
 - Policy registry — production policies may diverge from seeded `policy.yaml`
 
 ### Platform executor packs are separate

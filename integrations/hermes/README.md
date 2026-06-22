@@ -6,7 +6,7 @@ Hermes does **not** ship an IntentFrame executor pack or runtime. This folder pr
 |------|---------|
 | `agent.json` | Agent profile, adapter socket, exported `env` for Hermes plugin |
 | `policy.yaml` | RUN_COMMAND + host-file + deletion domain rules seeded into policy-registry |
-| `governance/tools.yaml` | Default governed-tool template (seeded to runtime on first integrate) |
+| `governance/tools.yaml` | Default governed-tool **template** (seeded to runtime on first integrate) |
 | `shared/` | `hermes-governance` package — contract loader for adapter |
 | `adapter/` | Hermes adapter sidecar (bridge client, tool mapping, HTTP/UDS server) |
 | `plugin/intentframe-gate/` | Hermes plugin — selective schema override + adapter gate |
@@ -38,15 +38,29 @@ bin/intentframe-integrations gateway start hermes --api-server
 
 ## Governed tools (v1)
 
-Configured in `governance/tools.yaml`:
+**Governed** = IntentFrame validate-only gate is active for a Hermes tool name
+(plugin wrap + adapter validate). It is **not** “Hermes enabled the tool on
+`/v1/toolsets`.” Ungoverned tools may still appear there and run without the gate.
 
-| Hermes tool | IntentFrame action |
-|-------------|-------------------|
-| `terminal`, `process` | `RUN_COMMAND` |
-| `write_file`, `patch` (update/add) | `WRITE_HOST_FILE` |
-| `delete_file`, `patch` (V4A delete) | `DELETE_HOST_FILE` |
+Terminology: [`docs/agent-tool-gating.md`](../../docs/agent-tool-gating.md#terminology-what-governed-means).
 
-Reads (`read_file`, `search_files`, …) stay ungoverned unless explicitly added.
+Configured in runtime `~/.intentframe/integrations/hermes/governance/tools.yaml`
+(seeded from repo `governance/tools.yaml` on first integrate). Each entry has
+`enabled: true|false` — read **`enabled` as IntentFrame-governed**:
+
+| Hermes tool | IntentFrame action | `enabled: false` effect |
+|-------------|-------------------|-------------------------|
+| `terminal`, `process` | `RUN_COMMAND` | Native Hermes handler, no IF gate |
+| `write_file`, `patch` (update/add) | `WRITE_HOST_FILE` | same |
+| `delete_file`, `patch` (V4A delete) | `DELETE_HOST_FILE` | same |
+
+```bash
+bin/intentframe-integrations governance list hermes
+bin/intentframe-integrations governance disable hermes write_file
+bin/intentframe-integrations governance enable hermes write_file
+```
+
+Reads (`read_file`, `search_files`, …) stay **ungoverned** unless explicitly added to the catalog.
 
 ## Commands
 

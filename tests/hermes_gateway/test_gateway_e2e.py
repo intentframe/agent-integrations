@@ -17,7 +17,13 @@ _TESTS_DIR = HERE.parent
 if str(_TESTS_DIR) not in sys.path:
     sys.path.insert(0, str(_TESTS_DIR))
 
-from hermes_governance_fixtures import runtime_governed_tool_names  # noqa: E402
+from hermes_governance_fixtures import template_governed_tool_names  # noqa: E402
+from governance_e2e_setup import (  # noqa: E402
+    cleanup_e2e_governance_yaml,
+    format_gateway_probe_plan,
+    load_e2e_governance_snapshot,
+    setup_e2e_governance_yaml,
+)
 
 from api_client import (  # noqa: E402
     assert_intentframe_gate_toolsets,
@@ -171,9 +177,22 @@ def _run_api_allow_block(env: IsolatedEnv, *, label: str) -> None:
     toolsets_snapshot = parse_toolsets_response(toolsets_body)
     print(f"\n==> {label} toolsets snapshot\n{format_toolsets_snapshot(toolsets_snapshot)}", file=sys.stderr)
 
-    governed = runtime_governed_tool_names()
+    snapshot = load_e2e_governance_snapshot()
+    governed = snapshot.governed
+    probes_ran: set[str] = set()
+    probes_skipped = sorted(snapshot.ungoverned)
+
+    step(
+        f"{label} governance + probe plan\n"
+        f"{format_gateway_probe_plan(governed)}"
+    )
+    step(
+        f"{label} runtime governed tools for IntentFrame gate: "
+        f"{sorted(governed)} (yaml={snapshot.yaml_path})"
+    )
 
     if "terminal" in governed:
+        probes_ran.add("terminal")
         marker = f"intentframe-hermes-e2e-ok-{env.run_id}"
         step(f"{label}: POST /v1/responses ALLOW (LLM → terminal → adapter → bridge)")
         run_allow_with_retries(host=API_HOST, port=env.api_port, api_key=env.api_key, marker=marker)
@@ -182,6 +201,7 @@ def _run_api_allow_block(env: IsolatedEnv, *, label: str) -> None:
         run_block_once(host=API_HOST, port=env.api_port, api_key=env.api_key)
 
     if "process" in governed:
+        probes_ran.add("process")
         step(f"{label}: POST /v1/responses process ALLOW")
         run_process_allow_with_retries(host=API_HOST, port=env.api_port, api_key=env.api_key)
 
@@ -189,6 +209,7 @@ def _run_api_allow_block(env: IsolatedEnv, *, label: str) -> None:
         run_process_block_once(host=API_HOST, port=env.api_port, api_key=env.api_key)
 
     if "write_file" in governed:
+        probes_ran.add("write_file")
         write_marker = f"intentframe-hermes-write-ok-{env.run_id}"
         step(f"{label}: POST /v1/responses write_file ALLOW")
         run_write_file_allow_with_retries(
@@ -202,6 +223,7 @@ def _run_api_allow_block(env: IsolatedEnv, *, label: str) -> None:
         run_write_file_block_once(host=API_HOST, port=env.api_port, api_key=env.api_key)
 
     if "delete_file" in governed:
+        probes_ran.add("delete_file")
         delete_marker = f"intentframe-hermes-delete-ok-{env.run_id}"
         step(f"{label}: POST /v1/responses delete_file semantic ~/ (ALLOW or BLOCK)")
         run_delete_file_semantic_with_retries(
@@ -215,6 +237,7 @@ def _run_api_allow_block(env: IsolatedEnv, *, label: str) -> None:
         run_delete_file_block_once(host=API_HOST, port=env.api_port, api_key=env.api_key)
 
     if "patch" in governed:
+        probes_ran.add("patch")
         patch_marker = f"intentframe-hermes-patch-ok-{env.run_id}"
         step(f"{label}: POST /v1/responses patch replace ALLOW")
         run_patch_replace_allow_with_retries(
@@ -242,6 +265,26 @@ def _run_api_allow_block(env: IsolatedEnv, *, label: str) -> None:
             port=env.api_port,
             api_key=env.api_key,
             marker=v4a_marker,
+        )
+
+    expected_ran = set(governed)
+    if probes_ran != expected_ran:
+        raise AssertionError(
+            f"{label} probe execution mismatch.\n"
+            f"  expected RUN: {sorted(expected_ran)}\n"
+            f"  actual RUN:   {sorted(probes_ran)}\n"
+            f"  expected SKIP: {probes_skipped}"
+        )
+
+    step(
+        f"{label} probe summary: RUN={sorted(probes_ran)} "
+        f"SKIP={probes_skipped}"
+    )
+
+    unexpected_catalog = governed - template_governed_tool_names()
+    if unexpected_catalog:
+        raise AssertionError(
+            f"{label} governed tools not in E2E catalog: {sorted(unexpected_catalog)}"
         )
 
 
@@ -335,6 +378,8 @@ def pass2b_external_hermes(env: IsolatedEnv) -> None:
 def main() -> int:
     _require_openai_api_key()
 
+    setup_e2e_governance_yaml(log=lambda msg: step(msg))
+
     env1: IsolatedEnv | None = None
     env2: IsolatedEnv | None = None
     exit_code = 1
@@ -401,6 +446,7 @@ def main() -> int:
                 print(f"\nERROR: {exc}", file=sys.stderr)
                 exit_code = 1
 
+    cleanup_e2e_governance_yaml()
     return exit_code
 
 

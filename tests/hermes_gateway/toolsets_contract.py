@@ -16,7 +16,7 @@ _TESTS_DIR = Path(__file__).resolve().parent.parent
 if str(_TESTS_DIR) not in sys.path:
     sys.path.insert(0, str(_TESTS_DIR))
 
-from hermes_governance_fixtures import template_enabled_tool_names  # noqa: E402
+from hermes_governance_fixtures import template_governed_tool_names  # noqa: E402
 
 # Hermes 0.17 hermes-api-server composite (toolsets.py) — names the model may see.
 API_SERVER_COMPOSITE_TOOLSET = "hermes-api-server"
@@ -26,7 +26,7 @@ GOVERNED_TOOLS_NOT_ON_API_SERVER = frozenset({"delete_file"})
 
 
 def governed_tools_on_api_server() -> frozenset[str]:
-    return template_enabled_tool_names() - GOVERNED_TOOLS_NOT_ON_API_SERVER
+    return template_governed_tool_names() - GOVERNED_TOOLS_NOT_ON_API_SERVER
 
 # Ungoverned tools that explain LLM tool-selection noise in gateway E2E.
 UNGATED_DISTRACTOR_TOOLS = frozenset(
@@ -71,6 +71,8 @@ class ToolsetEntry:
 
 @dataclass(frozen=True)
 class ToolsetsSnapshot:
+    """Hermes ``/v1/toolsets`` — ``enabled_tool_names`` is the native api_server surface (not IF governance)."""
+
     platform: str
     entries: tuple[ToolsetEntry, ...]
     enabled_tool_names: frozenset[str]
@@ -182,13 +184,13 @@ def assert_intentframe_gate_toolsets_surface(body: dict[str, Any]) -> ToolsetsSn
         )
 
     unexpected_governed_missing = sorted(
-        template_enabled_tool_names()
+        template_governed_tool_names()
         - governed_tools_on_api_server()
         - GOVERNED_TOOLS_NOT_ON_API_SERVER
     )
     if unexpected_governed_missing:
         raise AssertionError(
-            f"template_enabled_tool_names includes tools not classified for api_server: "
+            f"template_governed_tool_names includes tools not classified for api_server: "
             f"{unexpected_governed_missing}"
         )
 

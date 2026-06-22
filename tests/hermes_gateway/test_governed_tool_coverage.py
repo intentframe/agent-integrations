@@ -30,8 +30,10 @@ class TestGovernedToolCoverage(unittest.TestCase):
 
     def test_gateway_e2e_invokes_all_governed_tools(self) -> None:
         source = (GATEWAY_DIR / "test_gateway_e2e.py").read_text(encoding="utf-8")
-        self.assertIn("runtime_governed_tool_names", source)
+        self.assertIn("load_e2e_governance_snapshot", source)
+        self.assertIn("snapshot.governed", source)
         for tool, symbols in GATEWAY_E2E_PROBE_SYMBOLS.items():
+            self.assertIn(f'"{tool}" in governed', source, msg=f"missing governed guard for {tool!r}")
             for symbol in symbols:
                 self.assertIn(
                     symbol,

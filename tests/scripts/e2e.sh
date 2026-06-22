@@ -156,6 +156,7 @@ step "Integrations CLI unit tests"
 (cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_hermes_install.py)
 (cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_governance_edit.py)
 (cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_governance_runtime_contract.py)
+(cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_scoped_governance_yaml.py)
 
 step "Hermes gateway unit tests"
 (cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_isolation.py)

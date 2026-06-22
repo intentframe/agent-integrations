@@ -18,7 +18,14 @@ intentframe-integrations status
 intentframe-integrations seed hermes [--skip-if-exists]
 intentframe-integrations test [--agent-config path/to/agent.json]
 intentframe-integrations doctor hermes [--install-only]
+intentframe-integrations governance list hermes
+intentframe-integrations governance enable hermes <tool>
+intentframe-integrations governance disable hermes <tool>
 ```
+
+`governance enable|disable` toggles **IntentFrame governance** for a catalog tool
+(yaml `enabled: true/false`). It does not enable or disable Hermes native tools.
+See [`docs/agent-tool-gating.md`](../docs/agent-tool-gating.md#terminology-what-governed-means).
 
 Run from repo root via `bin/intentframe-integrations` or:
 
@@ -71,5 +78,6 @@ termination and verifies the PID is still a Hermes gateway before trusting stale
 The CLI does **not** configure Hermes LLM model or provider — only plugin install, config merge,
 adapter sync, and gateway lifecycle.
 
-See `integrations/hermes/README.md` for architecture. Opt-in gateway E2E (sandbox, log paths,
-troubleshooting): `tests/hermes_gateway/README.md`.
+See `integrations/hermes/README.md` for architecture and governed-tool terminology.
+Opt-in gateway E2E (sandbox, log paths, troubleshooting): `tests/hermes_gateway/README.md`.
+Concepts: [`docs/agent-tool-gating.md`](docs/agent-tool-gating.md#terminology-what-governed-means).

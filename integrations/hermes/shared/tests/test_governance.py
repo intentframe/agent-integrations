@@ -17,7 +17,7 @@ if str(TESTS_DIR) not in sys.path:
 from hermes_governance_fixtures import (  # noqa: E402
     governance_env,
     template_catalog_tool_names,
-    template_enabled_tool_names,
+    template_governed_tool_names,
 )
 
 
@@ -38,7 +38,7 @@ class TestGovernanceLoader(unittest.TestCase):
             self.assertIn("RUN_COMMAND", supported_actions())
             self.assertIn("DELETE_HOST_FILE", supported_actions())
             self.assertEqual(frozenset(catalog), template_catalog_tool_names())
-            self.assertEqual(frozenset(tools), template_enabled_tool_names())
+            self.assertEqual(frozenset(tools), template_governed_tool_names())
 
     def test_enabled_false_excluded_from_governed_set(self) -> None:
         from hermes_governance.loader import load_governed_tools, load_tool_catalog

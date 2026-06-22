@@ -99,14 +99,20 @@ def template_catalog_tool_names() -> frozenset[str]:
 
 
 @lru_cache(maxsize=1)
-def template_enabled_tool_names() -> frozenset[str]:
+def template_governed_tool_names() -> frozenset[str]:
+    """Tools marked governed (yaml ``enabled: true``) in the default template."""
     ensure_shared_loader_importable()
     from hermes_governance.loader import load_governed_tools
 
     return frozenset(load_governed_tools(str(DEFAULT_GOVERNANCE_TEMPLATE)).keys())
 
 
+# Deprecated alias — prefer template_governed_tool_names.
+template_enabled_tool_names = template_governed_tool_names
+
+
 def runtime_governed_tool_names() -> frozenset[str]:
+    """IntentFrame-governed tools from active governance yaml (``HERMES_GOVERNANCE_YAML`` or runtime path)."""
     ensure_shared_loader_importable()
     from hermes_governance.loader import load_governed_tools
 

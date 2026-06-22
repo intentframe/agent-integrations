@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for catalog-enabled governance yaml generator."""
+"""Tests for catalog-all-governed governance yaml generator."""
 
 from __future__ import annotations
 
@@ -25,8 +25,8 @@ class TestMakeCatalogYaml(unittest.TestCase):
     def tearDown(self) -> None:
         load_tool_catalog.cache_clear()
 
-    def test_all_catalog_tools_enabled_in_output(self) -> None:
-        path = make_catalog_yaml.write_catalog_enabled_yaml()
+    def test_all_catalog_tools_governed_in_output(self) -> None:
+        path = make_catalog_yaml.write_catalog_all_governed_yaml()
         try:
             catalog = load_tool_catalog(str(path))
             governed = load_governed_tools(str(path))

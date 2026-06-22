@@ -37,6 +37,45 @@ in
 
 ---
 
+## Terminology: what “governed” means
+
+In this repo, **governed** always means **IntentFrame’s validate-only gate is active**
+for a Hermes tool name (plugin wrap + adapter `/validate`). It does **not** mean
+the tool is enabled or disabled in Hermes itself.
+
+| Term | Meaning |
+|------|---------|
+| **Governed tool** | Entry in `governance/tools.yaml` with `enabled: true`. Plugin injects required `reason`, calls adapter before Hermes runs the handler. |
+| **Ungoverned tool** | Not in the governance catalog, or in catalog with `enabled: false`. Hermes runs the native handler with **no** IntentFrame gate. |
+| **Governance catalog** | All tools under `tools:` in yaml (both governed and ungoverned entries). |
+| **Runtime governed set** | Tools with `enabled: true` — returned by `load_governed_tools()` / `runtime_governed_tool_names()`. |
+
+**Do not confuse with:**
+
+| Similar name | What it actually controls |
+|--------------|---------------------------|
+| yaml `enabled: true/false` | IntentFrame governance for that catalog entry (**not** Hermes tool visibility). |
+| Hermes `/v1/toolsets` “enabled” tools | Native api_server surface the LLM may see — separate from governance. |
+| `plugins.enabled` in `config.yaml` | Whether the **intentframe-gate plugin** loads — not per-tool governance. |
+| `governance enable\|disable hermes <tool>` | Toggle IntentFrame gate for one catalog tool in **runtime** yaml. |
+
+**Mental model:**
+
+```
+governance/tools.yaml
+  enabled: true  → governed  → plugin wraps + adapter validates
+  enabled: false → ungoverned → Hermes native handler (side effects without IF gate)
+
+Hermes may still expose ungoverned tools on /v1/toolsets even when governance is off for them.
+```
+
+Code and E2E env vars prefer **governed** language (`load_governed_tools`, `HERMES_E2E_GOVERNED_TOOLS`).
+The yaml field remains `enabled` for backward compatibility; read it as **“governed by IntentFrame.”**
+
+See also: [`NATIVE_KIT_INTEGRATION.md`](./NATIVE_KIT_INTEGRATION.md) §2, [`integrations/hermes/governance/tools.yaml`](../integrations/hermes/governance/tools.yaml) header comments.
+
+---
+
 ## 1. The problem
 
 An agent "turns thought into effect" the moment it executes a tool. IntentFrame
@@ -270,10 +309,12 @@ Drift is prevented by a **shared contract**: `governance/tools.yaml` +
 `hermes-governance` loader; adapter exposes `supported_tools()` for doctor/sync
 checks.
 
-Each tool entry may set `enabled: true|false` (default `true`). Only **enabled**
-tools are governed at runtime (plugin wrap + adapter validate). Disabled tools
-remain in the catalog with full mapper specs but run ungoverned through native
-Hermes handlers.
+Each tool entry may set `enabled: true|false` (default `true`). In this yaml,
+**`enabled` means IntentFrame-governed**, not “Hermes tool enabled.” Only entries
+with `enabled: true` are in the **runtime governed set** (plugin wrap + adapter
+validate). Entries with `enabled: false` stay in the catalog with full mapper
+specs but run **ungoverned** through native Hermes handlers — the LLM may still
+see and call them on `/v1/toolsets`.
 
 Users toggle governed tools in the **runtime** config at
 `~/.intentframe/integrations/hermes/governance/tools.yaml` (CLI or hand-edit).
@@ -283,15 +324,18 @@ Use `integrate hermes --reset-governance` to restore defaults from the template.
 
 ```bash
 intentframe-integrations governance list hermes
-intentframe-integrations governance disable hermes write_file
-intentframe-integrations governance enable hermes write_file
+intentframe-integrations governance disable hermes write_file   # ungovern write_file
+intentframe-integrations governance enable hermes write_file    # govern write_file again
 ```
 
-After changing `enabled`, restart the Hermes gateway and adapter (governance is
+After changing governance, restart the Hermes gateway and adapter (governance is
 loaded at process start).
 
-Catalog-wide integration tests generate a throwaway all-enabled yaml from
-the default template via `HERMES_GOVERNANCE_YAML`; they never mutate runtime user config.
+**Tests:** catalog-wide integration tests generate a throwaway all-governed yaml
+from the default template via `HERMES_GOVERNANCE_YAML`; they never mutate runtime
+user config. Gateway E2E accepts `HERMES_E2E_GOVERNED_TOOLS=terminal,process` to
+scope which governed tools get LLM probes (plugin gate only — not Hermes toolsets).
+See [`tests/hermes_gateway/README.md`](../tests/hermes_gateway/README.md).
 
 ### Lifecycle: a one-shot wrap is not enough
 
