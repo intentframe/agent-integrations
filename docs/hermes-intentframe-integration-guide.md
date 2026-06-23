@@ -463,7 +463,7 @@ VALID_MAPPER_KINDS = frozenset({"terminal", "process", "write_file", "patch", "g
 ```
 
 For `mapper: generic`, no new mapper function is needed — `map_generic` handles all
-generic tools. Regenerate committed `governance/actions.manifest` and update dev
+generic tools. Regenerate committed `governance/generic_actions.manifest` and update dev
 artifacts (Step 3).
 
 ### Step 2 — Adapter mapper
@@ -492,7 +492,7 @@ Update shipped repo files when adding a new action ID:
 
 | File | What to add |
 |------|-------------|
-| `governance/actions.manifest` | Generic action ID (comma-separated; full catalog superset) |
+| `governance/generic_actions.manifest` | Generic action ID (comma-separated; full catalog superset) |
 | `agent.json` `action_types` | Every action ID the agent may emit |
 | `integrations/hermes/policy.yaml` | `allowed_actions` row (`safe: false` for generic) |
 | `executor.yaml` `supported_actions` | Same action IDs for validate-only executor |

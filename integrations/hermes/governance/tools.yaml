@@ -8,7 +8,7 @@
 #   writes ONLY the runtime copy (~/.intentframe/.../governance/tools.yaml).
 #   Restart Hermes gateway + adapter after toggling (governance is cached at process start).
 #
-# Dev control: this repo template + actions.manifest + agent.json + policy.yaml +
+# Dev control: this repo template + generic_actions.manifest + agent.json + policy.yaml +
 #   executor.yaml. Nothing at runtime auto-regenerates those files.
 #
 # Governance (enabled) and policy (allowed_actions) are independent gates — they do

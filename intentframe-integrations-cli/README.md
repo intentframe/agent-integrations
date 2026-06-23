@@ -42,7 +42,7 @@ gateway restart needed.
 **Runtime artifacts** (copied on first `integrate`, never auto-overwritten):
 
 - `governance/tools.yaml` — user toggles via `governance enable|disable`
-- `governance/actions.manifest` — static dev-shipped superset of generic action IDs
+- `governance/generic_actions.manifest` — static dev-shipped superset of generic action IDs
 - `policy.yaml` — user edits via policy CLI
 
 There is no `sync` command. Repo templates are dev-maintained only.
@@ -104,7 +104,7 @@ adapter sync, and gateway lifecycle.
 | Variable | Set by | Effect |
 |----------|--------|--------|
 | `HERMES_GOVERNANCE_YAML` | `agent.json` default; override in shell or test harness | Which tools are **IntentFrame-governed** at runtime. If already set in the parent environment, `start hermes` (adapter) and `gateway start hermes` preserve it via `setdefault` — they do not replace it with the sandbox-seeded path from `integrate`. |
-| `IF_DYNAMIC_BUNDLE_MANIFEST` | `agent.json` default | Path to static `actions.manifest` (generic `HERMES_*` action IDs). Backend dynamic bundle reads this at boot; unset env → dynamic bundle is a no-op. |
+| `IF_DYNAMIC_BUNDLE_MANIFEST` | `agent.json` default | Path to static `generic_actions.manifest` (generic `HERMES_*` action IDs). Backend dynamic bundle reads this at boot; unset env → dynamic bundle is a no-op. |
 | `IF_AGENT_ADAPTER_SOCKET` | `agent.json` | UDS path for plugin → adapter validate calls. |
 
 `integrate hermes` prints `export …` lines from `format_env_exports()`: values already

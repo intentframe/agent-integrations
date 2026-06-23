@@ -1,7 +1,7 @@
 """Load runtime policy YAML into policy-registry (validate + upsert).
 
 Policy changes apply immediately via policy-registry UDS — no gateway or adapter
-restart. Does not modify governance/tools.yaml or actions.manifest.
+restart. Does not modify governance/tools.yaml or generic_actions.manifest.
 """
 
 from __future__ import annotations

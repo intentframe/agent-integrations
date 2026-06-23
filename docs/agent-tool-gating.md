@@ -318,7 +318,7 @@ closed**. Every governed name needs a matching mapper kind and policy.
 
 Drift is prevented by a **shared contract**: `governance/tools.yaml` +
 `hermes-governance` loader; adapter exposes `supported_tools()` for doctor checks.
-Dev-maintained `governance/actions.manifest` lists all generic-mapper action IDs
+Dev-maintained `governance/generic_actions.manifest` lists all generic-mapper action IDs
 (full catalog superset); golden test
 [`test_actions_manifest.py`](../tests/intentframe_integrations/test_actions_manifest.py)
 enforces parity. There is no user-facing `sync` command — runtime CLI never

@@ -87,7 +87,7 @@ document explicitly if you leave reads open.
 
 Every governed action must appear here **and** in shipped `policy.yaml` **and** in
 `executor.yaml` `supported_actions` for validate-only. Generic action IDs are also
-listed in committed `governance/actions.manifest` (static superset; copied to runtime
+listed in committed `governance/generic_actions.manifest` (static superset; copied to runtime
 on `integrate hermes`). Golden test:
 `tests/intentframe_integrations/test_actions_manifest.py`.
 

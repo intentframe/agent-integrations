@@ -84,7 +84,7 @@ class TestGenericDynamicBundle(unittest.TestCase):
         import intentframe_bundle_sdk.registry as registry
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            manifest = Path(temp_dir) / "actions.manifest"
+            manifest = Path(temp_dir) / "generic_actions.manifest"
             manifest.write_text("HERMES_CRONJOB", encoding="utf-8")
             previous = os.environ.get("IF_DYNAMIC_BUNDLE_MANIFEST")
             os.environ["IF_DYNAMIC_BUNDLE_MANIFEST"] = str(manifest)

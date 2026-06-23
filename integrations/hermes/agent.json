@@ -20,6 +20,6 @@
   "env": {
     "IF_AGENT_ADAPTER_SOCKET": "~/.intentframe/integrations/hermes/adapter.sock",
     "HERMES_GOVERNANCE_YAML": "~/.intentframe/integrations/hermes/governance/tools.yaml",
-    "IF_DYNAMIC_BUNDLE_MANIFEST": "~/.intentframe/integrations/hermes/governance/actions.manifest"
+    "IF_DYNAMIC_BUNDLE_MANIFEST": "~/.intentframe/integrations/hermes/governance/generic_actions.manifest"
   }
 }

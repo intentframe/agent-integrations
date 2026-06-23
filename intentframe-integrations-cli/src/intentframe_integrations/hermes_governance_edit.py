@@ -1,7 +1,7 @@
 """Enable/disable governed Hermes tools in runtime governance/tools.yaml.
 
 Only flips ``enabled`` on the runtime copy under ~/.intentframe/. Does not touch
-actions.manifest, policy.yaml, or any repo templates. Restart Hermes gateway +
+generic_actions.manifest, policy.yaml, or any repo templates. Restart Hermes gateway +
 adapter after changes (governance is cached at process start).
 """
 

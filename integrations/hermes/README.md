@@ -7,7 +7,7 @@ Hermes does **not** ship an IntentFrame executor pack or runtime. This folder pr
 | `agent.json` | Agent profile, adapter socket, exported `env` for Hermes plugin |
 | `policy.yaml` | Shipped policy **template** (copied to runtime on first integrate/start) |
 | `governance/tools.yaml` | Default governed-tool **template** (seeded to runtime on first integrate) |
-| `governance/actions.manifest` | Static generic action IDs (copied to runtime on first integrate) |
+| `governance/generic_actions.manifest` | Static generic action IDs (copied to runtime on first integrate) |
 | `governance/README.md` | Dev vs user ownership for governance artifacts |
 | `shared/` | `hermes-governance` package — contract loader for adapter |
 | `adapter/` | Hermes adapter sidecar (bridge client, tool mapping, HTTP/UDS server) |
@@ -118,7 +118,7 @@ bin/intentframe-integrations stop
 from repo templates (never overwrites existing user files):
 
 - `~/.intentframe/integrations/hermes/governance/tools.yaml`
-- `~/.intentframe/integrations/hermes/governance/actions.manifest`
+- `~/.intentframe/integrations/hermes/governance/generic_actions.manifest`
 - `~/.intentframe/integrations/hermes/policy.yaml`
 
 ### Config ownership
@@ -127,7 +127,7 @@ from repo templates (never overwrites existing user files):
 |------|-----------|----------------------|
 | Runtime `governance/tools.yaml` `enabled` | User (`governance enable\|disable`) | Hermes gateway + adapter |
 | Runtime `policy.yaml` | User (`policy set\|reload\|reset`) | None (live registry) |
-| Repo templates (`tools.yaml`, `actions.manifest`, `policy.yaml`, `agent.json`, `executor.yaml`) | Dev only | Backend restart if manifest/action IDs change |
+| Repo templates (`tools.yaml`, `generic_actions.manifest`, `policy.yaml`, `agent.json`, `executor.yaml`) | Dev only | Backend restart if manifest/action IDs change |
 
 There is no user-facing `sync` command. Runtime CLI never rewrites repo templates.
 
@@ -145,7 +145,7 @@ The CLI propagates governance config to child processes as follows:
 | Env | Points to | Read by |
 |-----|-----------|---------|
 | `HERMES_GOVERNANCE_YAML` | Runtime `governance/tools.yaml` | Plugin gate, adapter |
-| `IF_DYNAMIC_BUNDLE_MANIFEST` | Runtime `governance/actions.manifest` | Dynamic bundle at backend boot (registers all catalog generic action IDs) |
+| `IF_DYNAMIC_BUNDLE_MANIFEST` | Runtime `governance/generic_actions.manifest` | Dynamic bundle at backend boot (registers all catalog generic action IDs) |
 | `IF_AGENT_ADAPTER_SOCKET` | Adapter UDS | Plugin → adapter validate calls |
 
 To use a custom governed-tool set without editing runtime yaml, export
@@ -187,7 +187,7 @@ Export env from `agent.json` (or set in the shell before `start` / `gateway star
 
 - `IF_AGENT_ADAPTER_SOCKET=~/.intentframe/integrations/hermes/adapter.sock`
 - `HERMES_GOVERNANCE_YAML=~/.intentframe/integrations/hermes/governance/tools.yaml` (optional override path for governed-tool set)
-- `IF_DYNAMIC_BUNDLE_MANIFEST=~/.intentframe/integrations/hermes/governance/actions.manifest` (static generic action IDs; set by us in agent.json)
+- `IF_DYNAMIC_BUNDLE_MANIFEST=~/.intentframe/integrations/hermes/governance/generic_actions.manifest` (static generic action IDs; set by us in agent.json)
 
 ## Adding a governed tool
 
@@ -203,7 +203,7 @@ See [`governance/README.md`](governance/README.md) for dev vs user ownership.
 **Generic mapper** (semantic-only, e.g. `cronjob` → `HERMES_CRONJOB`):
 
 1. Add entry with `mapper: generic` and a distinct `HERMES_*` action ID in `tools.yaml`.
-2. Regenerate committed `governance/actions.manifest` (full catalog superset).
+2. Regenerate committed `governance/generic_actions.manifest` (full catalog superset).
 3. Update dev artifacts as above; add `safe: false` row in shipped `policy.yaml`.
 4. Golden test: `tests/intentframe_integrations/test_actions_manifest.py`.
 5. No plugin code changes — `map_generic` handles all generic tools.

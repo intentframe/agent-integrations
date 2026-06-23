@@ -6,7 +6,7 @@ Agent profiles live under `../integrations/` (e.g. `integrations/hermes/`) — e
 
 **Dynamic bundle** (`bundles/dynamic.py`): agent-agnostic pass-through bundle. Reads
 `IF_DYNAMIC_BUNDLE_MANIFEST` (comma-separated action IDs). If unset, registers nothing.
-Hermes sets this env in `agent.json` pointing at runtime `actions.manifest`.
+Hermes sets this env in `agent.json` pointing at runtime `generic_actions.manifest`.
 
 ## Quick start
 

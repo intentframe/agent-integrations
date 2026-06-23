@@ -49,7 +49,7 @@ class patch_home:
             self.home / ".intentframe" / "integrations" / "hermes" / "governance"
         )
         manifest_dir.mkdir(parents=True, exist_ok=True)
-        manifest_path = manifest_dir / "actions.manifest"
+        manifest_path = manifest_dir / "generic_actions.manifest"
         manifest_path.write_text("HERMES_CRONJOB", encoding="utf-8")
         os.environ["IF_DYNAMIC_BUNDLE_MANIFEST"] = str(manifest_path)
         self._reset_bundle_loader_state()

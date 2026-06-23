@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Dev golden test: committed actions.manifest and derived configs match the catalog.
+"""Dev golden test: committed generic_actions.manifest and derived configs match the catalog.
 
 These artifacts are dev-generated and static; they only change when a developer
 adds a tool to governance/tools.yaml. This test fails on drift so they cannot
@@ -55,7 +55,7 @@ class TestActionsManifestGolden(unittest.TestCase):
         self.assertEqual(
             present,
             set(catalog_generic_action_ids()),
-            "committed actions.manifest is out of sync with the generic catalog; "
+            "committed generic_actions.manifest is out of sync with the generic catalog; "
             f"regenerate it to: {format_manifest(catalog_generic_action_ids())}",
         )
 
