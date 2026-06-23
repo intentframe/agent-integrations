@@ -2,8 +2,11 @@
 """Probe Hermes registry schemas after intentframe-gate (reason injection).
 
 Run inside the managed Hermes venv with HERMES_HOME set. Used by gateway
-toolsets live test to verify governed tools still use Hermes names but require
-``reason`` in their JSON schema.
+toolsets live test to verify **native-mapper** governed tools use Hermes names
+and require ``reason`` in their JSON schema.
+
+Generic-mapper tools (e.g. ``cronjob``) are governed at runtime but excluded
+here — same two-tier contract as gateway E2E (live semantic smoke only).
 """
 
 from __future__ import annotations
@@ -14,11 +17,15 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+TESTS_DIR = REPO_ROOT / "tests"
 PLUGIN_SRC = REPO_ROOT / "integrations" / "hermes" / "plugin" / "intentframe-gate"
+if str(TESTS_DIR) not in sys.path:
+    sys.path.insert(0, str(TESTS_DIR))
 if str(PLUGIN_SRC) not in sys.path:
     sys.path.insert(0, str(PLUGIN_SRC))
 
 from governance_loader import governed_tool_names  # type: ignore  # noqa: E402
+from hermes_governance_fixtures import gateway_e2e_probe_tool_names  # noqa: E402
 
 
 def main() -> int:
@@ -46,6 +53,8 @@ def main() -> int:
     definitions = get_tool_definitions(enabled_toolsets=enabled_toolsets, quiet_mode=True)
 
     governed = governed_tool_names()
+    probe_targets = gateway_e2e_probe_tool_names() & governed
+    skipped_generic = sorted(governed - probe_targets)
     by_name: dict[str, dict] = {}
     for item in definitions:
         fn = item.get("function")
@@ -60,12 +69,13 @@ def main() -> int:
         "enabled_toolset_count": len(enabled_toolsets),
         "definition_count": len(definitions),
         "governed_tools": {},
+        "skipped_generic_governed": skipped_generic,
         "distractors": {},
     }
 
     errors: list[str] = []
 
-    for tool_name in sorted(governed):
+    for tool_name in sorted(probe_targets):
         if tool_name not in by_name:
             errors.append(f"governed tool {tool_name!r} missing from get_tool_definitions()")
             continue

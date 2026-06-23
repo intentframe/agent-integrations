@@ -251,8 +251,8 @@ noise; still sends the full `tools=` list upstream).
 | Surface | What it proves |
 |---------|----------------|
 | `GET /v1/toolsets` | Hermes **config** tool names for api_server (e.g. ~31) |
-| `probe_hermes_tool_schemas.py` | **Registry** schemas after plugin load (e.g. ~16 defs); governed `reason` + gate |
-| Request dump + round-trip assert | **OpenAI `chat.completions` payload** (e.g. ~17 tools in `tools=`) |
+| `probe_hermes_tool_schemas.py` | **Registry** schemas for native-mapper governed tools (`reason` + gate); generic tools skipped |
+| Request dump + round-trip assert | **OpenAI `chat.completions` payload** — native governed tools with required `reason` in `tools=` |
 
 The registry count and toolsets count differ by design — not every listed toolset
 name becomes a registry definition on the LLM path. See
@@ -263,7 +263,7 @@ name becomes a registry definition on the LLM path. See
 | Helper | Checks |
 |--------|--------|
 | `assert_gateway_openai_roundtrip()` | Gateway `status: completed` and `usage.total_tokens > 0` |
-| `assert_provider_tools_surface()` | Governed tools in dump `request.body.tools` with required `reason` |
+| `assert_provider_tools_surface()` | Native-mapper governed tools in dump `request.body.tools` with required `reason` |
 
 The request dump is written at **preflight** (before the HTTP call to OpenAI). Token
 usage from the gateway response proves the call **completed** — the dump alone only

@@ -47,7 +47,7 @@ from toolsets_contract import format_toolsets_snapshot, parse_toolsets_response 
 _TESTS_DIR = HERE.parent
 if str(_TESTS_DIR) not in sys.path:
     sys.path.insert(0, str(_TESTS_DIR))
-from hermes_governance_fixtures import template_governed_tool_names  # noqa: E402
+from hermes_governance_fixtures import gateway_e2e_probe_tool_names  # noqa: E402
 
 API_HOST = "127.0.0.1"
 INSTALL_TIMEOUT = 600.0
@@ -156,7 +156,7 @@ def main() -> int:
             instructions="Automated integration test. Do not use tools.",
         )
         assert_gateway_openai_roundtrip(responses_body)
-        governed = template_governed_tool_names()
+        governed = gateway_e2e_probe_tool_names()
         dump_path, provider_body = load_newest_request_dump(
             env.hermes_home,
             existing=existing_dumps,
