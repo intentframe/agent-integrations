@@ -67,23 +67,17 @@ class TestGovernedToolCoverage(unittest.TestCase):
         for fixture in LIVE_PLUGIN_EXTRA_FIXTURES:
             self.assertIn(fixture, source)
 
-    def test_toolsets_live_uses_native_gateway_probe_tier_only(self) -> None:
-        native = gateway_e2e_probe_tool_names()
-        generic = live_semantic_probe_tool_names()
+    def test_toolsets_live_verifies_full_governed_catalog(self) -> None:
+        """Toolsets live test asserts plugin changes for all governed tools, not native E2E tier only."""
         probe = (GATEWAY_DIR / "probe_hermes_tool_schemas.py").read_text(encoding="utf-8")
         toolsets_live = (GATEWAY_DIR / "test_gateway_toolsets_live.py").read_text(
             encoding="utf-8"
         )
-        self.assertIn("gateway_e2e_probe_tool_names", probe)
-        self.assertIn("gateway_e2e_probe_tool_names", toolsets_live)
-        self.assertNotIn("template_governed_tool_names", toolsets_live)
-        for tool in generic:
-            self.assertNotIn(
-                f'"{tool}"',
-                probe,
-                msg=f"schema probe must not hardcode generic tool {tool!r}",
-            )
-        self.assertFalse(native & generic)
+        self.assertIn("governed_tool_names()", probe)
+        self.assertNotIn("gateway_e2e_probe_tool_names", probe)
+        self.assertIn("template_governed_tool_names", toolsets_live)
+        self.assertNotIn("gateway_e2e_probe_tool_names", toolsets_live)
+        self.assertNotIn("skipped_generic_governed", probe)
 
 
 def main() -> int:

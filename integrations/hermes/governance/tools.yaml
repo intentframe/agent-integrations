@@ -4,6 +4,9 @@
 # enabled: true  → IntentFrame gates at runtime (plugin wrap + adapter validate).
 # enabled: false → spec kept in catalog; Hermes runs the tool ungoverned (no intent sent).
 #
+# builtin_module → Hermes module that registers this tool at import time (dev-owned preload map).
+#   Must start with "tools."; plugin imports only for enabled tools before registry snapshot.
+#
 # User control: intentframe-integrations governance enable|disable hermes <tool>
 #   writes ONLY the runtime copy (~/.intentframe/.../governance/tools.yaml).
 #   Restart Hermes gateway + adapter after toggling (governance is cached at process start).
@@ -22,6 +25,7 @@ tools:
     risk: local_process
     mapper: terminal
     blocked_response: terminal_json
+    builtin_module: tools.terminal_tool
 
   process:
     enabled: true
@@ -29,6 +33,7 @@ tools:
     risk: local_process
     mapper: process
     blocked_response: generic_json
+    builtin_module: tools.process_registry
 
   write_file:
     enabled: true
@@ -36,6 +41,7 @@ tools:
     risk: local_write
     mapper: write_file
     blocked_response: generic_json
+    builtin_module: tools.file_tools
 
   patch:
     enabled: true
@@ -44,6 +50,7 @@ tools:
     risk: local_write
     mapper: patch
     blocked_response: generic_json
+    builtin_module: tools.file_tools
 
   cronjob:
     enabled: true
@@ -51,3 +58,4 @@ tools:
     risk: local_process
     mapper: generic
     blocked_response: generic_json
+    builtin_module: tools.cronjob_tools

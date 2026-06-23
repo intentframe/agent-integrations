@@ -12,6 +12,7 @@ import yaml
 
 VALID_BLOCKED_RESPONSES = frozenset({"terminal_json", "generic_json"})
 VALID_MAPPER_KINDS = frozenset({"terminal", "process", "write_file", "patch", "generic"})
+BUILTIN_MODULE_PREFIX = "tools."
 
 
 @dataclass(frozen=True)
@@ -23,6 +24,7 @@ class ToolSpec:
     blocked_response: str = "generic_json"
     actions: tuple[str, ...] = ()
     enabled: bool = True
+    builtin_module: str | None = None
 
     def policy_actions(self) -> frozenset[str]:
         if self.actions:
@@ -85,6 +87,20 @@ def _parse_enabled(raw: dict[str, Any]) -> bool:
     return enabled
 
 
+def _parse_builtin_module(name: str, raw: dict[str, Any]) -> str | None:
+    value = raw.get("builtin_module")
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"Tool {name!r} builtin_module must be a non-empty string when present")
+    module = value.strip()
+    if not module.startswith(BUILTIN_MODULE_PREFIX):
+        raise ValueError(
+            f"Tool {name!r} builtin_module {module!r} must start with {BUILTIN_MODULE_PREFIX!r}"
+        )
+    return module
+
+
 def _parse_tool(name: str, raw: dict[str, Any]) -> ToolSpec:
     action = str(raw.get("action", "")).strip()
     risk = str(raw.get("risk", "")).strip()
@@ -104,6 +120,7 @@ def _parse_tool(name: str, raw: dict[str, Any]) -> ToolSpec:
         blocked_response=blocked_response,
         actions=_parse_actions(raw, action),
         enabled=_parse_enabled(raw),
+        builtin_module=_parse_builtin_module(name, raw),
     )
 
 

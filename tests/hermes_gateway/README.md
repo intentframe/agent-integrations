@@ -197,6 +197,7 @@ Hermes gateway before trusting stale PID files.
 | Wrong governed set at runtime | Parent env not propagated to adapter/gateway | E2E `assert_governance_env_contract` failure; check `gateway start` stderr for `Hermes governance config:` line |
 | `patch replace ALLOW` fails Pass 2a (overwrite BLOCK) | Same marker/file reused across passes | Pass-unique marker + `seed_patch_replace_target` (see [Probe harness determinism](#probe-harness-determinism)) |
 | `patch replace BLOCK`: path under `/tmp/…` | LLM rewrote `/etc/…` after block | Explicit block prompt in `run_patch_replace_block_once` |
+| Toolsets probe: `cronjob missing from get_tool_definitions()` | Probe subprocess lacks gateway session env | Toolsets live sets `HERMES_GATEWAY_SESSION=1` in probe env; see [Recent fixes](#recent-fixes-2026-06) under toolsets section |
 
 ## Related docs
 
@@ -227,6 +228,8 @@ parity with CLI child env builders). `test_hermes_install.py` covers
 
 Lighter-weight than full gateway E2E: proves intentframe-gate changes appear on the
 **OpenAI upstream `tools=` payload**, not just Hermes config/listing surfaces.
+Covers **all** governed catalog tools (including generic mappers like `cronjob`), not
+only the native-mapper subset used for gateway E2E ALLOW/BLOCK probes.
 
 Entrypoint: `test_gateway_toolsets_live.py`  
 Wrapper: `tests/scripts/test-hermes-gateway-toolsets.sh`
@@ -242,7 +245,9 @@ POST /v1/responses   →  real chat.completions round-trip + request dump
 assertions           →  token usage > 0, governed tools + reason in tools=
 ```
 
-Hermes gateway starts with `HERMES_DUMP_REQUESTS=1`. One cheap `POST /v1/responses`
+Hermes gateway starts with `HERMES_DUMP_REQUESTS=1`. The schema probe subprocess
+sets `HERMES_GATEWAY_SESSION=1` so ``cronjob`` passes Hermes ``check_fn`` (same
+as the running gateway). One cheap `POST /v1/responses`
 prompts the model to reply `OK` without calling tools (minimizes IntentFrame policy
 noise; still sends the full `tools=` list upstream).
 
@@ -251,8 +256,8 @@ noise; still sends the full `tools=` list upstream).
 | Surface | What it proves |
 |---------|----------------|
 | `GET /v1/toolsets` | Hermes **config** tool names for api_server (e.g. ~31) |
-| `probe_hermes_tool_schemas.py` | **Registry** schemas for native-mapper governed tools (`reason` + gate); generic tools skipped |
-| Request dump + round-trip assert | **OpenAI `chat.completions` payload** — native governed tools with required `reason` in `tools=` |
+| `probe_hermes_tool_schemas.py` | **Registry** schemas for all governed tools (`reason` + gate), including generic mappers |
+| Request dump + round-trip assert | **OpenAI `chat.completions` payload** — all governed tools with required `reason` in `tools=` |
 
 The registry count and toolsets count differ by design — not every listed toolset
 name becomes a registry definition on the LLM path. See
@@ -263,7 +268,7 @@ name becomes a registry definition on the LLM path. See
 | Helper | Checks |
 |--------|--------|
 | `assert_gateway_openai_roundtrip()` | Gateway `status: completed` and `usage.total_tokens > 0` |
-| `assert_provider_tools_surface()` | Native-mapper governed tools in dump `request.body.tools` with required `reason` |
+| `assert_provider_tools_surface()` | All governed catalog tools in dump `request.body.tools` with required `reason` |
 
 The request dump is written at **preflight** (before the HTTP call to OpenAI). Token
 usage from the gateway response proves the call **completed** — the dump alone only
@@ -273,16 +278,19 @@ Contract helpers: `tests/hermes_gateway/provider_request_contract.py`
 
 ### Stderr on success
 
-1. **OpenAI round-trip proof** — input/output/total tokens, provider URL/model
-2. **Provider tools= snapshot** — dump path, sorted tool list, `[governed, reason_required=true]` markers
+1. **OpenAI round-trip proof** — run marker, input/output/total tokens, provider URL/model
+2. **Provider tools= snapshot** — run marker, dump path, sorted tool list, `[governed, reason_required=true]` markers
 
 ### Finding the call in OpenAI Platform
 
-Shows as **Chat Completion** (`gpt-4o-mini`), not Responses API. Typical signature:
+Each run prints a unique marker: ``intentframe-toolsets-<run_id>``. Search Platform
+Logs / Usage for that token in the user prompt or assistant reply to match this run.
 
-- User prompt: `Reply with the single word OK. Do not call any tools.`
-- System includes: `Automated integration test. Do not use tools.`
-- ~11k input tokens, **17 tools** in the Tools list, output `OK`
+Typical signature:
+
+- User prompt contains: ``Reply with exactly this single token ... intentframe-toolsets-...``
+- System includes: ``Automated IntentFrame toolsets integration test run_id=...``
+- ~11k input tokens, **17+ tools** in the Tools list, output is the marker token
 - No tool invocations (unlike full E2E entries that say “Call the terminal tool…”)
 
 Platform Logs list tool **names** but not JSON schema details (`reason` in `required`).
@@ -294,3 +302,15 @@ RUN_HERMES_GATEWAY_TOOLSETS=1 ./tests/scripts/test-hermes-gateway-toolsets.sh
 
 The full gateway E2E also asserts `/v1/toolsets` before the LLM probes, but uses
 tool-calling prompts for ALLOW/BLOCK — a different OpenAI log signature.
+
+### Recent fixes (2026-06)
+
+These were gaps between production behavior and what the toolsets live harness asserted.
+
+| Bug | Symptom | Root cause | Fix |
+|-----|---------|------------|-----|
+| **Partial governed coverage** | Toolsets test skipped `cronjob` while production governs it | Probe and provider dump used `gateway_e2e_probe_tool_names()` (native E2E tier only) | Probe uses `governed_tool_names()`; live test asserts `template_governed_tool_names()` on the request dump |
+| **Preload map drift** | Adding a governed builtin required editing a hardcoded Python dict | `GOVERNED_BUILTIN_MODULES` lived in `builtin_preload.py`, separate from `tools.yaml` | `builtin_module: tools.<module>` per tool in repo `tools.yaml`; plugin preload imports enabled specs; shared + plugin loaders validate `tools.` prefix |
+| **`cronjob` schema probe failure** | Probe reported `cronjob missing from get_tool_definitions()` despite yaml preload | Preload registered `cronjob`, but Hermes `check_cronjob_requirements()` filters it unless `HERMES_GATEWAY_SESSION=1` (or interactive/exec env); probe subprocess lacked that env while the gateway had it | `_run_schema_probe()` sets `probe_env["HERMES_GATEWAY_SESSION"] = "1"` to mirror the running gateway |
+
+Guarded by `test_governed_tool_coverage.py` (`test_toolsets_live_verifies_full_governed_catalog`) and loader parity in `tests/hermes_plugin/test_gate.py` (`builtin_module` must match between plugin and shared loaders).

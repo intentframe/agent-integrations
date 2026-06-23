@@ -44,13 +44,13 @@ At plugin load (`register()`):
 3. Snapshot loop — wrap governed registry entries with `override=True`
 
 On gateway startup, plugins load **before** Hermes builtins. [`builtin_preload.py`](builtin_preload.py)
-imports only modules in `GOVERNED_BUILTIN_MODULES` for **governed** tool names so
-the snapshot loop can wrap them without calling full `discover_builtin_tools()`
-(which would pull in extras like `read_terminal`). Details:
-[`docs/hermes-plugin-registration-order.md`](../../../docs/hermes-plugin-registration-order.md).
+imports ``builtin_module`` from each **enabled** governed tool in the dev-owned
+``governance/tools.yaml`` so the snapshot loop can wrap them without calling full
+``discover_builtin_tools()`` (which would pull in extras like ``read_terminal``).
+Details: [`docs/hermes-plugin-registration-order.md`](../../../docs/hermes-plugin-registration-order.md).
 
-When adding a governed Hermes builtin, add its import module to
-`GOVERNED_BUILTIN_MODULES` and extend
+When adding a governed Hermes builtin, set ``builtin_module: tools.<module>`` in the
+repo template and extend
 [`tests/hermes_plugin/test_builtin_preload.py`](../../../tests/hermes_plugin/test_builtin_preload.py).
 
 ## Env

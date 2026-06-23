@@ -66,25 +66,29 @@ def discover_builtin_tools(tools_dir: Optional[Path] = None) -> List[str]:
 | **`intentframe-gate` (broken)** | Hook + snapshot only — **no preload** | **empty** → `wrapped = []` |
 | **`intentframe-gate` (fixed)** | `preload_governed_builtins(governed)` + generic snapshot | governed names present |
 
-The fixed plugin restores the old **early-import effect** generically:
+The fixed plugin restores the old **early-import effect** generically from the dev-owned
+catalog template:
 
-```12:29:integrations/hermes/plugin/intentframe-gate/builtin_preload.py
-GOVERNED_BUILTIN_MODULES: dict[str, str] = {
-    "terminal": "tools.terminal_tool",
-    "process": "tools.process_registry",
-    "write_file": "tools.file_tools",
-    "patch": "tools.file_tools",
-}
-...
-            importlib.import_module(module_name)
+```yaml
+# integrations/hermes/governance/tools.yaml (excerpt)
+terminal:
+  enabled: true
+  builtin_module: tools.terminal_tool
+cronjob:
+  enabled: true
+  builtin_module: tools.cronjob_tools
 ```
+
+[`builtin_preload.py`](../integrations/hermes/plugin/intentframe-gate/builtin_preload.py)
+imports each enabled tool's ``builtin_module`` (must start with ``tools.``) before snapshot.
 
 Then the same wrap loop runs for every governed name — no terminal-specific
 `_register_terminal_override()`:
 
 ```20:35:integrations/hermes/plugin/intentframe-gate/__init__.py
-    governed = governed_tool_names()
-    preload_governed_builtins(governed)
+    governed_tools = load_governed_tools()
+    governed = frozenset(governed_tools)
+    preload_governed_builtins(governed_tools)
 
     for entry in registry._snapshot_entries():
         if entry.name not in governed:
@@ -97,10 +101,11 @@ Then the same wrap loop runs for every governed name — no terminal-specific
 
 ### Why this matters for code review
 
-Treat changes to `GOVERNED_BUILTIN_MODULES` and any plugin `import` like **API
-surface changes**:
+Treat changes to ``builtin_module`` in the repo ``tools.yaml`` and any plugin ``import``
+like **API surface changes**:
 
-- Removing an import line can remove a tool from the OpenAI payload entirely.
+- Removing or omitting ``builtin_module`` can remove a tool from the OpenAI payload entirely.
+- Invalid ``builtin_module`` values are rejected (must start with ``tools.``).
 - Adding `discover_builtin_tools()` can register unrelated tools (`read_terminal`).
 - Unit test: [`tests/hermes_plugin/test_builtin_preload.py`](../tests/hermes_plugin/test_builtin_preload.py).
 
@@ -154,7 +159,7 @@ enough on the gateway path — governed Hermes builtins must be preloaded first.
 ```mermaid
 flowchart TB
     subgraph mechanisms["intentframe-gate registration"]
-        A["1. Selective preload<br/>GOVERNED_BUILTIN_MODULES"]
+        A["1. Selective preload<br/>tools.yaml builtin_module"]
         B["2. Snapshot loop<br/>registry._snapshot_entries()"]
         C["3. Registry hook<br/>patch registry.register"]
     end
@@ -183,8 +188,8 @@ flowchart TB
 **Why not full `discover_builtin_tools()`?** It imports every builtin module.
 That pulled in `read_terminal`, which Hermes then merged into the `terminal` toolset
 and broke the E2E toolsets contract (`['process', 'terminal']` expected). Selective
-preload imports only modules listed in `GOVERNED_BUILTIN_MODULES` for names in the
-runtime governed set.
+preload imports ``builtin_module`` from each **enabled** governed tool in the dev-owned
+catalog template (copied to runtime on integrate).
 
 ---
 
@@ -305,7 +310,7 @@ registered a gated override — same **early import + wrap** effect as preload t
 ```python
 install_registry_hook()
 governed = governed_tool_names()
-preload_governed_builtins(governed)   # GOVERNED_BUILTIN_MODULES
+preload_governed_builtins(governed_tools)   # yaml builtin_module per enabled tool
 
 for entry in registry._snapshot_entries():
     if entry.name not in governed:
@@ -402,13 +407,13 @@ Unit tests: [`tests/hermes_plugin/test_builtin_preload.py`](../tests/hermes_plug
 
 | File | Role |
 |------|------|
-| [`builtin_preload.py`](../integrations/hermes/plugin/intentframe-gate/builtin_preload.py) | `GOVERNED_BUILTIN_MODULES` map + selective `importlib.import_module` |
+| [`builtin_preload.py`](../integrations/hermes/plugin/intentframe-gate/builtin_preload.py) | Preload from yaml ``builtin_module`` + selective ``importlib.import_module`` |
 | [`schema.py`](../integrations/hermes/plugin/intentframe-gate/schema.py) | `inject_reason()` — terminal-specific reason text branch |
 | [`gate.py`](../integrations/hermes/plugin/intentframe-gate/gate.py) | Validate via adapter, strip `reason`, delegate |
 | [`registry_hook.py`](../integrations/hermes/plugin/intentframe-gate/registry_hook.py) | Patch `registry.register` for dynamic tools |
 
-When adding a governed Hermes **builtin**, add its import module to
-`GOVERNED_BUILTIN_MODULES` (see [`test_builtin_preload.py`](../tests/hermes_plugin/test_builtin_preload.py)).
+When adding a governed Hermes **builtin**, set ``builtin_module: tools.<module>`` in the
+repo catalog template (see [`test_builtin_preload.py`](../tests/hermes_plugin/test_builtin_preload.py)).
 
 ---
 
@@ -416,7 +421,7 @@ When adding a governed Hermes **builtin**, add its import module to
 
 | Tool | Gateway E2E | Registration note |
 |------|-------------|-------------------|
-| `terminal`, `process`, `write_file`, `patch` | Probed when in scoped yaml | Listed in `GOVERNED_BUILTIN_MODULES` — preload + snapshot |
+| `terminal`, `process`, `write_file`, `patch`, `cronjob` | Probed when in scoped yaml | ``builtin_module`` in repo ``tools.yaml`` — preload + snapshot |
 
 Delete coverage uses `patch` V4A `*** Delete File:` ops (maps to `DELETE_HOST_FILE`).
 
@@ -426,7 +431,7 @@ If a governed tool fails with “model never calls tool X”:
 2. If X is on `/v1/toolsets` but **not** in the OpenAI Tools list, the registry /
    `get_definitions()` path dropped it (missing entry or failed `check_fn`).
 3. Check plugin register logs for `wrapped` — empty means preload map may be missing X.
-4. Add X to `GOVERNED_BUILTIN_MODULES` if Hermes registers it at module import time.
+4. Set ``builtin_module: tools.<module>`` in the repo catalog template if Hermes registers it at module import time.
 
 **Hermes-native long-term fix:** gateway could call `discover_builtin_tools()` before
 `discover_plugins()` (upstream). Until then, the plugin owns selective preload.
