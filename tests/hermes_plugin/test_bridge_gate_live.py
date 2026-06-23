@@ -103,9 +103,9 @@ class TestLiveBridgeGate(unittest.TestCase):
         delegate = MagicMock()
         self._assert_blocked("write_file", WRITE_BLOCK_ARGS, delegate=delegate)
 
-    def test_allow_patch_replace(self) -> None:
+    def test_patch_replace_allow_semantic(self) -> None:
         delegate = MagicMock(return_value='{"status": "ok"}')
-        self._assert_allowed("patch", PATCH_ALLOW_REPLACE_ARGS, delegate=delegate)
+        self._assert_semantic_gate("patch", PATCH_ALLOW_REPLACE_ARGS, delegate=delegate)
 
     def test_block_patch_replace(self) -> None:
         delegate = MagicMock()

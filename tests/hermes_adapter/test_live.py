@@ -95,9 +95,9 @@ class TestLiveHermesAdapter(unittest.TestCase):
         self.assertFalse(body["allowed"])
         self.assertIn("agent_response", body)
 
-    def test_allow_patch_replace(self) -> None:
+    def test_patch_replace_allow_semantic(self) -> None:
         body = self._validate_tool("patch", PATCH_ALLOW_REPLACE_ARGS)
-        self.assertTrue(body["allowed"])
+        assert_adapter_semantic_validate(body)
 
     def test_block_patch_replace(self) -> None:
         body = self._validate_tool("patch", PATCH_BLOCK_REPLACE_ARGS)
