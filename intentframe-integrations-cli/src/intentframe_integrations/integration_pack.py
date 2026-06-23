@@ -97,7 +97,8 @@ def seed_hermes_runtime_governance(pack: IntegrationPack) -> None:
 
     Ensures tools.yaml and generic_actions.manifest exist at their runtime paths
     so IF_DYNAMIC_BUNDLE_MANIFEST and HERMES_GOVERNANCE_YAML are never set to
-    missing files. Safe to call before ``integrate hermes`` has run; if the
+    missing files. Copies committed repo templates only — never derives from yaml.
+    Safe to call before ``integrate hermes`` has run; if the
     committed templates are missing the error surfaces at integrate time.
     """
     from intentframe_integrations.hermes_governance_contract import (

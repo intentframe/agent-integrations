@@ -488,7 +488,9 @@ on first BLOCK.
 
 ### Step 3 — Dev artifacts (hand-edited, golden-tested)
 
-Update shipped repo files when adding a new action ID:
+Replaces a planned `sync hermes` CLI: edit shipped repo files when adding a new action ID,
+then run the golden test. Full contract:
+[`governance/README.md` — Derived artifacts (sync replacement)](../integrations/hermes/governance/README.md#derived-artifacts-sync-replacement).
 
 | File | What to add |
 |------|-------------|

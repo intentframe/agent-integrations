@@ -321,7 +321,9 @@ Drift is prevented by a **shared contract**: `governance/tools.yaml` +
 Dev-maintained `governance/generic_actions.manifest` lists all generic-mapper action IDs
 (full catalog superset); golden test
 [`test_actions_manifest.py`](../tests/intentframe_integrations/test_actions_manifest.py)
-enforces parity. There is no user-facing `sync` command — runtime CLI never
+enforces parity (replaces planned `sync hermes` — see
+[`governance/README.md`](../integrations/hermes/governance/README.md#derived-artifacts-sync-replacement)).
+There is no user-facing `sync` command — runtime CLI never
 rewrites repo templates.
 
 **Governance and policy are independent gates.** Disabling a tool stops Hermes

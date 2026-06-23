@@ -20,6 +20,26 @@
 Governance and policy are **independent**: disabling a tool stops Hermes from sending
 intents; policy rows for that action ID can remain without harm.
 
+## Derived artifacts (sync replacement)
+
+There is **no** `intentframe-integrations sync hermes` command. Instead:
+
+- **Source of truth:** repo `tools.yaml` (catalog, mappers, action IDs).
+- **Dev updates shipped files by hand** when adding a tool (see workflow below).
+- **CI guard:** `tests/intentframe_integrations/test_actions_manifest.py` fails if
+  `generic_actions.manifest`, `agent.json`, or `executor.yaml` drift from the catalog.
+- **Runtime:** `integrate hermes` / `start hermes` only **copy** committed templates to
+  `~/.intentframe/...` on first use — they never regenerate derived lists from yaml.
+
+This replaces a codegen/sync CLI: manual edits preserve policy comments and formatting;
+the golden test catches drift instead of auto-rewriting repo files.
+
+Verify after edits:
+
+```bash
+uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_actions_manifest.py
+```
+
 ## Dev workflow (adding a generic tool)
 
 1. Add entry to `tools.yaml` with `mapper: generic` and a `HERMES_*` action ID.
@@ -31,5 +51,5 @@ intents; policy rows for that action ID can remain without harm.
    and `tests/hermes_plugin/test_bridge_gate_live.py` (no gateway LLM E2E).
 5. Set `IF_DYNAMIC_BUNDLE_MANIFEST` in `agent.json` env (already points at runtime path).
 
-There is **no** user-facing `sync` command. Runtime automation never rewrites repo
-templates or user governance/policy files.
+Runtime automation never rewrites repo templates or user governance/policy files.
+See [Derived artifacts (sync replacement)](#derived-artifacts-sync-replacement) above.

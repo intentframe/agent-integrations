@@ -1,4 +1,9 @@
-"""Install and verify Hermes ↔ IntentFrame integration (plugin + adapter)."""
+"""Install and verify Hermes ↔ IntentFrame integration (plugin + adapter).
+
+``integrate hermes`` copies committed governance templates to runtime (first use only);
+it never regenerates manifest or policy from ``tools.yaml``. Dev artifact parity is
+enforced by ``tests/intentframe_integrations/test_actions_manifest.py``.
+"""
 
 from __future__ import annotations
 

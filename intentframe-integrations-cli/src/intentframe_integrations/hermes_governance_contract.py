@@ -1,6 +1,9 @@
 """Default governance template paths and runtime user config materialization.
 
 Repo templates (dev-maintained): governance/tools.yaml, governance/generic_actions.manifest.
+Derived lists (agent.json, executor.yaml, policy rows) are hand-edited by devs when
+tools.yaml changes; drift is caught by tests/intentframe_integrations/test_actions_manifest.py
+(no sync CLI — see integrations/hermes/governance/README.md).
 Runtime copies (~/.intentframe/...): seeded on first integrate; never overwritten
 unless the user runs --reset-governance or deletes the file. User toggles tool
 governance via CLI; that only edits runtime tools.yaml enabled flags.
@@ -71,7 +74,10 @@ def actions_manifest_runtime_path(agent_id: str = HERMES_AGENT_ID) -> Path:
 
 
 def ensure_runtime_actions_manifest(agent_id: str = HERMES_AGENT_ID) -> Path:
-    """Return runtime manifest, copying the committed template on first use only."""
+    """Return runtime manifest, copying the committed template on first use only.
+
+    Never regenerates from tools.yaml — dev updates the repo template and golden test.
+    """
     runtime = actions_manifest_runtime_path(agent_id)
     if runtime.is_file():
         return runtime

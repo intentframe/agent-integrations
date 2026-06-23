@@ -58,7 +58,9 @@ process environment — it must see the same manifest path the backend used at b
 - `governance/generic_actions.manifest` — static dev-shipped superset of generic action IDs
 - `policy.yaml` — user edits via policy CLI
 
-There is no `sync` command. Repo templates are dev-maintained only.
+There is no `sync` command — dev-maintained repo templates plus golden test
+`tests/intentframe_integrations/test_actions_manifest.py`. See
+[`integrations/hermes/governance/README.md`](../integrations/hermes/governance/README.md#derived-artifacts-sync-replacement).
 
 Run from repo root via `bin/intentframe-integrations` or:
 

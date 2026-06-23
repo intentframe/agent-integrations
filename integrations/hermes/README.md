@@ -213,7 +213,8 @@ See [`governance/README.md`](governance/README.md) for dev vs user ownership.
 5. Add live adapter + plugin semantic smoke probe (`action: list` or other low-risk args).
 6. No plugin code changes — `map_generic` handles all generic tools. No gateway LLM E2E probe.
 
-No user-facing sync step. Users toggle governance via CLI; policy via policy CLI.
+No user-facing sync step — see [`governance/README.md`](governance/README.md#derived-artifacts-sync-replacement).
+Users toggle governance via CLI; policy via policy CLI.
 
 If the tool can emit **multiple IntentFrames per call** (like V4A `patch`), follow
 the `map_patch` pattern in `mapper.py`: scoped per-op `content` for writes (not
