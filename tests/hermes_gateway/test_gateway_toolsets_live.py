@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Live gateway test: GET /v1/toolsets + schema probe after intentframe-gate."""
+"""Live gateway test: toolsets, schema probe, and provider tools= payload."""
 
 from __future__ import annotations
 
@@ -15,7 +15,14 @@ if str(HERE) not in sys.path:
 from api_client import (  # noqa: E402
     assert_intentframe_gate_toolsets,
     get_toolsets,
+    post_responses,
     wait_health,
+)
+from provider_request_contract import (  # noqa: E402
+    assert_provider_tools_surface,
+    format_provider_tools_snapshot,
+    load_newest_request_dump,
+    request_dump_paths,
 )
 from cli_runner import CliError, format_diagnostics, run_cli, step, stop_everything  # noqa: E402
 from isolation import (  # noqa: E402
@@ -33,6 +40,11 @@ from isolation import (  # noqa: E402
 )
 from isolation import _e2e_openai_model  # noqa: E402
 from toolsets_contract import format_toolsets_snapshot, parse_toolsets_response  # noqa: E402
+
+_TESTS_DIR = HERE.parent
+if str(_TESTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_TESTS_DIR))
+from hermes_governance_fixtures import template_governed_tool_names  # noqa: E402
 
 API_HOST = "127.0.0.1"
 INSTALL_TIMEOUT = 600.0
@@ -102,6 +114,8 @@ def main() -> int:
         step("integrate hermes (intentframe-gate)")
         run_cli(["integrate", "hermes"], env=env, timeout=INSTALL_TIMEOUT)
 
+        os.environ["HERMES_DUMP_REQUESTS"] = "1"
+
         step(f"gateway start hermes --api-server (port {env.api_port})")
         run_cli(
             [
@@ -128,6 +142,35 @@ def main() -> int:
         print(format_toolsets_snapshot(snapshot), file=sys.stderr)
 
         _run_schema_probe(env)
+
+        existing_dumps = frozenset(request_dump_paths(env.hermes_home))
+        step("POST /v1/responses (capture provider tools= for OpenAI)")
+        post_responses(
+            host=API_HOST,
+            port=env.api_port,
+            api_key=env.api_key,
+            prompt="Reply with the single word OK. Do not call any tools.",
+            instructions="Automated integration test. Do not use tools.",
+        )
+        governed = template_governed_tool_names()
+        dump_path, provider_body = load_newest_request_dump(
+            env.hermes_home,
+            existing=existing_dumps,
+        )
+        assert_provider_tools_surface(
+            provider_body,
+            governed,
+            expected_model=_e2e_openai_model(),
+        )
+        print(
+            "\n==> Provider tools= snapshot (OpenAI upstream payload)\n"
+            + format_provider_tools_snapshot(
+                provider_body,
+                governed,
+                dump_path=dump_path,
+            ),
+            file=sys.stderr,
+        )
 
         assert_real_state_untouched(env)
         exit_code = 0

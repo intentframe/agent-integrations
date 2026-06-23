@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Opt-in live test: GET /v1/toolsets + schema probe after intentframe-gate.
+# Opt-in live test: toolsets + schema probe + provider tools= payload after intentframe-gate.
 #
 #   RUN_HERMES_GATEWAY_TOOLSETS=1 ./tests/scripts/test-hermes-gateway-toolsets.sh
 set -euo pipefail

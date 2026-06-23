@@ -214,6 +214,7 @@ uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_h
 uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_api_client.py
 uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_governed_tool_coverage.py
 uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_toolsets_contract.py
+uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_provider_request_contract.py
 uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_scoped_governance_yaml.py
 ```
 
@@ -221,11 +222,17 @@ uv run --package intentframe-integrations-cli python tests/intentframe_integrati
 parity with CLI child env builders). `test_hermes_install.py` covers
 `build_gateway_env`, `_adapter_env`, and `format_env_exports` override behavior.
 
-## Toolsets surface test (opt-in, no LLM)
+## Toolsets + provider payload test (opt-in, networked LLM)
 
-Deterministic check of `GET /v1/toolsets` after `integrate hermes`, plus a Hermes-venv
-schema probe that governed tools still use Hermes names with required `reason` and gate
-markers. Does **not** call `/v1/responses`.
+Deterministic check of `GET /v1/toolsets` after `integrate hermes`, a Hermes-venv
+schema probe (governed tools + required `reason`), then one `POST /v1/responses`
+with `HERMES_DUMP_REQUESTS=1` to assert the OpenAI provider payload includes
+governed tools with required `reason` in `request.body.tools`.
+
+Requires `OPENAI_API_KEY`.
+
+On success, stderr prints a **provider tools= snapshot**: dump path, every tool name
+sent to OpenAI, and `[governed, reason_required=…]` markers for template-governed tools.
 
 ```bash
 RUN_HERMES_GATEWAY_TOOLSETS=1 ./tests/scripts/test-hermes-gateway-toolsets.sh
