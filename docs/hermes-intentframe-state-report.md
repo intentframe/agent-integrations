@@ -1,6 +1,6 @@
 # IntentFrame × Hermes integration — state report
 
-> Snapshot of the Hermes agent integration as of **2026-06-23**. For how-to and
+> Snapshot of the Hermes agent integration as of **2026-06-24**. For how-to and
 > troubleshooting, see [`hermes-intentframe-integration-guide.md`](./hermes-intentframe-integration-guide.md).
 
 ---
@@ -45,7 +45,7 @@ LLM (POST /v1/responses)
 
 | Path | Purpose |
 |------|---------|
-| `integrations/hermes/governance/tools.yaml` | Default governed-tool **template** (4 entries) |
+| `integrations/hermes/governance/tools.yaml` | Default governed-tool **template** (5 entries) |
 | `integrations/hermes/policy.yaml` | Shipped policy **template** (RUN_COMMAND + host-file + deletion) |
 | `~/.intentframe/integrations/hermes/governance/tools.yaml` | Runtime governed-tool config (user-owned) |
 | `~/.intentframe/integrations/hermes/policy.yaml` | Runtime policy config (user-owned) |
@@ -93,7 +93,11 @@ At `register()`:
    - `terminal` → `tools.terminal_tool`
    - `process` → `tools.process_registry`
    - `write_file`, `patch` → `tools.file_tools`
+   - `cronjob` → `tools.cronjob_tools`
 3. **Snapshot loop** — wrap governed entries with `inject_reason()` + `gate_tool_call()`.
+
+`cronjob` also requires `HERMES_GATEWAY_SESSION=1` (or interactive/exec env) to pass
+Hermes `check_fn` filtering in `get_tool_definitions()` — preload alone is not enough.
 
 See [`hermes-plugin-registration-order.md`](./hermes-plugin-registration-order.md) for
 load-order evidence and bisect notes.
@@ -136,7 +140,7 @@ or restore defaults. Policy commands apply `agent.json` env via `load_and_activa
 | Layer | Entry | LLM / network |
 |-------|-------|---------------|
 | Unit | `tests/hermes_plugin/`, `tests/hermes_gateway/test_*.py`, adapter tests, `test_policy_manage.py`, `test_integration_pack.py` | No |
-| Toolsets + provider payload | `RUN_HERMES_GATEWAY_TOOLSETS=1 ./tests/scripts/test-hermes-gateway-toolsets.sh` | OpenAI `chat.completions` (one round-trip); asserts `tools=` + `reason` in request dump |
+| Toolsets + provider payload | `RUN_HERMES_GATEWAY_TOOLSETS=1 ./tests/scripts/test-hermes-gateway-toolsets.sh` | OpenAI `chat.completions` (one round-trip); asserts **all** governed tools + `reason` in request dump |
 | Live integration | `./tests/scripts/test-hermes-integration.sh` | Backend; policy reload smoke + adapter/plugin probes (no LLM) |
 | Gateway E2E | `RUN_HERMES_GATEWAY_E2E=1 ./tests/scripts/test-hermes-gateway-e2e.sh` | OpenAI + full stack; native-mapper LLM probes only |
 
@@ -167,7 +171,7 @@ See [`tests/hermes_gateway/README.md`](../tests/hermes_gateway/README.md).
 
 ---
 
-## Recent changes (branch `fix-plugin-new-mechanism`)
+## Recent changes
 
 | Change | Rationale |
 |--------|-----------|
@@ -177,6 +181,11 @@ See [`tests/hermes_gateway/README.md`](../tests/hermes_gateway/README.md).
 | Hardened block probe prompts | Fix LLM rewriting `/etc/` to sandbox paths |
 | `load_and_activate_pack` + policy env parity | Policy validation sees same manifest env as backend boot |
 | `cronjob` generic tool + two-tier probe contract | Live semantic smoke; no gateway LLM E2E for generic mappers |
+| **`builtin_module` in repo `tools.yaml`** | Replace hardcoded preload dict; single catalog source for Hermes import paths |
+| **Toolsets live: full governed catalog** | Probe/dump had used native E2E tier only — `cronjob` was skipped despite production governance |
+| **Toolsets probe: `HERMES_GATEWAY_SESSION=1`** | `cronjob` registered via preload but filtered by Hermes `check_fn` without gateway session env |
+| **Toolsets run marker** | Unique token per run for OpenAI Platform log correlation |
+| **Loader parity test (`builtin_module`)** | Plugin and shared governance loaders must agree on catalog shape |
 
 ---
 

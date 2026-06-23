@@ -197,6 +197,7 @@ Hermes gateway before trusting stale PID files.
 | Wrong governed set at runtime | Parent env not propagated to adapter/gateway | E2E `assert_governance_env_contract` failure; check `gateway start` stderr for `Hermes governance config:` line |
 | `patch replace ALLOW` fails Pass 2a (overwrite BLOCK) | Same marker/file reused across passes | Pass-unique marker + `seed_patch_replace_target` (see [Probe harness determinism](#probe-harness-determinism)) |
 | `patch replace BLOCK`: path under `/tmp/…` | LLM rewrote `/etc/…` after block | Explicit block prompt in `run_patch_replace_block_once` |
+| Toolsets probe: `cronjob missing from get_tool_definitions()` | Probe subprocess lacks gateway session env | Toolsets live sets `HERMES_GATEWAY_SESSION=1` in probe env; see [Recent fixes](#recent-fixes-2026-06) under toolsets section |
 
 ## Related docs
 
@@ -227,6 +228,8 @@ parity with CLI child env builders). `test_hermes_install.py` covers
 
 Lighter-weight than full gateway E2E: proves intentframe-gate changes appear on the
 **OpenAI upstream `tools=` payload**, not just Hermes config/listing surfaces.
+Covers **all** governed catalog tools (including generic mappers like `cronjob`), not
+only the native-mapper subset used for gateway E2E ALLOW/BLOCK probes.
 
 Entrypoint: `test_gateway_toolsets_live.py`  
 Wrapper: `tests/scripts/test-hermes-gateway-toolsets.sh`
@@ -299,3 +302,15 @@ RUN_HERMES_GATEWAY_TOOLSETS=1 ./tests/scripts/test-hermes-gateway-toolsets.sh
 
 The full gateway E2E also asserts `/v1/toolsets` before the LLM probes, but uses
 tool-calling prompts for ALLOW/BLOCK — a different OpenAI log signature.
+
+### Recent fixes (2026-06)
+
+These were gaps between production behavior and what the toolsets live harness asserted.
+
+| Bug | Symptom | Root cause | Fix |
+|-----|---------|------------|-----|
+| **Partial governed coverage** | Toolsets test skipped `cronjob` while production governs it | Probe and provider dump used `gateway_e2e_probe_tool_names()` (native E2E tier only) | Probe uses `governed_tool_names()`; live test asserts `template_governed_tool_names()` on the request dump |
+| **Preload map drift** | Adding a governed builtin required editing a hardcoded Python dict | `GOVERNED_BUILTIN_MODULES` lived in `builtin_preload.py`, separate from `tools.yaml` | `builtin_module: tools.<module>` per tool in repo `tools.yaml`; plugin preload imports enabled specs; shared + plugin loaders validate `tools.` prefix |
+| **`cronjob` schema probe failure** | Probe reported `cronjob missing from get_tool_definitions()` despite yaml preload | Preload registered `cronjob`, but Hermes `check_cronjob_requirements()` filters it unless `HERMES_GATEWAY_SESSION=1` (or interactive/exec env); probe subprocess lacked that env while the gateway had it | `_run_schema_probe()` sets `probe_env["HERMES_GATEWAY_SESSION"] = "1"` to mirror the running gateway |
+
+Guarded by `test_governed_tool_coverage.py` (`test_toolsets_live_verifies_full_governed_catalog`) and loader parity in `tests/hermes_plugin/test_gate.py` (`builtin_module` must match between plugin and shared loaders).

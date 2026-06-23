@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""Live gateway test: toolsets, schema probe, and provider tools= payload."""
+"""Live gateway test: toolsets, schema probe, and provider tools= payload.
+
+Asserts every IntentFrame-governed catalog tool (native mappers and generic mappers
+such as ``cronjob``) on the OpenAI upstream ``tools=`` payload with required
+``reason``. Differs from gateway E2E, which LLM-probes only the native-mapper tier.
+
+See ``tests/hermes_gateway/README.md`` (toolsets section) for flow and recent fixes.
+"""
 
 from __future__ import annotations
 

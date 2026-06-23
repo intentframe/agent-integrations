@@ -153,7 +153,9 @@ Names only — full JSON schemas are probed separately via ``probe_hermes_tool_s
 
 **Rule:** when debugging “model never calls tool X”, verify X appears in the **OpenAI
 Tools block** (request dump with `HERMES_DUMP_REQUESTS=1`, trace, or gateway logs),
-not only on `/v1/toolsets`. Automated check:
+not only on `/v1/toolsets`. For governed builtins, also check preload (`builtin_module`
+in yaml) and Hermes per-tool `check_fn` env (e.g. `cronjob` needs `HERMES_GATEWAY_SESSION`).
+Automated check:
 `RUN_HERMES_GATEWAY_TOOLSETS=1 ./tests/scripts/test-hermes-gateway-toolsets.sh`
 (see [`tests/hermes_gateway/README.md`](../tests/hermes_gateway/README.md#toolsets--provider-payload-test-opt-in-networked-llm)).
 
@@ -676,14 +678,14 @@ RUN_HERMES_GATEWAY_TOOLSETS=1 ./tests/scripts/test-hermes-gateway-toolsets.sh
 Requires `OPENAI_API_KEY`. After `integrate hermes`:
 
 1. `GET /v1/toolsets` — config tool name surface
-2. `probe_hermes_tool_schemas.py` — registry schemas (`reason_required`, gate markers)
+2. `probe_hermes_tool_schemas.py` — registry schemas for **all** governed catalog tools (`reason_required`, gate markers); probe env includes `HERMES_GATEWAY_SESSION=1` so `cronjob` passes Hermes `check_fn`
 3. `POST /v1/responses` with `HERMES_DUMP_REQUESTS=1` — one real `chat.completions` call
-4. Assert token usage > 0 and governed tools have required `reason` in `request.body.tools`
+4. Assert token usage > 0 and **all** governed catalog tools have required `reason` in `request.body.tools`
 
-Asserts `terminal: ['process', 'terminal']` on toolsets and provider payload schema
-for governed tools. Lighter than full E2E (no tool-calling ALLOW/BLOCK probes).
+Lighter than full E2E (no tool-calling ALLOW/BLOCK probes). Covers generic mappers
+(e.g. `cronjob`) that gateway E2E omits from LLM probes.
 
-Details: [`tests/hermes_gateway/README.md`](../tests/hermes_gateway/README.md#toolsets--provider-payload-test-opt-in-networked-llm).
+Details and recent bug fixes: [`tests/hermes_gateway/README.md`](../tests/hermes_gateway/README.md#toolsets--provider-payload-test-opt-in-networked-llm).
 
 ### Layer 3 — Scoped gateway E2E (fast smoke)
 
