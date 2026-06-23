@@ -2,6 +2,7 @@
 
 bundles:
   - native
+  - dynamic
 
 executor:
   mode: real

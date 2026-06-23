@@ -69,7 +69,7 @@ def validate_policy_file(pack: IntegrationPack, yaml_path: Path) -> None:
     _validate_policy_agent_id(path, pack.agent.agent_id)
 
     from intentframe_bundle_sdk.loader import validate_policy_with_bundles
-    from if_security_backend.runtime.policy import DEFAULT_BUNDLE
+    from if_security_backend.runtime.bundles import load_core_bundle_packages
     from policy_registry.seeds import load_policy_seed
 
     try:
@@ -78,7 +78,7 @@ def validate_policy_file(pack: IntegrationPack, yaml_path: Path) -> None:
             user_id=pack.agent.user_id,
             agent_id=pack.agent.agent_id,
         )
-        validate_policy_with_bundles(policy, [DEFAULT_BUNDLE])
+        validate_policy_with_bundles(policy, load_core_bundle_packages())
     except Exception as exc:
         raise PolicyError(str(exc)) from exc
 

@@ -1,7 +1,19 @@
 # Default governed-tool template (reference). Runtime user config lives under ~/.intentframe/.
 # Select by tool name (not toolset). Reads stay unlisted unless deployment policy requires them.
+#
 # enabled: true  → IntentFrame gates at runtime (plugin wrap + adapter validate).
-# enabled: false → spec kept in catalog; Hermes runs the tool ungoverned.
+# enabled: false → spec kept in catalog; Hermes runs the tool ungoverned (no intent sent).
+#
+# User control: intentframe-integrations governance enable|disable hermes <tool>
+#   writes ONLY the runtime copy (~/.intentframe/.../governance/tools.yaml).
+#   Restart Hermes gateway + adapter after toggling (governance is cached at process start).
+#
+# Dev control: this repo template + actions.manifest + agent.json + policy.yaml +
+#   executor.yaml. Nothing at runtime auto-regenerates those files.
+#
+# Governance (enabled) and policy (allowed_actions) are independent gates — they do
+# not need to stay in sync. Disabled tools never emit intents; policy rows for their
+# action IDs can remain in the seeded policy harmlessly.
 
 tools:
   terminal:
@@ -31,4 +43,11 @@ tools:
     actions: [WRITE_HOST_FILE, DELETE_HOST_FILE]
     risk: local_write
     mapper: patch
+    blocked_response: generic_json
+
+  cronjob:
+    enabled: true
+    action: HERMES_CRONJOB
+    risk: local_process
+    mapper: generic
     blocked_response: generic_json

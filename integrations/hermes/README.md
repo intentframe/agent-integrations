@@ -7,6 +7,8 @@ Hermes does **not** ship an IntentFrame executor pack or runtime. This folder pr
 | `agent.json` | Agent profile, adapter socket, exported `env` for Hermes plugin |
 | `policy.yaml` | Shipped policy **template** (copied to runtime on first integrate/start) |
 | `governance/tools.yaml` | Default governed-tool **template** (seeded to runtime on first integrate) |
+| `governance/actions.manifest` | Static generic action IDs (copied to runtime on first integrate) |
+| `governance/README.md` | Dev vs user ownership for governance artifacts |
 | `shared/` | `hermes-governance` package — contract loader for adapter |
 | `adapter/` | Hermes adapter sidecar (bridge client, tool mapping, HTTP/UDS server) |
 | `plugin/intentframe-gate/` | Hermes plugin — selective schema override + adapter gate |
@@ -60,6 +62,7 @@ Configured in runtime `~/.intentframe/integrations/hermes/governance/tools.yaml`
 | `terminal`, `process` | `RUN_COMMAND` | Native Hermes handler, no IF gate |
 | `write_file`, `patch` (update/add) | `WRITE_HOST_FILE` | same |
 | `patch` (V4A delete) | `DELETE_HOST_FILE` | same |
+| `cronjob` | `HERMES_CRONJOB` | same (semantic-only via dynamic bundle) |
 
 ```bash
 bin/intentframe-integrations governance list hermes
@@ -67,7 +70,12 @@ bin/intentframe-integrations governance disable hermes write_file
 bin/intentframe-integrations governance enable hermes write_file
 ```
 
-Reads (`read_file`, `search_files`, …) stay **ungoverned** unless explicitly added to the catalog.
+**Restart Hermes gateway + adapter** after enable/disable (governance is cached at
+process start). IntentFrame backend does **not** need restart for governance toggles.
+
+Governance and policy are **independent gates** — they do not need to stay in sync.
+Disabling a tool stops Hermes from sending intents; manifest and policy rows for that
+action ID can remain harmlessly. See [`governance/README.md`](governance/README.md).
 
 ## Policy (runtime)
 
@@ -106,9 +114,22 @@ bin/intentframe-integrations stop
 
 `integrate hermes` symlinks the plugin to `$HERMES_HOME/plugins/intentframe-gate`, merges
 `plugins.enabled` in `$HERMES_HOME/config.yaml`, syncs the adapter venv at
-`~/.intentframe/integrations/hermes/.venv`, seeds runtime governance config at
-`~/.intentframe/integrations/hermes/governance/tools.yaml` and runtime policy at
-`~/.intentframe/integrations/hermes/policy.yaml` if missing.
+`~/.intentframe/integrations/hermes/.venv`, and on first use copies runtime artifacts
+from repo templates (never overwrites existing user files):
+
+- `~/.intentframe/integrations/hermes/governance/tools.yaml`
+- `~/.intentframe/integrations/hermes/governance/actions.manifest`
+- `~/.intentframe/integrations/hermes/policy.yaml`
+
+### Config ownership
+
+| What | Who edits | Restart after change |
+|------|-----------|----------------------|
+| Runtime `governance/tools.yaml` `enabled` | User (`governance enable\|disable`) | Hermes gateway + adapter |
+| Runtime `policy.yaml` | User (`policy set\|reload\|reset`) | None (live registry) |
+| Repo templates (`tools.yaml`, `actions.manifest`, `policy.yaml`, `agent.json`, `executor.yaml`) | Dev only | Backend restart if manifest/action IDs change |
+
+There is no user-facing `sync` command. Runtime CLI never rewrites repo templates.
 
 ### Governance env contract
 
@@ -117,9 +138,15 @@ The CLI propagates governance config to child processes as follows:
 
 | Step | Behavior |
 |------|----------|
-| `integrate hermes` | Prints `export HERMES_GOVERNANCE_YAML=…` using the **effective** value (`os.environ` overrides `agent.json`). |
+| `integrate hermes` | Prints `export …` using the **effective** value (`os.environ` overrides `agent.json`). Copies governance yaml, actions manifest, and policy template to runtime on first use. |
 | `start hermes` (adapter) | `_adapter_env()` copies the parent environment and `setdefault`s `pack.agent.env` keys — an existing `HERMES_GOVERNANCE_YAML` in the shell is preserved. |
 | `gateway start hermes` | `build_gateway_env()` uses the same `setdefault` pattern; logs `Hermes governance config: …` on startup. |
+
+| Env | Points to | Read by |
+|-----|-----------|---------|
+| `HERMES_GOVERNANCE_YAML` | Runtime `governance/tools.yaml` | Plugin gate, adapter |
+| `IF_DYNAMIC_BUNDLE_MANIFEST` | Runtime `governance/actions.manifest` | Dynamic bundle at backend boot (registers all catalog generic action IDs) |
+| `IF_AGENT_ADAPTER_SOCKET` | Adapter UDS | Plugin → adapter validate calls |
 
 To use a custom governed-tool set without editing runtime yaml, export
 `HERMES_GOVERNANCE_YAML` **before** `start hermes` / `gateway start hermes`. Gateway E2E

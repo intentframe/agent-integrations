@@ -25,8 +25,12 @@ from intentframe_integrations.hermes_paths import (
     hermes_plugins_dir,
 )
 from intentframe_integrations.hermes_governance_contract import (
+    actions_manifest_runtime_path,
+    catalog_generic_action_ids,
     default_governance_template_path,
+    ensure_runtime_actions_manifest,
     ensure_runtime_governance_yaml,
+    governance_yaml_runtime_path,
     reset_runtime_governance_yaml,
 )
 from intentframe_integrations.policy_contract import (
@@ -45,6 +49,18 @@ REMOVED_PLUGIN_KEYS = frozenset({"intentframe-terminal"})
 
 def plugin_source_dir() -> Path:
     return repo_root() / "integrations" / "hermes" / "plugin" / PLUGIN_DIR_NAME
+
+
+def executor_profile_path() -> Path:
+    return (
+        repo_root()
+        / "if-integration-backend"
+        / "src"
+        / "if_security_backend"
+        / "config"
+        / "profiles"
+        / "executor.yaml"
+    )
 
 
 def plugin_install_path() -> Path:
@@ -325,6 +341,9 @@ def integrate_hermes(
         pol_dest = ensure_runtime_policy_yaml(pack)
         messages.append(f"Policy config at {pol_dest}")
 
+    manifest_dest = ensure_runtime_actions_manifest(pack.agent.agent_id)
+    messages.append(f"Actions manifest at {manifest_dest}")
+
     return IntegrateResult(
         plugin_installed=True,
         config_updated=config_updated,
@@ -422,6 +441,73 @@ def governance_doctor_lines(pack: IntegrationPack) -> tuple[list[str], bool]:
 
     tool_names = ", ".join(sorted(contract))
     lines.append(f"  governance tools: {tool_names}")
+
+    catalog_generic = catalog_generic_action_ids()
+    manifest_path = actions_manifest_runtime_path(pack.agent.agent_id)
+    manifest_env_key = "IF_DYNAMIC_BUNDLE_MANIFEST"
+    if catalog_generic:
+        env_value = pack.agent.env.get(manifest_env_key, "").strip()
+        if not env_value:
+            ok = False
+            lines.append(f"  manifest: {manifest_env_key} not set in agent.json")
+        else:
+            env_path = Path(os.path.expanduser(env_value))
+            if env_path != manifest_path:
+                ok = False
+                lines.append(
+                    f"  manifest: {manifest_env_key}={env_value!r} does not match "
+                    f"expected {manifest_path}"
+                )
+            elif not manifest_path.is_file():
+                ok = False
+                lines.append(
+                    f"  manifest: missing at {manifest_path} "
+                    f"(run: intentframe-integrations integrate hermes)"
+                )
+            else:
+                present = {
+                    part.strip()
+                    for part in manifest_path.read_text(encoding="utf-8").split(",")
+                    if part.strip()
+                }
+                missing = sorted(catalog_generic - present)
+                if missing:
+                    ok = False
+                    lines.append(
+                        f"  manifest: missing catalog action(s) {missing} at {manifest_path}"
+                    )
+                else:
+                    lines.append(
+                        f"  manifest: ok at {manifest_path} "
+                        f"({manifest_env_key} configured)"
+                    )
+    else:
+        lines.append("  manifest: no generic mapper tools in catalog")
+
+    executor_path = executor_profile_path()
+    if executor_path.is_file():
+        executor_raw = yaml.safe_load(executor_path.read_text(encoding="utf-8")) or {}
+        supported = (
+            executor_raw.get("pack_options", {})
+            .get("validate_only", {})
+            .get("supported_actions")
+        )
+        if isinstance(supported, list):
+            missing_executor = sorted(governed_actions - {str(item) for item in supported})
+            if missing_executor:
+                ok = False
+                lines.append(
+                    f"  executor: missing supported_actions: {missing_executor}"
+                )
+            else:
+                lines.append("  executor: supported_actions covers governed actions")
+        else:
+            ok = False
+            lines.append(f"  executor: {executor_path} missing validate_only.supported_actions")
+    else:
+        ok = False
+        lines.append(f"  executor: profile missing at {executor_path}")
+
     return lines, ok
 
 

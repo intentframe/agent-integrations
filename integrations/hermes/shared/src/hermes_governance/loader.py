@@ -12,7 +12,7 @@ from typing import Any
 import yaml
 
 VALID_BLOCKED_RESPONSES = frozenset({"terminal_json", "generic_json"})
-VALID_MAPPER_KINDS = frozenset({"terminal", "process", "write_file", "patch"})
+VALID_MAPPER_KINDS = frozenset({"terminal", "process", "write_file", "patch", "generic"})
 
 
 @dataclass(frozen=True)
@@ -180,3 +180,9 @@ def supported_actions() -> frozenset[str]:
     for spec in load_governed_tools().values():
         actions.update(spec.policy_actions())
     return frozenset(actions)
+
+
+def generic_mapper_action_ids(yaml_path: str | None = None) -> frozenset[str]:
+    """Action IDs for enabled tools using mapper: generic."""
+    tools = load_governed_tools(yaml_path)
+    return frozenset(spec.action for spec in tools.values() if spec.mapper == "generic")

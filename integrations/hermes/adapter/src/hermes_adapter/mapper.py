@@ -10,6 +10,7 @@ from hermes_governance import load_governed_tools
 
 IntentDict = dict[str, Any]
 MapperFn = Callable[[dict[str, Any]], list[IntentDict]]
+GenericMapperFn = Callable[..., list[IntentDict]]
 
 _V4A_OP_RE = re.compile(
     r"^\*\*\*\s+(Update|Add|Delete)\s+File:\s*(.+)$",
@@ -265,7 +266,20 @@ def map_patch(args: dict[str, Any]) -> list[IntentDict]:
     return intents
 
 
-MAPPERS: dict[str, MapperFn] = {
+def map_generic(tool: str, args: dict[str, Any], *, action: str) -> list[IntentDict]:
+    reason = validate_reason(args.get("reason"))
+    return [
+        {
+            "action": action,
+            "reason": reason,
+            "target": tool,
+            "hermes_tool": tool,
+            "hermes_args": {key: value for key, value in args.items() if key != "reason"},
+        }
+    ]
+
+
+MAPPERS: dict[str, MapperFn | GenericMapperFn] = {
     "terminal": map_terminal,
     "process": map_process,
     "write_file": map_write_file,
@@ -282,6 +296,9 @@ def map_tool(tool: str, args: dict[str, Any]) -> list[IntentDict]:
     spec = governed.get(tool)
     if spec is None:
         raise ValidationError(f"Unsupported tool for validation: {tool!r}")
+
+    if spec.mapper == "generic":
+        return map_generic(tool, args, action=spec.action)
 
     mapper = MAPPERS.get(spec.mapper)
     if mapper is None:

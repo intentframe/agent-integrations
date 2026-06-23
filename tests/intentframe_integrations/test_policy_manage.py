@@ -12,6 +12,7 @@ from unittest.mock import patch
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CLI_SRC = REPO_ROOT / "intentframe-integrations-cli" / "src"
+GOVERNANCE_TEMPLATE = REPO_ROOT / "integrations" / "hermes" / "governance" / "tools.yaml"
 if str(CLI_SRC) not in sys.path:
     sys.path.insert(0, str(CLI_SRC))
 
@@ -35,17 +36,51 @@ class patch_home:
     def __init__(self, home: Path) -> None:
         self.home = home
         self._previous: str | None = None
+        self._gov_previous: str | None = None
+        self._manifest_previous: str | None = None
 
     def __enter__(self) -> None:
         self._previous = os.environ.get("HOME")
+        self._gov_previous = os.environ.get("HERMES_GOVERNANCE_YAML")
+        self._manifest_previous = os.environ.get("IF_DYNAMIC_BUNDLE_MANIFEST")
         os.environ["HOME"] = str(self.home)
+        os.environ["HERMES_GOVERNANCE_YAML"] = str(GOVERNANCE_TEMPLATE)
+        manifest_dir = (
+            self.home / ".intentframe" / "integrations" / "hermes" / "governance"
+        )
+        manifest_dir.mkdir(parents=True, exist_ok=True)
+        manifest_path = manifest_dir / "actions.manifest"
+        manifest_path.write_text("HERMES_CRONJOB", encoding="utf-8")
+        os.environ["IF_DYNAMIC_BUNDLE_MANIFEST"] = str(manifest_path)
+        self._reset_bundle_loader_state()
         return self
 
     def __exit__(self, *args: object) -> None:
+        self._reset_bundle_loader_state()
+        if self._manifest_previous is None:
+            os.environ.pop("IF_DYNAMIC_BUNDLE_MANIFEST", None)
+        else:
+            os.environ["IF_DYNAMIC_BUNDLE_MANIFEST"] = self._manifest_previous
+        if self._gov_previous is None:
+            os.environ.pop("HERMES_GOVERNANCE_YAML", None)
+        else:
+            os.environ["HERMES_GOVERNANCE_YAML"] = self._gov_previous
         if self._previous is None:
             os.environ.pop("HOME", None)
         else:
             os.environ["HOME"] = self._previous
+
+    @staticmethod
+    def _reset_bundle_loader_state() -> None:
+        import intentframe_bundle_sdk.loader as bundle_loader
+        import intentframe_bundle_sdk.registry as registry
+
+        bundle_loader._LOADED_PACKAGES = None
+        registry._ACTION_BY_ID.clear()
+        registry._ACTION_INSTANCES.clear()
+        registry._DOMAIN_BY_ID.clear()
+        registry._ACTION_TO_DOMAINS.clear()
+        registry._ROUTED_DOMAIN_IDS = frozenset()
 
 
 class TestPolicyManage(unittest.TestCase):

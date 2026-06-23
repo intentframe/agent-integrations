@@ -37,8 +37,15 @@ class TestGovernanceLoader(unittest.TestCase):
             self.assertIn("terminal", governed_tool_names())
             self.assertIn("RUN_COMMAND", supported_actions())
             self.assertIn("DELETE_HOST_FILE", supported_actions())
+            self.assertIn("HERMES_CRONJOB", supported_actions())
             self.assertEqual(frozenset(catalog), template_catalog_tool_names())
             self.assertEqual(frozenset(tools), template_governed_tool_names())
+
+    def test_generic_mapper_action_ids(self) -> None:
+        from hermes_governance.loader import generic_mapper_action_ids
+
+        with governance_env():
+            self.assertEqual(generic_mapper_action_ids(), frozenset({"HERMES_CRONJOB"}))
 
     def test_enabled_false_excluded_from_governed_set(self) -> None:
         from hermes_governance.loader import load_governed_tools, load_tool_catalog

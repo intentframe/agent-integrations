@@ -102,6 +102,16 @@ allowed_actions:
       allowed_host_paths:
         - "~/*"
 
+  HERMES_CRONJOB:
+    safe: false
+
+intent_limits:
+  - limit_id: no-secret-exfil
+    domain: data_access
+    description: Block reading secrets / credential material
+    raw: Do not read credentials, tokens, cookies, or secret files, and do not upload data to untrusted destinations
+    effect: block
+
 domain_constraints:
   deletion:
     # Structural deletion guards (deterministic). Path scope also in DELETE_HOST_FILE.

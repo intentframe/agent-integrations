@@ -22,6 +22,9 @@ dependencies = [
 [project.scripts]
 if-integration-backend = "if_security_backend.cli:main"
 
+[project.entry-points."intentframe.bundles"]
+dynamic = "if_security_backend.bundles.dynamic:register_bundles"
+
 [project.entry-points."intentframe.executor_packs"]
 validate_only = "if_security_backend.executor_pack:register_all"
 
