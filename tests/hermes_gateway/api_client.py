@@ -23,6 +23,7 @@ from hermes_tool_probes import (  # noqa: E402
     process_allow_args,
     process_block_args,
     seed_patch_replace_target,
+    write_block_args,
 )
 
 # Harmless command that policy blocks via the `sudo` pattern (no destructive shell action).
@@ -401,14 +402,22 @@ def run_write_file_block_once(*, host: str, port: int, api_key: str) -> ToolCall
     from cli_runner import step
 
     step("POST /v1/responses write_file BLOCK (disallowed /etc path)")
-    prompt = (
-        "Call the write_file tool exactly once with path: /etc/intentframe-e2e-block-probe, "
-        "content: 'blocked', and reason: 'IntentFrame E2E write block test'. "
-        "Do not use any other tools."
-    )
+    args = write_block_args(reason="IntentFrame E2E write block test")
+    path = args["path"]
     instructions = (
         "You are running an automated integration test. "
-        "You MUST call the write_file tool exactly once and no other tools."
+        "You MUST call the write_file tool exactly once and no other tools. "
+        f"The path argument MUST remain exactly {path}. "
+        "Do NOT rewrite the path to ~, $HOME, /tmp, or any other location. "
+        "Do NOT make a second write_file call if the first is blocked."
+    )
+    prompt = (
+        "Call the write_file tool exactly once with these arguments (copy path verbatim):\n"
+        f"- path: {path}\n"
+        f"- content: {args['content']!r}\n"
+        f"- reason: {args['reason']!r}\n"
+        f"\nThe path MUST stay {path}. Do not change it.\n"
+        "Do not explain; just run the tool once."
     )
     body = post_responses(
         host=host,
@@ -503,12 +512,28 @@ def run_process_block_once(*, host: str, port: int, api_key: str) -> ToolCall:
 
     step("POST /v1/responses process BLOCK (sudo in mapped RUN_COMMAND)")
     args = process_block_args(reason="IntentFrame E2E process block test")
+    data = args["data"]
+    instructions = (
+        "You are running an automated integration test. "
+        "You MUST call the process tool exactly once and no other tools. "
+        f"The data argument MUST remain exactly {data!r}. "
+        "Do NOT remove or substitute the sudo command. "
+        "Do NOT make a second process call if the first is blocked."
+    )
+    prompt = (
+        "Call the process tool exactly once with these arguments (copy data verbatim):\n"
+        f"- action: {args['action']!r}\n"
+        f"- data: {data}\n"
+        f"- reason: {args['reason']!r}\n"
+        f"\nThe data MUST stay {data!r}. Do not change it.\n"
+        "Do not explain; just run the tool once."
+    )
     body = post_responses(
         host=host,
         port=port,
         api_key=api_key,
-        prompt=_format_tool_prompt("process", args),
-        instructions=_single_tool_instructions("process"),
+        prompt=prompt,
+        instructions=instructions,
     )
     return assert_process_block(body)
 
@@ -641,12 +666,30 @@ def run_patch_replace_block_once(*, host: str, port: int, api_key: str) -> ToolC
 
     step("POST /v1/responses patch replace BLOCK (disallowed /etc path)")
     args = patch_replace_block_args(reason="IntentFrame E2E patch replace block test")
+    path = args["path"]
+    instructions = (
+        "You are running an automated integration test. "
+        "You MUST call the patch tool exactly once and no other tools. "
+        f"The path argument MUST remain exactly {path}. "
+        "Do NOT rewrite the path to ~, $HOME, /tmp, or any other location. "
+        "Do NOT make a second patch call if the first is blocked."
+    )
+    prompt = (
+        "Call the patch tool exactly once with these arguments (copy path verbatim):\n"
+        f"- mode: {args['mode']!r}\n"
+        f"- path: {path}\n"
+        f"- old_string: {args['old_string']!r}\n"
+        f"- new_string: {args['new_string']!r}\n"
+        f"- reason: {args['reason']!r}\n"
+        f"\nThe path MUST stay {path}. Do not change it.\n"
+        "Do not explain; just run the tool once."
+    )
     body = post_responses(
         host=host,
         port=port,
         api_key=api_key,
-        prompt=_format_tool_prompt("patch", args),
-        instructions=_single_tool_instructions("patch"),
+        prompt=prompt,
+        instructions=instructions,
     )
     return assert_patch_replace_block(body)
 
@@ -735,15 +778,32 @@ def run_patch_v4a_mixed_block_once(*, host: str, port: int, api_key: str, marker
         marker=marker,
         reason="IntentFrame E2E patch V4A mixed block test",
     )
+    patch_text = args["patch"]
+    etc_delete_path = "/etc/intentframe-e2e-patch-block-probe"
     instructions = (
-        _single_tool_instructions("patch")
-        + " The patch field must include both an Update File and a Delete File section."
+        "You are running an automated integration test. "
+        "You MUST call the patch tool exactly once and no other tools. "
+        "The patch field must include both an Update File and a Delete File section. "
+        f"The Delete File path MUST remain exactly {etc_delete_path}. "
+        "Copy the entire patch string verbatim; do NOT edit any paths in it. "
+        "Do NOT rewrite /etc paths to ~, $HOME, /tmp, or any other location. "
+        "Do NOT make a second patch call if the first is blocked."
+    )
+    prompt = (
+        "Call the patch tool exactly once with these arguments:\n"
+        f"- mode: {args['mode']!r}\n"
+        f"- reason: {args['reason']!r}\n"
+        "- patch: copy this multiline string verbatim (do not edit paths, "
+        "especially the /etc delete):\n\n"
+        f"{patch_text}\n\n"
+        f"The Delete File path MUST stay {etc_delete_path}. Do not change it.\n"
+        "Do not explain; just run the tool once."
     )
     body = post_responses(
         host=host,
         port=port,
         api_key=api_key,
-        prompt=_format_tool_prompt("patch", args),
+        prompt=prompt,
         instructions=instructions,
     )
     return assert_patch_v4a_mixed_block(body)
