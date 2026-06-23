@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 
 def process_allow_args(*, reason: str = "Live process allow test") -> dict[str, str]:
     return {"action": "list", "reason": reason}
@@ -27,10 +29,30 @@ def write_block_args(*, reason: str = "E2E write to system path probe") -> dict[
     }
 
 
+def patch_replace_target_relpath(*, marker: str) -> str:
+    return f"intentframe-e2e-patch-{marker}.txt"
+
+
+def patch_replace_target_path(*, marker: str) -> str:
+    return f"~/{patch_replace_target_relpath(marker=marker)}"
+
+
+def patch_replace_target_file(home: Path, marker: str) -> Path:
+    return home / patch_replace_target_relpath(marker=marker)
+
+
+def seed_patch_replace_target(home: Path, marker: str) -> Path:
+    """Create the patch-replace probe file with content ``a`` (idempotent per attempt)."""
+    path = patch_replace_target_file(home, marker)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("a", encoding="utf-8")
+    return path
+
+
 def patch_replace_allow_args(*, marker: str, reason: str | None = None) -> dict[str, str]:
     return {
         "mode": "replace",
-        "path": f"~/intentframe-e2e-patch-{marker}.txt",
+        "path": patch_replace_target_path(marker=marker),
         "old_string": "a",
         "new_string": marker,
         "reason": reason or "Live patch replace allow test",

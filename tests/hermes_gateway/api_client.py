@@ -22,6 +22,7 @@ from hermes_tool_probes import (  # noqa: E402
     patch_v4a_mixed_home_delete_args,
     process_allow_args,
     process_block_args,
+    seed_patch_replace_target,
 )
 
 # Harmless command that policy blocks via the `sudo` pattern (no destructive shell action).
@@ -607,6 +608,7 @@ def run_patch_replace_allow_with_retries(
     port: int,
     api_key: str,
     marker: str,
+    sandbox_home: Path,
     attempts: int = 3,
 ) -> ToolCall:
     from cli_runner import step
@@ -615,6 +617,7 @@ def run_patch_replace_allow_with_retries(
     last_error: Exception | None = None
     for attempt in range(1, attempts + 1):
         step(f"POST /v1/responses patch replace ALLOW (attempt {attempt}/{attempts})")
+        seed_patch_replace_target(sandbox_home, marker)
         args = patch_replace_allow_args(
             marker=marker,
             reason=f"IntentFrame E2E patch replace allow {attempt}",

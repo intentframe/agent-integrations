@@ -161,6 +161,11 @@ def _gateway_stop(env: IsolatedEnv, *, label: str) -> None:
     run_cli(["gateway", "stop", "hermes"], env=env, stream=False)
 
 
+def _pass_marker_slug(label: str) -> str:
+    """Short pass id for probe markers (Pass 1 / Pass 2a / Pass 2b → p1 / p2a / p2b)."""
+    return label.lower().replace("pass ", "p").replace(" ", "")
+
+
 def _run_api_allow_block(env: IsolatedEnv, *, label: str) -> None:
     log_sandbox_paths(
         env,
@@ -191,9 +196,11 @@ def _run_api_allow_block(env: IsolatedEnv, *, label: str) -> None:
         f"{sorted(governed)} (yaml={snapshot.yaml_path})"
     )
 
+    pass_slug = _pass_marker_slug(label)
+
     if "terminal" in governed:
         probes_ran.add("terminal")
-        marker = f"intentframe-hermes-e2e-ok-{env.run_id}"
+        marker = f"intentframe-hermes-e2e-ok-{env.run_id}-{pass_slug}"
         step(f"{label}: POST /v1/responses ALLOW (LLM → terminal → adapter → bridge)")
         run_allow_with_retries(host=API_HOST, port=env.api_port, api_key=env.api_key, marker=marker)
 
@@ -210,7 +217,7 @@ def _run_api_allow_block(env: IsolatedEnv, *, label: str) -> None:
 
     if "write_file" in governed:
         probes_ran.add("write_file")
-        write_marker = f"intentframe-hermes-write-ok-{env.run_id}"
+        write_marker = f"intentframe-hermes-write-ok-{env.run_id}-{pass_slug}"
         step(f"{label}: POST /v1/responses write_file ALLOW")
         run_write_file_allow_with_retries(
             host=API_HOST,
@@ -224,19 +231,20 @@ def _run_api_allow_block(env: IsolatedEnv, *, label: str) -> None:
 
     if "patch" in governed:
         probes_ran.add("patch")
-        patch_marker = f"intentframe-hermes-patch-ok-{env.run_id}"
+        patch_marker = f"intentframe-hermes-patch-ok-{env.run_id}-{pass_slug}"
         step(f"{label}: POST /v1/responses patch replace ALLOW")
         run_patch_replace_allow_with_retries(
             host=API_HOST,
             port=env.api_port,
             api_key=env.api_key,
             marker=patch_marker,
+            sandbox_home=env.home,
         )
 
         step(f"{label}: POST /v1/responses patch replace BLOCK (disallowed /etc path)")
         run_patch_replace_block_once(host=API_HOST, port=env.api_port, api_key=env.api_key)
 
-        v4a_marker = f"intentframe-hermes-v4a-{env.run_id}"
+        v4a_marker = f"intentframe-hermes-v4a-{env.run_id}-{pass_slug}"
         step(f"{label}: POST /v1/responses patch V4A mixed semantic (home delete ALLOW or BLOCK)")
         run_patch_v4a_mixed_home_delete_semantic_with_retries(
             host=API_HOST,
