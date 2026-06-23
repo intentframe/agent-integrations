@@ -17,9 +17,6 @@ for path in (TESTS_DIR, ADAPTER_TESTS):
 
 from _loader import load_plugin_module  # noqa: E402
 from live_fixtures import (  # noqa: E402
-    DELETE_BLOCK_ARGS,
-    DELETE_DENY_FLOOR_ARGS,
-    DELETE_HOME_ARGS,
     PATCH_ALLOW_REPLACE_ARGS,
     PATCH_BLOCK_REPLACE_ARGS,
     PATCH_V4A_BLOCK_ARGS,
@@ -105,18 +102,6 @@ class TestLiveBridgeGate(unittest.TestCase):
     def test_block_write_file(self) -> None:
         delegate = MagicMock()
         self._assert_blocked("write_file", WRITE_BLOCK_ARGS, delegate=delegate)
-
-    def test_delete_file_home_semantic(self) -> None:
-        delegate = MagicMock(return_value='{"status": "ok"}')
-        self._assert_semantic_gate("delete_file", DELETE_HOME_ARGS, delegate=delegate)
-
-    def test_block_delete_file_deny_floor(self) -> None:
-        delegate = MagicMock()
-        self._assert_blocked("delete_file", DELETE_DENY_FLOOR_ARGS, delegate=delegate)
-
-    def test_block_delete_file(self) -> None:
-        delegate = MagicMock()
-        self._assert_blocked("delete_file", DELETE_BLOCK_ARGS, delegate=delegate)
 
     def test_allow_patch_replace(self) -> None:
         delegate = MagicMock(return_value='{"status": "ok"}')

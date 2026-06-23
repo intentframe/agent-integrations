@@ -27,29 +27,6 @@ def write_block_args(*, reason: str = "E2E write to system path probe") -> dict[
     }
 
 
-def delete_home_args(*, marker: str, reason: str | None = None) -> dict[str, str]:
-    """Home-path delete probe — passes deterministic checks; AE/Guardian may ALLOW or BLOCK."""
-    return {
-        "path": f"~/intentframe-e2e-delete-{marker}.txt",
-        "reason": reason or "E2E delete home path probe",
-    }
-
-
-def delete_deny_floor_args(*, reason: str = "E2E delete sensitive home path probe") -> dict[str, str]:
-    """Sensitive home-path delete — deterministic deny floor should always BLOCK."""
-    return {
-        "path": "~/.ssh/intentframe-e2e-delete-deny-floor-probe",
-        "reason": reason,
-    }
-
-
-def delete_block_args(*, reason: str = "E2E delete system path probe") -> dict[str, str]:
-    return {
-        "path": "/etc/intentframe-e2e-delete-block-probe",
-        "reason": reason,
-    }
-
-
 def patch_replace_allow_args(*, marker: str, reason: str | None = None) -> dict[str, str]:
     return {
         "mode": "replace",

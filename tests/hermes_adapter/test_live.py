@@ -18,9 +18,6 @@ for path in (HERE, TESTS_DIR):
 
 from intentframe_validation_helpers import assert_adapter_semantic_validate  # noqa: E402
 from live_fixtures import (  # noqa: E402
-    DELETE_BLOCK_ARGS,
-    DELETE_DENY_FLOOR_ARGS,
-    DELETE_HOME_ARGS,
     PATCH_ALLOW_REPLACE_ARGS,
     PATCH_BLOCK_REPLACE_ARGS,
     PATCH_V4A_BLOCK_ARGS,
@@ -95,20 +92,6 @@ class TestLiveHermesAdapter(unittest.TestCase):
 
     def test_block_write_file(self) -> None:
         body = self._validate_tool("write_file", WRITE_BLOCK_ARGS)
-        self.assertFalse(body["allowed"])
-        self.assertIn("agent_response", body)
-
-    def test_delete_file_home_semantic(self) -> None:
-        body = self._validate_tool("delete_file", DELETE_HOME_ARGS)
-        assert_adapter_semantic_validate(body)
-
-    def test_block_delete_file_deny_floor(self) -> None:
-        body = self._validate_tool("delete_file", DELETE_DENY_FLOOR_ARGS)
-        self.assertFalse(body["allowed"])
-        self.assertTrue(body.get("error") or body.get("agent_response"))
-
-    def test_block_delete_file(self) -> None:
-        body = self._validate_tool("delete_file", DELETE_BLOCK_ARGS)
         self.assertFalse(body["allowed"])
         self.assertIn("agent_response", body)
 

@@ -56,18 +56,7 @@ Each call maps to one or more bridge `/validate` payloads; multi-intent tools
 }
 ```
 
-**`delete_file`** → `DELETE_HOST_FILE`:
-
-```json
-{
-  "tool": "delete_file",
-  "args": { "path": "~/notes.txt", "reason": "Remove stale notes" }
-}
-```
-
-Mapper adds `irreversible: true` on delete intents.
-
-**`patch`** (V4A) → multiple intents; write op includes batch manifest:
+**`patch`** (V4A) → multiple intents; delete ops map to `DELETE_HOST_FILE`; write op includes batch manifest:
 
 ```json
 {

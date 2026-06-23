@@ -32,8 +32,6 @@ from api_client import (  # noqa: E402
     get_toolsets,
     run_allow_with_retries,
     run_block_once,
-    run_delete_file_block_once,
-    run_delete_file_semantic_with_retries,
     run_patch_replace_allow_with_retries,
     run_patch_replace_block_once,
     run_patch_v4a_mixed_block_once,
@@ -223,20 +221,6 @@ def _run_api_allow_block(env: IsolatedEnv, *, label: str) -> None:
 
         step(f"{label}: POST /v1/responses write_file BLOCK (disallowed /etc path)")
         run_write_file_block_once(host=API_HOST, port=env.api_port, api_key=env.api_key)
-
-    if "delete_file" in governed:
-        probes_ran.add("delete_file")
-        delete_marker = f"intentframe-hermes-delete-ok-{env.run_id}"
-        step(f"{label}: POST /v1/responses delete_file semantic ~/ (ALLOW or BLOCK)")
-        run_delete_file_semantic_with_retries(
-            host=API_HOST,
-            port=env.api_port,
-            api_key=env.api_key,
-            marker=delete_marker,
-        )
-
-        step(f"{label}: POST /v1/responses delete_file BLOCK (disallowed /etc path)")
-        run_delete_file_block_once(host=API_HOST, port=env.api_port, api_key=env.api_key)
 
     if "patch" in governed:
         probes_ran.add("patch")

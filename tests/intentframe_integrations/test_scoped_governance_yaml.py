@@ -106,7 +106,7 @@ class TestGovernanceE2eSetup(unittest.TestCase):
         snapshot = log_e2e_governance(log=messages.append)
 
         self.assertEqual(snapshot.governed, frozenset({"terminal", "process"}))
-        self.assertEqual(snapshot.ungoverned, frozenset({"write_file", "delete_file", "patch"}))
+        self.assertEqual(snapshot.ungoverned, frozenset({"write_file", "patch"}))
         joined = "\n".join(messages)
         self.assertIn("HERMES_E2E_GOVERNED_TOOLS", joined)
         self.assertIn("terminal: RUN", joined)

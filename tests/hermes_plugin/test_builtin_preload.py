@@ -28,7 +28,7 @@ class PreloadGovernedBuiltinsTests(unittest.TestCase):
         self.assertEqual(import_module.call_count, 2)
 
     def test_skips_unknown_governed_tools(self) -> None:
-        governed = frozenset({"delete_file"})
+        governed = frozenset({"unknown_future_tool"})
         with mock.patch.object(preload_mod.importlib, "import_module") as import_module:
             preload_mod.preload_governed_builtins(governed)
         import_module.assert_not_called()

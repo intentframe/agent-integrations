@@ -70,7 +70,6 @@ Configured in [`governance/tools.yaml`](../integrations/hermes/governance/tools.
 | `terminal` | `RUN_COMMAND` | `terminal` | Full `command_shield` + capability analysis |
 | `process` | `RUN_COMMAND` | `process` | Synthetic `process:…` command string |
 | `write_file` | `WRITE_HOST_FILE` | `write_file` | Path + content |
-| `delete_file` | `DELETE_HOST_FILE` | `delete_file` | Path only |
 | `patch` | `WRITE_HOST_FILE`, `DELETE_HOST_FILE` | `patch` | Multi-intent from V4A diff |
 
 **Ungoverned by design (v1):** reads — `read_file`, `search_files`, `browser_snapshot`,
@@ -241,8 +240,7 @@ map into `IntentFrame.data` on the backend.
 **Hermes mappers:**
 
 - `write_file` — direct path + content
-- `delete_file` — path + irreversible flag
-- `patch` — parses V4A; one intent per Update/Add/Delete; batch metadata in
+- `patch` — parses V4A; one intent per Update/Add/Delete (including `DELETE_HOST_FILE` for delete ops); batch metadata in
   `patch_op_index`, `patch_op_count`, `patch_operations`
 
 **Patch caveat:** validation sees patch **body**, not post-merge file content. Path/floor

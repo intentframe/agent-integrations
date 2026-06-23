@@ -223,9 +223,9 @@ Three independent knobs:
 | **IntentFrame governed** | Plugin wrap + adapter validate active | `enabled: true` in governance yaml |
 | **Policy allows action** | IntentFrame returns ALLOW | `policy.yaml` + seeded policy-registry |
 
-Governance template (v1 catalog — five tools):
+Governance template (v1 catalog — four Hermes tools):
 
-```6:41:integrations/hermes/governance/tools.yaml
+```6:34:integrations/hermes/governance/tools.yaml
 tools:
   terminal:
     enabled: true
@@ -237,11 +237,10 @@ tools:
   write_file:
     enabled: true
     ...
-  delete_file:
-    enabled: true
-    ...
   patch:
     enabled: true
+    action: WRITE_HOST_FILE
+    actions: [WRITE_HOST_FILE, DELETE_HOST_FILE]
     ...
 ```
 
@@ -440,7 +439,7 @@ Runtime copy: `~/.intentframe/integrations/hermes/governance/tools.yaml`.
 Valid mapper kinds (plugin loader):
 
 ```14:14:integrations/hermes/plugin/intentframe-gate/governance_loader.py
-VALID_MAPPER_KINDS = frozenset({"terminal", "process", "write_file", "delete_file", "patch"})
+VALID_MAPPER_KINDS = frozenset({"terminal", "process", "write_file", "patch"})
 ```
 
 Extend this set when adding a new mapper kind.
@@ -482,13 +481,7 @@ If the tool is a Hermes built-in registered at import time, add to
 If several catalog names share one module (like `write_file` + `patch` → `file_tools`),
 one import is enough — preload dedupes modules.
 
-`delete_file` is in the governance catalog but has **no** Hermes 0.17 standalone
-registry module — E2E marks it as not on api_server surface:
-
-```24:26:tests/hermes_gateway/toolsets_contract.py
-# Governed tools in governance/tools.yaml that are not standalone Hermes 0.17 registry tools.
-GOVERNED_TOOLS_NOT_ON_API_SERVER = frozenset({"delete_file"})
-```
+Delete coverage is via `patch` V4A `*** Delete File:` operations (maps to `DELETE_HOST_FILE`).
 
 ### Step 5 — E2E probes
 
@@ -570,7 +563,7 @@ uv run python tests/hermes_plugin/test_gate.py
 # Scoped governance yaml + env contract
 uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_scoped_governance_yaml.py
 
-# Probe symbol coverage for all 5 catalog tools
+# Probe symbol coverage for all catalog tools
 uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_governed_tool_coverage.py
 ```
 
@@ -593,15 +586,15 @@ HERMES_E2E_GOVERNED_TOOLS=terminal RUN_HERMES_GATEWAY_E2E=1 \
 
 Expect: `POST /v1/responses ALLOW (attempt 1/3)`, passes 1/2a/2b.
 
-### Layer 4 — Full gateway E2E (all 5 governed tools)
+### Layer 4 — Full gateway E2E (all governed catalog tools)
 
 ```bash
 # Default — all catalog tools governed
 RUN_HERMES_GATEWAY_E2E=1 ./tests/scripts/test-hermes-gateway-e2e.sh
 ```
 
-Runs ALLOW/BLOCK/semantic probes for `terminal`, `process`, `write_file`, `delete_file`,
-`patch` across greenfield, idempotent, and external-`HERMES_BIN` paths.
+Runs ALLOW/BLOCK/semantic probes for `terminal`, `process`, `write_file`, `patch`
+(including V4A delete via `patch`) across greenfield, idempotent, and external-`HERMES_BIN` paths.
 
 Probe matrix: [`tests/hermes_gateway/README.md`](../tests/hermes_gateway/README.md).
 

@@ -31,9 +31,6 @@ GATEWAY_E2E_PROBE_SYMBOLS: dict[str, frozenset[str]] = {
     "write_file": frozenset(
         {"run_write_file_allow_with_retries", "run_write_file_block_once"}
     ),
-    "delete_file": frozenset(
-        {"run_delete_file_semantic_with_retries", "run_delete_file_block_once"}
-    ),
     "patch": frozenset(
         {
             "run_patch_replace_allow_with_retries",

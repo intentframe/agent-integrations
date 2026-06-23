@@ -86,7 +86,6 @@ to scope LLM probes.
 | `terminal` | `printf '<marker>'` | `sudo echo …` | — |
 | `process` | `action: list` | `action: run`, `data` contains `sudo` | — |
 | `write_file` | path under `~/…` | path under `/etc/…` | — |
-| `delete_file` | — | path under `/etc/…` | path under `~/…` |
 | `patch` (replace) | replace under `~/…` | replace under `/etc/…` | — |
 | `patch` (V4A mixed) | — | Update `~/…` + Delete `/etc/…` (fail-closed batch) | Update `~/…` + Delete `~/…` (per-intent AE/Guardian; batch fails if any op BLOCKs) |
 

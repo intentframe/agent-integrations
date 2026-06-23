@@ -14,7 +14,6 @@ if str(HERE) not in sys.path:
 
 from api_client import (  # noqa: E402
     assert_block_response,
-    assert_delete_file_semantic,
     assert_patch_replace_allow,
     assert_patch_replace_block,
     assert_patch_v4a_mixed_block,
@@ -94,22 +93,6 @@ class TestApiClientAssertions(unittest.TestCase):
             output='{"status": "blocked", "error": "policy"}',
         )
         assert_patch_replace_block(body)
-
-    def test_assert_delete_file_semantic_block(self) -> None:
-        body = _response(
-            tool="delete_file",
-            arguments={"path": "~/intentframe-e2e-delete-marker.txt", "reason": "probe"},
-            output='{"status": "blocked", "error": "policy"}',
-        )
-        assert_delete_file_semantic(body, marker="marker")
-
-    def test_assert_delete_file_semantic_allow(self) -> None:
-        body = _response(
-            tool="delete_file",
-            arguments={"path": "~/intentframe-e2e-delete-marker.txt", "reason": "probe"},
-            output='{"status": "ok"}',
-        )
-        assert_delete_file_semantic(body, marker="marker")
 
     def test_assert_patch_v4a_mixed_home_delete_semantic_block(self) -> None:
         patch = (

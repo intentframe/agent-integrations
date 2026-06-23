@@ -249,14 +249,14 @@ Hermes internals — so enumerating the registry is no new coupling.
 ### Current state: contract-driven multi-tool gate (v1)
 
 The shipped plugin **`intentframe-gate`** wraps a curated allowlist from
-[`governance/tools.yaml`](../integrations/hermes/governance/tools.yaml). v1 governs five Hermes
+[`governance/tools.yaml`](../integrations/hermes/governance/tools.yaml). v1 governs four Hermes
 tools (reads stay ungoverned):
 
 | Hermes tool | IntentFrame action(s) |
 |-------------|----------------------|
 | `terminal`, `process` | `RUN_COMMAND` |
 | `write_file`, `patch` (update/add) | `WRITE_HOST_FILE` |
-| `delete_file`, `patch` (V4A delete) | `DELETE_HOST_FILE` |
+| `patch` (V4A delete) | `DELETE_HOST_FILE` |
 
 Wiring (schema/handler layers plus registration order):
 
@@ -298,7 +298,7 @@ Hermes' own toolsets mix reads and writes — proof that you must select by name
 
 [`adapter/src/hermes_adapter/mapper.py`](../integrations/hermes/adapter/src/hermes_adapter/mapper.py)
 dispatches through the governance contract — each entry names a `mapper` kind
-(`terminal`, `process`, `write_file`, `delete_file`, `patch`):
+(`terminal`, `process`, `write_file`, `patch`):
 
 ```python
 def map_tool(tool, args):

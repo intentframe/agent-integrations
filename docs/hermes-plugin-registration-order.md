@@ -415,7 +415,8 @@ When adding a governed Hermes **builtin**, add its import module to
 | Tool | Gateway E2E | Registration note |
 |------|-------------|-------------------|
 | `terminal`, `process`, `write_file`, `patch` | Probed when in scoped yaml | Listed in `GOVERNED_BUILTIN_MODULES` — preload + snapshot |
-| `delete_file` | Probed when in scoped yaml | No Hermes 0.17 standalone import module — rely on hook / MCP path |
+
+Delete coverage uses `patch` V4A `*** Delete File:` ops (maps to `DELETE_HOST_FILE`).
 
 If a governed tool fails with “model never calls tool X”:
 

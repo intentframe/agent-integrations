@@ -57,7 +57,7 @@ Configured in runtime `~/.intentframe/integrations/hermes/governance/tools.yaml`
 |-------------|-------------------|-------------------------|
 | `terminal`, `process` | `RUN_COMMAND` | Native Hermes handler, no IF gate |
 | `write_file`, `patch` (update/add) | `WRITE_HOST_FILE` | same |
-| `delete_file`, `patch` (V4A delete) | `DELETE_HOST_FILE` | same |
+| `patch` (V4A delete) | `DELETE_HOST_FILE` | same |
 
 ```bash
 bin/intentframe-integrations governance list hermes
@@ -164,9 +164,9 @@ each intent honestly. See [`docs/delete-host-file-validation.md`](../../docs/del
 7. Ask LLM to run `sudo echo intentframe-e2e-block-probe` → blocked by IntentFrame policy (`sudo` pattern)
 8. Ask LLM to `write_file` under `~/…` with a reason → executes (deterministic ALLOW)
 9. Ask LLM to `write_file` to `/etc/…` → blocked by host-path policy (deterministic)
-10. Ask LLM to `delete_file` under `~/…` with a reason → may ALLOW or BLOCK (semantic;
+10. Ask LLM to `patch` with V4A `*** Delete File: ~/…` → may ALLOW or BLOCK (semantic;
     passes path policy; Guardian decides). Not a guaranteed execute.
-11. Ask LLM to `delete_file` on `/etc/…` → blocked by host-path policy (deterministic)
+11. Ask LLM to `patch` with V4A `*** Delete File: /etc/…` → blocked by host-path policy (deterministic)
 
 ## Live integration tests (all governed tools)
 
@@ -176,7 +176,7 @@ Deterministic adapter + plugin gate probes (no LLM) against a running Hermes sta
 ./tests/scripts/test-hermes-integration.sh
 ```
 
-Covers all five governed tools (`terminal`, `process`, `write_file`, `delete_file`, `patch`)
+Covers all four Hermes governed tools (`terminal`, `process`, `write_file`, `patch`)
 including V4A `patch` multi-intent write+delete. Requires `OPENAI_API_KEY` (backend startup).
 
 ## Gateway E2E test (opt-in)
@@ -189,5 +189,5 @@ RUN_HERMES_GATEWAY_E2E=1 \
   python tests/hermes_gateway/test_gateway_e2e.py
 ```
 
-Requires `OPENAI_API_KEY`. Covers ALLOW/BLOCK for all five governed tools (`terminal`, `process`,
-`write_file`, `delete_file`, `patch`), including V4A mixed write+delete multi-intent `patch` probes.
+Requires `OPENAI_API_KEY`. Covers ALLOW/BLOCK for all four Hermes governed tools (`terminal`, `process`,
+`write_file`, `patch`), including V4A mixed write+delete multi-intent `patch` probes.

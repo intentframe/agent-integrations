@@ -25,7 +25,7 @@ Configured in `integrations/hermes/governance/tools.yaml` (runtime copy under
 
 - `terminal`, `process` → `RUN_COMMAND`
 - `write_file`, `patch` (update/add) → `WRITE_HOST_FILE`
-- `delete_file`, `patch` (V4A delete) → `DELETE_HOST_FILE`
+- `patch` (V4A delete) → `DELETE_HOST_FILE`
 
 Reads and helpers stay ungoverned unless added to the contract explicitly.
 
