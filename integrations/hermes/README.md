@@ -221,3 +221,15 @@ Full run (passes 1, 2a, 2b) is green as of 2026-06-23. The harness seeds `patch 
 targets, uses pass-unique markers, and explicit block prompts — see
 [Probe harness determinism](../../tests/hermes_gateway/README.md#probe-harness-determinism).
 Integration snapshot: [`docs/hermes-intentframe-state-report.md`](../../docs/hermes-intentframe-state-report.md).
+
+## Toolsets + provider payload test (opt-in)
+
+Proves intentframe-gate schema changes (`reason` required) reach OpenAI’s `tools=`
+parameter — not just `/v1/toolsets` or the local registry probe.
+
+```bash
+RUN_HERMES_GATEWAY_TOOLSETS=1 ./tests/scripts/test-hermes-gateway-toolsets.sh
+```
+
+Requires `OPENAI_API_KEY`. One `chat.completions` round-trip (~11k input tokens, ~17
+tools). See [`tests/hermes_gateway/README.md`](../../tests/hermes_gateway/README.md#toolsets--provider-payload-test-opt-in-networked-llm).

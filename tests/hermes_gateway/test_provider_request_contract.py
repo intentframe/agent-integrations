@@ -14,7 +14,9 @@ if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 
 from provider_request_contract import (  # noqa: E402
+    assert_gateway_openai_roundtrip,
     assert_provider_tools_surface,
+    format_gateway_roundtrip_snapshot,
     format_provider_tools_snapshot,
     load_newest_request_dump,
     load_newest_request_dump_body,
@@ -103,6 +105,33 @@ class ProviderRequestContractTests(unittest.TestCase):
                 ),
                 body,
             )
+
+    def test_assert_gateway_openai_roundtrip_passes(self) -> None:
+        body = {
+            "status": "completed",
+            "usage": {"input_tokens": 100, "output_tokens": 2, "total_tokens": 102},
+        }
+        usage = assert_gateway_openai_roundtrip(body)
+        self.assertEqual(usage["total_tokens"], 102)
+
+    def test_assert_gateway_openai_roundtrip_zero_tokens(self) -> None:
+        body = {"status": "completed", "usage": {"total_tokens": 0}}
+        with self.assertRaisesRegex(AssertionError, "zero token usage"):
+            assert_gateway_openai_roundtrip(body)
+
+    def test_format_gateway_roundtrip_snapshot(self) -> None:
+        body = {
+            "status": "completed",
+            "usage": {"input_tokens": 11655, "output_tokens": 2, "total_tokens": 11657},
+            "output": [{"type": "message", "content": [{"text": "OK"}]}],
+        }
+        text = format_gateway_roundtrip_snapshot(
+            body,
+            provider_url="https://api.openai.com/v1/chat/completions",
+            expected_model="gpt-4o-mini",
+        )
+        self.assertIn("total_tokens=11657", text)
+        self.assertIn("provider_url='https://api.openai.com/v1/chat/completions'", text)
 
     def test_format_provider_tools_snapshot(self) -> None:
         body = {

@@ -152,7 +152,10 @@ Names only — full JSON schemas are probed separately via ``probe_hermes_tool_s
 ```
 
 **Rule:** when debugging “model never calls tool X”, verify X appears in the **OpenAI
-Tools block** (trace or gateway agent-init logs), not only on `/v1/toolsets`.
+Tools block** (request dump with `HERMES_DUMP_REQUESTS=1`, trace, or gateway logs),
+not only on `/v1/toolsets`. Automated check:
+`RUN_HERMES_GATEWAY_TOOLSETS=1 ./tests/scripts/test-hermes-gateway-toolsets.sh`
+(see [`tests/hermes_gateway/README.md`](../tests/hermes_gateway/README.md#toolsets--provider-payload-test-opt-in-networked-llm)).
 
 ---
 
@@ -585,13 +588,23 @@ uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_g
 
 Extend `test_builtin_preload.py` when adding `GOVERNED_BUILTIN_MODULES` entries.
 
-### Layer 2 — Toolsets contract (Hermes install, no LLM)
+### Layer 2 — Toolsets + OpenAI provider payload (networked LLM)
 
 ```bash
 RUN_HERMES_GATEWAY_TOOLSETS=1 ./tests/scripts/test-hermes-gateway-toolsets.sh
 ```
 
-Asserts `terminal: ['process', 'terminal']` and governed tool schema markers.
+Requires `OPENAI_API_KEY`. After `integrate hermes`:
+
+1. `GET /v1/toolsets` — config tool name surface
+2. `probe_hermes_tool_schemas.py` — registry schemas (`reason_required`, gate markers)
+3. `POST /v1/responses` with `HERMES_DUMP_REQUESTS=1` — one real `chat.completions` call
+4. Assert token usage > 0 and governed tools have required `reason` in `request.body.tools`
+
+Asserts `terminal: ['process', 'terminal']` on toolsets and provider payload schema
+for governed tools. Lighter than full E2E (no tool-calling ALLOW/BLOCK probes).
+
+Details: [`tests/hermes_gateway/README.md`](../tests/hermes_gateway/README.md#toolsets--provider-payload-test-opt-in-networked-llm).
 
 ### Layer 3 — Scoped gateway E2E (fast smoke)
 

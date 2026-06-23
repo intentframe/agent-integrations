@@ -241,8 +241,10 @@ passes**)”. [`GET /v1/toolsets`](../external-reference-only-libs/hermes-agent/
 uses static `resolve_toolset()` — it does **not** call `get_definitions()`.
 
 **Takeaway:** a passing `/v1/toolsets` snapshot does **not** prove `terminal` is in
-the OpenAI request. Verify the live payload (OpenAI trace, or gateway logs showing
-`Loaded N tools: …` in agent init).
+the OpenAI request. Verify the live payload (OpenAI Platform Chat Completion log,
+`HERMES_DUMP_REQUESTS=1` request dump, or gateway agent-init logs showing
+`Loaded N tools: …`). Automated:
+`RUN_HERMES_GATEWAY_TOOLSETS=1 ./tests/scripts/test-hermes-gateway-toolsets.sh`.
 
 ---
 
@@ -420,7 +422,7 @@ Delete coverage uses `patch` V4A `*** Delete File:` ops (maps to `DELETE_HOST_FI
 
 If a governed tool fails with “model never calls tool X”:
 
-1. Check an **OpenAI trace** (or agent init logs) — is X in the **Tools** parameter?
+1. Check OpenAI Platform **Chat Completion** log or `HERMES_DUMP_REQUESTS` dump — is X in the **Tools** parameter?
 2. If X is on `/v1/toolsets` but **not** in the OpenAI Tools list, the registry /
    `get_definitions()` path dropped it (missing entry or failed `check_fn`).
 3. Check plugin register logs for `wrapped` — empty means preload map may be missing X.
@@ -434,12 +436,16 @@ If a governed tool fails with “model never calls tool X”:
 ## Verification
 
 ```bash
-# Terminal-only scope (fastest repro)
+# Provider tools= payload (lighter than full E2E; asserts reason in OpenAI tools=)
+RUN_HERMES_GATEWAY_TOOLSETS=1 ./tests/scripts/test-hermes-gateway-toolsets.sh
+
+# Terminal-only scope (fastest full-stack repro)
 HERMES_E2E_GOVERNED_TOOLS=terminal RUN_HERMES_GATEWAY_E2E=1 \
   ./tests/scripts/test-hermes-gateway-e2e.sh
 ```
 
-Expect:
+Toolsets test expect: `total_tokens` > 0, governed tools in provider dump with
+`reason_required=true`. Full E2E expect:
 
 - `GET /v1/toolsets` — `terminal: ['process', 'terminal']` (no `read_terminal`)
 - `POST /v1/responses ALLOW (attempt 1/3)` on passes 1, 2a, 2b

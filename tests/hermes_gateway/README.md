@@ -224,18 +224,72 @@ parity with CLI child env builders). `test_hermes_install.py` covers
 
 ## Toolsets + provider payload test (opt-in, networked LLM)
 
-Deterministic check of `GET /v1/toolsets` after `integrate hermes`, a Hermes-venv
-schema probe (governed tools + required `reason`), then one `POST /v1/responses`
-with `HERMES_DUMP_REQUESTS=1` to assert the OpenAI provider payload includes
-governed tools with required `reason` in `request.body.tools`.
+Lighter-weight than full gateway E2E: proves intentframe-gate changes appear on the
+**OpenAI upstream `tools=` payload**, not just Hermes config/listing surfaces.
+
+Entrypoint: `test_gateway_toolsets_live.py`  
+Wrapper: `tests/scripts/test-hermes-gateway-toolsets.sh`
 
 Requires `OPENAI_API_KEY`.
 
-On success, stderr prints a **provider tools= snapshot**: dump path, every tool name
-sent to OpenAI, and `[governed, reason_required=…]` markers for template-governed tools.
+### Flow
+
+```
+GET /v1/toolsets     →  api_server tool name surface (~31 names)
+schema probe         →  registry schemas (governed + reason_required)
+POST /v1/responses   →  real chat.completions round-trip + request dump
+assertions           →  token usage > 0, governed tools + reason in tools=
+```
+
+Hermes gateway starts with `HERMES_DUMP_REQUESTS=1`. One cheap `POST /v1/responses`
+prompts the model to reply `OK` without calling tools (minimizes IntentFrame policy
+noise; still sends the full `tools=` list upstream).
+
+### Three surfaces (do not conflate)
+
+| Surface | What it proves |
+|---------|----------------|
+| `GET /v1/toolsets` | Hermes **config** tool names for api_server (e.g. ~31) |
+| `probe_hermes_tool_schemas.py` | **Registry** schemas after plugin load (e.g. ~16 defs); governed `reason` + gate |
+| Request dump + round-trip assert | **OpenAI `chat.completions` payload** (e.g. ~17 tools in `tools=`) |
+
+The registry count and toolsets count differ by design — not every listed toolset
+name becomes a registry definition on the LLM path. See
+[`docs/hermes-intentframe-integration-guide.md`](../../docs/hermes-intentframe-integration-guide.md#two-different-tool-surfaces-do-not-conflate).
+
+### Assertions
+
+| Helper | Checks |
+|--------|--------|
+| `assert_gateway_openai_roundtrip()` | Gateway `status: completed` and `usage.total_tokens > 0` |
+| `assert_provider_tools_surface()` | Governed tools in dump `request.body.tools` with required `reason` |
+
+The request dump is written at **preflight** (before the HTTP call to OpenAI). Token
+usage from the gateway response proves the call **completed** — the dump alone only
+proves Hermes **built** the payload.
+
+Contract helpers: `tests/hermes_gateway/provider_request_contract.py`
+
+### Stderr on success
+
+1. **OpenAI round-trip proof** — input/output/total tokens, provider URL/model
+2. **Provider tools= snapshot** — dump path, sorted tool list, `[governed, reason_required=true]` markers
+
+### Finding the call in OpenAI Platform
+
+Shows as **Chat Completion** (`gpt-4o-mini`), not Responses API. Typical signature:
+
+- User prompt: `Reply with the single word OK. Do not call any tools.`
+- System includes: `Automated integration test. Do not use tools.`
+- ~11k input tokens, **17 tools** in the Tools list, output `OK`
+- No tool invocations (unlike full E2E entries that say “Call the terminal tool…”)
+
+Platform Logs list tool **names** but not JSON schema details (`reason` in `required`).
+Use the test’s provider dump assertion for schema proof.
 
 ```bash
 RUN_HERMES_GATEWAY_TOOLSETS=1 ./tests/scripts/test-hermes-gateway-toolsets.sh
 ```
 
-The full gateway E2E also asserts `/v1/toolsets` before the LLM probes.
+The full gateway E2E also asserts `/v1/toolsets` before the LLM probes, but uses
+tool-calling prompts for ALLOW/BLOCK — a different OpenAI log signature.

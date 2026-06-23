@@ -134,9 +134,9 @@ or restore defaults.
 | Layer | Entry | LLM / network |
 |-------|-------|---------------|
 | Unit | `tests/hermes_plugin/`, `tests/hermes_gateway/test_*.py`, adapter tests | No |
-| Toolsets | `RUN_HERMES_GATEWAY_TOOLSETS=1 ./tests/scripts/test-hermes-gateway-toolsets.sh` | Hermes install only |
+| Toolsets + provider payload | `RUN_HERMES_GATEWAY_TOOLSETS=1 ./tests/scripts/test-hermes-gateway-toolsets.sh` | OpenAI `chat.completions` (one round-trip); asserts `tools=` + `reason` in request dump |
 | Live integration | `./tests/scripts/test-hermes-integration.sh` | Backend; no LLM probes |
-| Gateway E2E | `RUN_HERMES_GATEWAY_E2E=1 ./tests/scripts/test-hermes-gateway-e2e.sh` | OpenAI + full stack |
+| Gateway E2E | `RUN_HERMES_GATEWAY_E2E=1 ./tests/scripts/test-hermes-gateway-e2e.sh` | OpenAI + full stack; tool-calling ALLOW/BLOCK probes |
 
 ### Gateway E2E passes
 

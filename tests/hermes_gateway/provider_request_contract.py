@@ -152,6 +152,73 @@ def assert_provider_tools_surface(
         )
 
 
+def extract_gateway_usage(body: dict[str, Any]) -> dict[str, int]:
+    """Return token usage from a Hermes ``POST /v1/responses`` body."""
+    usage = body.get("usage")
+    if not isinstance(usage, dict):
+        return {}
+    extracted: dict[str, int] = {}
+    for key in ("input_tokens", "output_tokens", "total_tokens"):
+        value = usage.get(key)
+        if isinstance(value, int):
+            extracted[key] = value
+    return extracted
+
+
+def assert_gateway_openai_roundtrip(gateway_body: dict[str, Any]) -> dict[str, int]:
+    """Assert Hermes completed a real provider round-trip (non-zero token usage)."""
+    status = gateway_body.get("status")
+    if status != "completed":
+        raise AssertionError(
+            f"Gateway response not completed.\n"
+            f"  status: {status!r}\n"
+            f"  body: {json.dumps(gateway_body)[:2000]}"
+        )
+
+    usage = extract_gateway_usage(gateway_body)
+    total = usage.get("total_tokens", 0)
+    if total <= 0:
+        raise AssertionError(
+            "Gateway reported zero token usage — OpenAI round-trip did not occur.\n"
+            f"  usage: {usage!r}\n"
+            f"  body: {json.dumps(gateway_body)[:2000]}"
+        )
+    return usage
+
+
+def format_gateway_roundtrip_snapshot(
+    gateway_body: dict[str, Any],
+    *,
+    provider_url: str | None = None,
+    expected_model: str | None = None,
+) -> str:
+    """Human-readable proof that Hermes completed an OpenAI chat.completions call."""
+    usage = extract_gateway_usage(gateway_body)
+    output = gateway_body.get("output")
+    output_items = output if isinstance(output, list) else []
+    lines = [
+        "OpenAI round-trip completed (via Hermes gateway):",
+        f"  gateway_status={gateway_body.get('status')!r}",
+        f"  provider_url={provider_url!r}",
+    ]
+    if expected_model is not None:
+        lines.append(f"  provider_model={expected_model!r}")
+    lines.extend(
+        [
+            f"  input_tokens={usage.get('input_tokens', 0)}",
+            f"  output_tokens={usage.get('output_tokens', 0)}",
+            f"  total_tokens={usage.get('total_tokens', 0)}",
+            f"  output_items={len(output_items)}",
+        ]
+    )
+    lines.append("")
+    lines.append(
+        "Note: Platform Logs often omit chat.completions calls when store=false "
+        "(API default). Check Usage for gpt-4o-mini at this timestamp."
+    )
+    return "\n".join(lines)
+
+
 def format_provider_tools_snapshot(
     body: dict[str, Any],
     governed: frozenset[str],

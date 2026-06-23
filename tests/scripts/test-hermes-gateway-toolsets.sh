@@ -1,7 +1,15 @@
 #!/usr/bin/env bash
-# Opt-in live test: toolsets + schema probe + provider tools= payload after intentframe-gate.
+# Opt-in live test: toolsets + registry schema probe + OpenAI provider tools= payload.
+#
+# After integrate hermes:
+#   1. GET /v1/toolsets (config surface)
+#   2. probe_hermes_tool_schemas.py (registry + reason injection)
+#   3. POST /v1/responses + HERMES_DUMP_REQUESTS=1 (real chat.completions round-trip)
+#   4. Assert token usage > 0 and governed tools have required reason in tools=
 #
 #   RUN_HERMES_GATEWAY_TOOLSETS=1 ./tests/scripts/test-hermes-gateway-toolsets.sh
+#
+# Requires OPENAI_API_KEY. See tests/hermes_gateway/README.md#toolsets--provider-payload-test-opt-in-networked-llm
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

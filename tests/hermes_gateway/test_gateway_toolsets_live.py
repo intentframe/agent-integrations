@@ -19,9 +19,12 @@ from api_client import (  # noqa: E402
     wait_health,
 )
 from provider_request_contract import (  # noqa: E402
+    assert_gateway_openai_roundtrip,
     assert_provider_tools_surface,
+    format_gateway_roundtrip_snapshot,
     format_provider_tools_snapshot,
     load_newest_request_dump,
+    load_request_dump,
     request_dump_paths,
 )
 from cli_runner import CliError, format_diagnostics, run_cli, step, stop_everything  # noqa: E402
@@ -145,22 +148,38 @@ def main() -> int:
 
         existing_dumps = frozenset(request_dump_paths(env.hermes_home))
         step("POST /v1/responses (capture provider tools= for OpenAI)")
-        post_responses(
+        responses_body = post_responses(
             host=API_HOST,
             port=env.api_port,
             api_key=env.api_key,
             prompt="Reply with the single word OK. Do not call any tools.",
             instructions="Automated integration test. Do not use tools.",
         )
+        assert_gateway_openai_roundtrip(responses_body)
         governed = template_governed_tool_names()
         dump_path, provider_body = load_newest_request_dump(
             env.hermes_home,
             existing=existing_dumps,
         )
+        dump_raw = load_request_dump(dump_path)
+        request_meta = dump_raw.get("request")
+        request_meta_dict = request_meta if isinstance(request_meta, dict) else {}
         assert_provider_tools_surface(
             provider_body,
             governed,
             expected_model=_e2e_openai_model(),
+        )
+        provider_url = request_meta_dict.get("url")
+        if not isinstance(provider_url, str):
+            provider_url = None
+        print(
+            "\n==> OpenAI round-trip proof\n"
+            + format_gateway_roundtrip_snapshot(
+                responses_body,
+                provider_url=provider_url,
+                expected_model=_e2e_openai_model(),
+            ),
+            file=sys.stderr,
         )
         print(
             "\n==> Provider tools= snapshot (OpenAI upstream payload)\n"
