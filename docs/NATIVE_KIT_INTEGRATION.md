@@ -433,7 +433,7 @@ Add tests that simulate re-registration clobber.
 
 - `HERMES_GOVERNANCE_YAML` — alternate governance yaml (which tools are **IntentFrame-governed**). Set in the parent shell before `start` / `gateway start`; CLI child env builders preserve it over `agent.json` defaults.
 - `HERMES_E2E_GOVERNED_TOOLS` — gateway E2E only; comma-separated subset for LLM probes (not Hermes toolsets). E2E also asserts env parity via `assert_governance_env_contract`.
-- Policy registry — production policies may diverge from seeded `policy.yaml`
+- **Runtime policy** — `~/.intentframe/integrations/hermes/policy.yaml` (copied from shipped template on first `integrate` / `start`). Edit locally, then `bin/intentframe-integrations policy reload hermes`. Use `policy set`, `policy reset`, or `integrate hermes --reset-policy` to install or restore defaults.
 
 ### Platform executor packs are separate
 
@@ -463,9 +463,12 @@ docs/
   agent-tool-gating.md          ← portable gating pattern
 
 integrations/hermes/
-  governance/tools.yaml         ← governed tools contract
+  governance/tools.yaml         ← governed tools template (reference)
   agent.json                    ← action_types + adapter socket
-  policy.yaml                   ← seeded constraints
+  policy.yaml                   ← shipped policy template (reference)
+  ~/.intentframe/integrations/hermes/
+    governance/tools.yaml       ← runtime governed-tool config (user-owned)
+    policy.yaml                 ← runtime policy (user-owned; policy reload hermes)
   adapter/src/hermes_adapter/
     mapper.py                   ← Hermes → IntentFrame intents
     service.py                  ← multi-intent validate
@@ -490,7 +493,7 @@ tests/hermes_tool_probes.py     ← BLOCK/ALLOW probe payloads
 1. **Governance** — add `web_extract` → `HTTP_GET`, mapper `web_extract`
 2. **Mapper** — `{ action, reason, url: urls[0], target: url }`
 3. **agent.json** — `"HTTP_GET"` in `action_types`
-4. **policy.yaml**:
+4. **policy.yaml** (shipped template and/or runtime copy under `~/.intentframe/integrations/hermes/`):
 
    ```yaml
    HTTP_GET:
@@ -501,6 +504,8 @@ tests/hermes_tool_probes.py     ← BLOCK/ALLOW probe payloads
    ```
 
 5. **executor.yaml** — add `HTTP_GET` to `supported_actions`
-6. **Tests** — mapper test + probe blocking disallowed host
+6. **Runtime policy** — `bin/intentframe-integrations policy reload hermes` after editing
+   `~/.intentframe/integrations/hermes/policy.yaml`
+7. **Tests** — mapper test + probe blocking disallowed host
 
 No plugin edit if `generic_json` blocked response suffices.

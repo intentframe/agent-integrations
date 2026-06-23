@@ -5,7 +5,7 @@ Copy this folder to `integrations/<agent>/` and customize:
 | Path | Purpose |
 |------|---------|
 | `agent.json` | Agent profile, adapter sidecar config, plugin env exports |
-| `policy.yaml` | RUN_COMMAND rules seeded into policy-registry |
+| `policy.yaml` | RUN_COMMAND rules — copied to `~/.intentframe/integrations/<agent>/policy.yaml` |
 | `adapter/` | Agent adapter sidecar (bridge client, tool mapping, HTTP/UDS server) |
 | `plugin/` | Thin agent plugin (Hermes uses `plugin/intentframe-gate/`) |
 
@@ -23,6 +23,7 @@ Commands:
 ```bash
 bin/intentframe-integrations start <agent>
 bin/intentframe-integrations integrate <agent>   # Hermes today; extend per agent
+bin/intentframe-integrations policy reload <agent>
 bin/intentframe-integrations doctor <agent>
 ```
 

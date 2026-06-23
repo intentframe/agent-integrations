@@ -45,7 +45,7 @@ RUN_HERMES_GATEWAY_E2E=1 ./scripts/e2e.sh
 
 See [`tests/hermes_gateway/README.md`](tests/hermes_gateway/README.md) for log paths and troubleshooting.
 
-Reset local artifacts first:
+Reset local artifacts first (clears `~/.intentframe/backend`, `run`, and `integrations/` runtime config):
 
 ```bash
 ./scripts/clean-project.sh

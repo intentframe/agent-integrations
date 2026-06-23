@@ -29,6 +29,12 @@ from intentframe_integrations.hermes_governance_contract import (
     ensure_runtime_governance_yaml,
     reset_runtime_governance_yaml,
 )
+from intentframe_integrations.policy_contract import (
+    ensure_runtime_policy_yaml,
+    policy_yaml_runtime_path,
+    reset_runtime_policy_yaml,
+    shipped_policy_template_path,
+)
 from intentframe_integrations.integration_pack import IntegrationPack, load_integration_pack
 from intentframe_integrations.paths import agent_config_path, repo_root
 
@@ -269,6 +275,7 @@ def integrate_hermes(
     skip_config: bool = False,
     sync_adapter: bool = True,
     reset_governance: bool = False,
+    reset_policy: bool = False,
 ) -> IntegrateResult:
     messages: list[str] = []
     src = plugin_source_dir()
@@ -310,6 +317,13 @@ def integrate_hermes(
     else:
         gov_dest = ensure_runtime_governance_yaml(pack.agent.agent_id)
         messages.append(f"Governance config at {gov_dest}")
+
+    if reset_policy:
+        pol_dest = reset_runtime_policy_yaml(pack)
+        messages.append(f"Policy config reset from shipped default to {pol_dest}")
+    else:
+        pol_dest = ensure_runtime_policy_yaml(pack)
+        messages.append(f"Policy config at {pol_dest}")
 
     return IntegrateResult(
         plugin_installed=True,
@@ -376,8 +390,14 @@ def governance_doctor_lines(pack: IntegrationPack) -> tuple[list[str], bool]:
             f"agent.json covers {len(governed_actions)} action(s)"
         )
 
-    policy_path = pack.agent.policy_file
-    if policy_path is not None and policy_path.is_file():
+    policy_path = policy_yaml_runtime_path(pack.agent.agent_id)
+    if not policy_path.is_file():
+        try:
+            policy_path = ensure_runtime_policy_yaml(pack)
+        except FileNotFoundError:
+            policy_path = shipped_policy_template_path(pack)
+
+    if policy_path.is_file():
         policy_raw = yaml.safe_load(policy_path.read_text(encoding="utf-8")) or {}
         allowed = policy_raw.get("allowed_actions")
         if isinstance(allowed, dict):
@@ -387,16 +407,18 @@ def governance_doctor_lines(pack: IntegrationPack) -> tuple[list[str], bool]:
             if missing_policy:
                 ok = False
                 lines.append(
-                    f"  governance: policy.yaml missing allowed_actions: {missing_policy}"
+                    f"  policy: missing allowed_actions for governed tools: {missing_policy}"
                 )
             else:
-                lines.append("  governance: policy.yaml covers all governed actions")
+                lines.append(
+                    f"  policy: runtime config at {policy_path} covers governed actions"
+                )
         else:
             ok = False
-            lines.append("  governance: policy.yaml has no allowed_actions mapping")
+            lines.append(f"  policy: {policy_path} has no allowed_actions mapping")
     else:
         ok = False
-        lines.append("  governance: policy file missing from agent pack")
+        lines.append("  policy: runtime policy file missing")
 
     tool_names = ", ".join(sorted(contract))
     lines.append(f"  governance tools: {tool_names}")

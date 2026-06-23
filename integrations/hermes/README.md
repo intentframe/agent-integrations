@@ -5,7 +5,7 @@ Hermes does **not** ship an IntentFrame executor pack or runtime. This folder pr
 | Path | Purpose |
 |------|---------|
 | `agent.json` | Agent profile, adapter socket, exported `env` for Hermes plugin |
-| `policy.yaml` | RUN_COMMAND + host-file + deletion domain rules seeded into policy-registry |
+| `policy.yaml` | Shipped policy **template** (copied to runtime on first integrate/start) |
 | `governance/tools.yaml` | Default governed-tool **template** (seeded to runtime on first integrate) |
 | `shared/` | `hermes-governance` package — contract loader for adapter |
 | `adapter/` | Hermes adapter sidecar (bridge client, tool mapping, HTTP/UDS server) |
@@ -69,12 +69,34 @@ bin/intentframe-integrations governance enable hermes write_file
 
 Reads (`read_file`, `search_files`, …) stay **ungoverned** unless explicitly added to the catalog.
 
+## Policy (runtime)
+
+IntentFrame policy rules live at `~/.intentframe/integrations/hermes/policy.yaml`
+(copied from shipped `policy.yaml` on first `integrate` or `start`). Edit that file,
+then reload into the running registry:
+
+```bash
+bin/intentframe-integrations policy show hermes
+vim ~/.intentframe/integrations/hermes/policy.yaml
+bin/intentframe-integrations policy reload hermes
+
+# Install an external policy file (copy + load)
+bin/intentframe-integrations policy set hermes ~/my-hermes-policy.yaml
+
+# Restore shipped default (copy + load)
+bin/intentframe-integrations policy reset hermes
+# or: integrate hermes --reset-policy
+```
+
+Policy changes apply immediately — no gateway or adapter restart needed.
+`start hermes` seeds from the **runtime** policy file, not the repo copy.
+
 ## Commands
 
 ```bash
 bin/intentframe-integrations install hermes [--version VERSION] [--force]
 bin/intentframe-integrations start hermes
-bin/intentframe-integrations integrate hermes [--copy] [--skip-config]
+bin/intentframe-integrations integrate hermes [--copy] [--skip-config] [--reset-governance] [--reset-policy]
 bin/intentframe-integrations doctor hermes [--install-only]
 bin/intentframe-integrations gateway start hermes [--api-server]
 bin/intentframe-integrations gateway stop hermes
@@ -84,8 +106,9 @@ bin/intentframe-integrations stop
 
 `integrate hermes` symlinks the plugin to `$HERMES_HOME/plugins/intentframe-gate`, merges
 `plugins.enabled` in `$HERMES_HOME/config.yaml`, syncs the adapter venv at
-`~/.intentframe/integrations/hermes/.venv`, and seeds runtime governance config at
-`~/.intentframe/integrations/hermes/governance/tools.yaml` if missing.
+`~/.intentframe/integrations/hermes/.venv`, seeds runtime governance config at
+`~/.intentframe/integrations/hermes/governance/tools.yaml` and runtime policy at
+`~/.intentframe/integrations/hermes/policy.yaml` if missing.
 
 ### Governance env contract
 

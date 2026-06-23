@@ -222,7 +222,7 @@ Three independent knobs:
 |---------|---------|---------------|
 | **Hermes tool enabled** | Name appears on `/v1/toolsets` for api_server | Hermes `$HERMES_HOME/config.yaml` toolsets |
 | **IntentFrame governed** | Plugin wrap + adapter validate active | `enabled: true` in governance yaml |
-| **Policy allows action** | IntentFrame returns ALLOW | `policy.yaml` + seeded policy-registry |
+| **Policy allows action** | IntentFrame returns ALLOW | Runtime `~/.intentframe/integrations/hermes/policy.yaml` loaded into policy-registry |
 
 Governance template (v1 catalog — four Hermes tools):
 
@@ -463,8 +463,11 @@ on first BLOCK.
 
 ### Step 3 — Policy
 
-Add rules to `integrations/hermes/policy.yaml` for the action type(s). Ensure
-`agent.json` lists the action type:
+Add rules to the shipped template `integrations/hermes/policy.yaml` (for upstream
+changes) or edit the **runtime** file at
+`~/.intentframe/integrations/hermes/policy.yaml` (for local/production tuning).
+After editing runtime policy, run `bin/intentframe-integrations policy reload hermes`.
+Ensure `agent.json` lists the action type:
 
 ```5:5:integrations/hermes/agent.json
   "action_types": ["RUN_COMMAND", "WRITE_HOST_FILE", "DELETE_HOST_FILE"],
@@ -536,7 +539,9 @@ After schema changes, restart gateway (registry `_generation` memoization in Her
 
 ### Handler / validation behavior
 
-- **Policy-only change** → edit `policy.yaml`, re-seed or update policy-registry.
+- **Policy-only change** → edit `~/.intentframe/integrations/hermes/policy.yaml`, then
+  `bin/intentframe-integrations policy reload hermes` (or `policy set` / `policy reset`).
+  No gateway or adapter restart needed.
 - **Mapping change** → edit adapter `mapper.py` (what IntentFrame sees).
 - **Block response shape** → `blocked_response` in governance yaml +
   `gate.py` `blocked_response()` (`terminal_json` vs `generic_json`).

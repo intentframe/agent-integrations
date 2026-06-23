@@ -67,6 +67,8 @@ jobs:
           uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_adapter_lifecycle.py
           uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_hermes_install.py
           uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_governance_edit.py
+          uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_policy_contract.py
+          uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_policy_manage.py
           uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_governance_runtime_contract.py
           uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_make_catalog_yaml.py
           uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_scoped_governance_yaml.py

@@ -43,7 +43,10 @@ From the **repo root**:
 ```bash
 bin/intentframe-integrations start hermes
 bin/intentframe-integrations seed hermes --skip-if-exists
+bin/intentframe-integrations policy reload hermes   # after editing runtime policy
 ```
+
+Runtime policy: `~/.intentframe/integrations/hermes/policy.yaml` (see `policy show|reload|set|reset`).
 
 Or via the internal runtime CLI:
 

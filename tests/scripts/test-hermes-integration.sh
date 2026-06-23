@@ -41,5 +41,9 @@ HERMES_STARTED=1
 export IF_AGENT_ADAPTER_SOCKET="${ADAPTER_SOCKET}"
 test -S "${ADAPTER_SOCKET}"
 
+echo "==> policy show + reload hermes (live registry smoke)"
+(cd "$REPO_ROOT" && "$IF_INTEGRATIONS" policy show hermes)
+(cd "$REPO_ROOT" && "$IF_INTEGRATIONS" policy reload hermes)
+
 (cd "$REPO_ROOT" && uv run --directory integrations/hermes/adapter python "$ADAPTER_TEST")
 (cd "$REPO_ROOT" && uv run --with httpx --package intentframe-integrations-cli python "$GATE_TEST")

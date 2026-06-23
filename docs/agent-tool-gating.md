@@ -342,6 +342,20 @@ intentframe-integrations governance enable hermes write_file    # govern write_f
 After changing governance, restart the Hermes gateway and adapter (governance is
 loaded at process start).
 
+**Policy** (separate from governance) lives at
+`~/.intentframe/integrations/hermes/policy.yaml` — copied from the shipped template
+on first `integrate` / `start`. Edit that file, then reload into policy-registry:
+
+```bash
+intentframe-integrations policy show hermes
+intentframe-integrations policy reload hermes
+intentframe-integrations policy set hermes ~/my-policy.yaml
+intentframe-integrations policy reset hermes
+```
+
+Policy changes apply immediately (no gateway restart). Use `integrate hermes --reset-policy`
+to restore the shipped default.
+
 **Tests:** catalog-wide integration tests generate a throwaway all-governed yaml
 from the default template via `HERMES_GOVERNANCE_YAML`; they never mutate runtime
 user config. Gateway E2E accepts `HERMES_E2E_GOVERNED_TOOLS=terminal,process` to

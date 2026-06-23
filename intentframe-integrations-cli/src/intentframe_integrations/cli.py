@@ -41,6 +41,15 @@ from intentframe_integrations.hermes_governance_edit import (
     set_tool_enabled,
 )
 from intentframe_integrations.integration_pack import IntegrationPack, load_integration_pack
+from intentframe_integrations.policy_contract import ensure_runtime_policy_yaml
+from intentframe_integrations.policy_manage import (
+    PolicyError,
+    format_policy_show,
+    policy_reload,
+    policy_reset,
+    policy_set,
+    policy_show,
+)
 from intentframe_integrations.paths import agent_config_path, list_agents
 from intentframe_integrations.runtime_lifecycle import (
     backend_ready_for_pack,
@@ -89,7 +98,20 @@ def _seed_agent_config(cfg: Path, *, skip_if_exists: bool) -> int:
         return 1
 
     for path in paths:
-        argv = ["seed-policy", "--agent-config", str(path)]
+        pack = load_integration_pack(path)
+        try:
+            runtime_policy = ensure_runtime_policy_yaml(pack)
+        except FileNotFoundError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 1
+
+        argv = [
+            "seed-policy",
+            "--agent-config",
+            str(path),
+            "--policy",
+            str(runtime_policy),
+        ]
         if skip_if_exists:
             argv.append("--skip-if-exists")
         ec = _run_backend(argv)
@@ -300,12 +322,56 @@ def _cmd_doctor(
     return 0
 
 
+def _cmd_policy_show(agent: str) -> int:
+    try:
+        report = policy_show(agent)
+    except (PolicyError, FileNotFoundError, ValueError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    print(format_policy_show(report))
+    return 0
+
+
+def _cmd_policy_reload(agent: str) -> int:
+    try:
+        path = policy_reload(agent)
+    except PolicyError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    print(f"Policy reloaded from {path}")
+    print("Changes apply immediately (no gateway or adapter restart needed).")
+    return 0
+
+
+def _cmd_policy_set(agent: str, policy_path: Path) -> int:
+    try:
+        path = policy_set(agent, policy_path)
+    except (PolicyError, FileNotFoundError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    print(f"Policy installed to {path} and loaded into registry")
+    print("Changes apply immediately (no gateway or adapter restart needed).")
+    return 0
+
+
+def _cmd_policy_reset(agent: str) -> int:
+    try:
+        path = policy_reset(agent)
+    except PolicyError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    print(f"Policy reset to shipped default at {path} and loaded into registry")
+    print("Changes apply immediately (no gateway or adapter restart needed).")
+    return 0
+
+
 def _cmd_integrate(
     agent: str,
     *,
     copy: bool,
     skip_config: bool,
     reset_governance: bool,
+    reset_policy: bool,
 ) -> int:
     if agent != "hermes":
         print(f"ERROR: integrate is only implemented for hermes (got {agent!r})", file=sys.stderr)
@@ -319,6 +385,7 @@ def _cmd_integrate(
             copy=copy,
             skip_config=skip_config,
             reset_governance=reset_governance,
+            reset_policy=reset_policy,
         )
     except FileNotFoundError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
@@ -616,6 +683,39 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Overwrite runtime governance/tools.yaml from the default template (default: keep user config)",
     )
+    p_integrate.add_argument(
+        "--reset-policy",
+        action="store_true",
+        help="Overwrite runtime policy.yaml from the shipped default (default: keep user config)",
+    )
+
+    p_policy = sub.add_parser(
+        "policy",
+        help="Show, set, reload, or reset runtime agent policy.yaml",
+    )
+    policy_sub = p_policy.add_subparsers(dest="policy_command", required=True)
+
+    p_policy_show = policy_sub.add_parser("show", help="Show runtime policy path and registry status")
+    p_policy_show.add_argument("agent", choices=agents)
+
+    p_policy_reload = policy_sub.add_parser(
+        "reload",
+        help="Load runtime policy.yaml into policy-registry (after hand-editing)",
+    )
+    p_policy_reload.add_argument("agent", choices=agents)
+
+    p_policy_set = policy_sub.add_parser(
+        "set",
+        help="Copy a policy file to runtime and load into policy-registry",
+    )
+    p_policy_set.add_argument("agent", choices=agents)
+    p_policy_set.add_argument("path", type=Path, help="Path to policy YAML")
+
+    p_policy_reset = policy_sub.add_parser(
+        "reset",
+        help="Restore shipped default policy to runtime and load into registry",
+    )
+    p_policy_reset.add_argument("agent", choices=agents)
 
     p_run = sub.add_parser(
         "run",
@@ -735,7 +835,21 @@ def main(argv: list[str] | None = None) -> int:
                 copy=args.copy,
                 skip_config=args.skip_config,
                 reset_governance=args.reset_governance,
+                reset_policy=args.reset_policy,
             )
+        case "policy":
+            match args.policy_command:
+                case "show":
+                    return _cmd_policy_show(args.agent)
+                case "reload":
+                    return _cmd_policy_reload(args.agent)
+                case "set":
+                    return _cmd_policy_set(args.agent, args.path)
+                case "reset":
+                    return _cmd_policy_reset(args.agent)
+                case _:
+                    parser.error(f"Unknown policy command: {args.policy_command}")
+                    return 2
         case "run":
             gateway_args = args.gateway_args
             if gateway_args and gateway_args[0] == "--":

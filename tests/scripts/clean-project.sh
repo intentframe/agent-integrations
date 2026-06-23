@@ -16,6 +16,7 @@ PY_CLIENT_DIR="${REPO_ROOT}/if-integration-clients/python"
 TS_CLIENT_DIR="${REPO_ROOT}/if-integration-clients/typescript"
 INTENTFRAME_STATE="${HOME}/.intentframe/backend"
 INTENTFRAME_RUN="${HOME}/.intentframe/run"
+INTENTFRAME_INTEGRATIONS="${HOME}/.intentframe/integrations"
 
 KEEP_RUNTIME=0
 DRY_RUN=0
@@ -25,7 +26,8 @@ usage() {
 Usage: clean-project.sh [OPTIONS]
 
 Remove local Python/npm build artifacts created by development and e2e tests.
-By default also stops the integrations runtime and clears ~/.intentframe runtime state.
+By default also stops the integrations runtime and clears ~/.intentframe runtime
+state (backend sockets, policy-registry, and per-agent runtime policy/governance).
 
 Options:
   --keep-runtime   Remove repo venvs/node_modules only; do not touch ~/.intentframe
@@ -109,6 +111,7 @@ else
   step "Remove IntentFrame runtime state"
   remove_path "$INTENTFRAME_STATE"
   remove_path "$INTENTFRAME_RUN"
+  remove_path "$INTENTFRAME_INTEGRATIONS"
 fi
 
 step "Done"

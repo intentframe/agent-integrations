@@ -46,11 +46,13 @@ LLM (POST /v1/responses)
 | Path | Purpose |
 |------|---------|
 | `integrations/hermes/governance/tools.yaml` | Default governed-tool **template** (4 entries) |
-| `integrations/hermes/policy.yaml` | RUN_COMMAND + host-file + deletion rules |
+| `integrations/hermes/policy.yaml` | Shipped policy **template** (RUN_COMMAND + host-file + deletion) |
+| `~/.intentframe/integrations/hermes/governance/tools.yaml` | Runtime governed-tool config (user-owned) |
+| `~/.intentframe/integrations/hermes/policy.yaml` | Runtime policy config (user-owned) |
 | `integrations/hermes/agent.json` | Agent profile, action types, exported env |
 | `integrations/hermes/adapter/` | Sidecar: map tool args → IntentFrame `/validate` |
 | `integrations/hermes/plugin/intentframe-gate/` | Plugin: `reason` injection + gate + preload |
-| `intentframe-integrations-cli/` | `install`, `start`, `integrate`, `gateway`, `doctor` |
+| `intentframe-integrations-cli/` | `install`, `start`, `integrate`, `gateway`, `doctor`, `policy`, `governance` |
 
 ---
 
@@ -117,7 +119,13 @@ bin/intentframe-integrations gateway start hermes --api-server
 ```
 
 `integrate hermes` symlinks the plugin, enables it in `$HERMES_HOME/config.yaml`, syncs
-adapter venv, and seeds runtime governance yaml if missing.
+adapter venv, and copies shipped governance + policy templates into
+`~/.intentframe/integrations/hermes/` if missing.
+
+**Policy changes:** edit `~/.intentframe/integrations/hermes/policy.yaml`, then
+`bin/intentframe-integrations policy reload hermes` (no gateway restart).
+Use `policy set`, `policy reset`, or `integrate hermes --reset-policy` to switch
+or restore defaults.
 
 ---
 

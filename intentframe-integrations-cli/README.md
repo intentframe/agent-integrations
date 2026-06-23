@@ -21,11 +21,21 @@ intentframe-integrations doctor hermes [--install-only]
 intentframe-integrations governance list hermes
 intentframe-integrations governance enable hermes <tool>
 intentframe-integrations governance disable hermes <tool>
+intentframe-integrations policy show hermes
+intentframe-integrations policy reload hermes
+intentframe-integrations policy set hermes <path/to/policy.yaml>
+intentframe-integrations policy reset hermes
 ```
 
 `governance enable|disable` toggles **IntentFrame governance** for a catalog tool
 (yaml `enabled: true/false`). It does not enable or disable Hermes native tools.
 See [`docs/agent-tool-gating.md`](../docs/agent-tool-gating.md#terminology-what-governed-means).
+
+**Policy** lives at `~/.intentframe/integrations/<agent>/policy.yaml` (copied from the
+shipped template on first `integrate` or `start`). Edit that file, then
+`policy reload <agent>`. Use `policy set` to install an external yaml, or
+`policy reset` to restore the shipped default. Changes apply immediately — no
+gateway restart needed.
 
 Run from repo root via `bin/intentframe-integrations` or:
 
