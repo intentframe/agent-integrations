@@ -24,6 +24,7 @@ bin/intentframe-integrations gateway start hermes --api-server
 
 See `integrations/hermes/README.md` for details. Governed-tool terminology:
 [`docs/agent-tool-gating.md`](docs/agent-tool-gating.md#terminology-what-governed-means).
+Gateway plugin preload: [`docs/hermes-plugin-registration-order.md`](docs/hermes-plugin-registration-order.md).
 
 ## Quick start (e2e)
 

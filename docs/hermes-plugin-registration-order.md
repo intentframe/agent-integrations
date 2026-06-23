@@ -1,11 +1,12 @@
 # Hermes plugin registration order (intentframe-gate)
 
-> Why the v1 multi-tool gate regressed on gateway E2E, and why `terminal` needs an
-> explicit `ctx.register_tool(..., override=True)` at plugin load time.
+> Why the v1 multi-tool gate regressed on gateway E2E, and why governed builtins need
+> **selective module preload** before the generic snapshot wrap at plugin load time.
 
 Related: [`agent-tool-gating.md`](./agent-tool-gating.md),
 [`NATIVE_KIT_INTEGRATION.md`](./NATIVE_KIT_INTEGRATION.md),
-[`integrations/hermes/plugin/intentframe-gate/`](../integrations/hermes/plugin/intentframe-gate/).
+[`integrations/hermes/plugin/intentframe-gate/`](../integrations/hermes/plugin/intentframe-gate/),
+[`integrations/hermes/plugin/intentframe-gate/README.md`](../integrations/hermes/plugin/intentframe-gate/README.md).
 
 ---
 
@@ -13,11 +14,12 @@ Related: [`agent-tool-gating.md`](./agent-tool-gating.md),
 
 | Question | Answer |
 |----------|--------|
-| What broke? | Replacing `intentframe-terminal` with snapshot + hook only — no explicit terminal override at plugin load. |
+| What broke? | Replacing `intentframe-terminal` with snapshot + hook only — no preload before snapshot. |
 | Why? | Hermes loads **plugins before builtin tools**. The snapshot loop saw an **empty registry**; `terminal` never landed in the live registry before `get_definitions()` built the OpenAI payload. |
 | Symptom | **`terminal` was not sent to the LLM at all** (OpenAI trace Tools list has no `terminal`). Model called `vision_analyze` in a loop — it could not comply. |
-| Fix | Restore the old path: `build_terminal_schema()` + `ctx.register_tool(..., override=True)` for `terminal` in `__init__.py`. |
+| Fix | **`preload_governed_builtins(governed)`** then generic snapshot loop with `ctx.register_tool(..., override=True)` for each governed name. See [`builtin_preload.py`](../integrations/hermes/plugin/intentframe-gate/builtin_preload.py). |
 | Not the cause | Wrong yaml, reason wording, or LLM flakiness (same model + Hermes passed on old plugin). **`/v1/toolsets` showing `terminal` is not proof the LLM received it.** |
+| Avoid | Full `discover_builtin_tools()` in the plugin — side effects like `read_terminal` break the toolsets contract. |
 
 ---
 
@@ -32,6 +34,7 @@ sequenceDiagram
     participant GW as Gateway startup
     participant PM as PluginManager
     participant IG as intentframe-gate
+    participant BP as builtin_preload
     participant REG as tools.registry
     participant MT as model_tools (lazy)
     participant BT as discover_builtin_tools
@@ -39,15 +42,16 @@ sequenceDiagram
 
     GW->>PM: discover_plugins()
     PM->>IG: register(ctx)
-    Note over IG,REG: Registry is empty — no terminal yet
+    Note over IG,REG: Registry empty before preload
     IG->>REG: install_registry_hook()
-    IG->>REG: snapshot loop (often no-op)
+    IG->>BP: preload_governed_builtins(governed)
+    BP->>REG: import governed modules → register builtins
+    IG->>REG: snapshot loop → wrap governed tools
 
     Note over GW,MT: First API request
     API->>MT: import model_tools
     MT->>BT: discover_builtin_tools()
-    BT->>REG: import terminal_tool.py → register("terminal")
-    Note over REG: Hook may wrap handler here (hook-only path)
+    Note over REG: Governed modules already imported — gated entries persist
     API->>REG: get_definitions() → LLM tool list
 ```
 
@@ -59,20 +63,20 @@ guaranteed to have run before the gateway handles requests.
 
 ## Three registration mechanisms
 
-The shipped plugin combines three mechanisms. They are **not** interchangeable for
-`terminal`.
+The shipped plugin combines three mechanisms. Snapshot + hook alone is **not**
+enough on the gateway path — governed Hermes builtins must be preloaded first.
 
 ```mermaid
 flowchart TB
     subgraph mechanisms["intentframe-gate registration"]
-        A["1. Explicit override<br/>ctx.register_tool(..., override=True)"]
+        A["1. Selective preload<br/>GOVERNED_BUILTIN_MODULES"]
         B["2. Snapshot loop<br/>registry._snapshot_entries()"]
         C["3. Registry hook<br/>patch registry.register"]
     end
 
     subgraph when["When each runs"]
-        T1["Plugin load time"]
-        T2["Plugin load time<br/>(only if tools already registered)"]
+        T1["Plugin load time<br/>(before snapshot)"]
+        T2["Plugin load time<br/>(after preload populated registry)"]
         T3["Every registry.register<br/>(builtins, MCP refresh)"]
     end
 
@@ -87,9 +91,15 @@ flowchart TB
 
 | Mechanism | Purpose | Works when |
 |-----------|---------|------------|
-| **Explicit override** | Replace a builtin with gated schema + handler at plugin load | Always for `terminal` (proven E2E path) |
-| **Snapshot loop** | Wrap tools already in registry when plugin loads | Plugin runs **after** builtins (CLI path) or second plugin load |
-| **Registry hook** | Gate tools registered later (MCP refresh, late imports) | Complement — must not be the **only** path for `terminal` on gateway |
+| **Selective preload** | Import only Hermes modules for **governed** tool names before snapshot | Always on gateway — populates registry without full `discover_builtin_tools()` |
+| **Snapshot loop** | Wrap governed tools already in registry with gated schema + handler | After preload (gateway) or when builtins loaded first (some CLI paths) |
+| **Registry hook** | Gate tools registered later (MCP refresh, late imports) | Complement — must not be the **only** path for governed builtins on gateway |
+
+**Why not full `discover_builtin_tools()`?** It imports every builtin module.
+That pulled in `read_terminal`, which Hermes then merged into the `terminal` toolset
+and broke the E2E toolsets contract (`['process', 'terminal']` expected). Selective
+preload imports only modules listed in `GOVERNED_BUILTIN_MODULES` for names in the
+runtime governed set.
 
 ---
 
@@ -154,7 +164,7 @@ the OpenAI request. Verify the live payload (OpenAI trace, or gateway logs showi
 ## Broken design (regression)
 
 The first v1 refactor assumed snapshot + hook could replace the old
-`intentframe-terminal` one-liner.
+`intentframe-terminal` one-liner (which effectively preloaded `terminal_tool`).
 
 ```mermaid
 flowchart LR
@@ -196,30 +206,50 @@ Tools list** — so the model could not call it.
 
 ## Working design (old plugin + current fix)
 
-`intentframe-terminal` always did this at plugin load:
+### What `intentframe-terminal` did (historical)
+
+At plugin load it imported `tools.terminal_tool` via `build_terminal_schema()` and
+registered a gated override — same **early import + wrap** effect as preload today.
+
+### Current fix: selective preload + generic snapshot
+
+[`__init__.py`](../integrations/hermes/plugin/intentframe-gate/__init__.py):
 
 ```python
-schema = build_terminal_schema()   # imports tools.terminal_tool
-ctx.register_tool(name="terminal", schema=schema, handler=_handle_terminal,
-                  check_fn=..., override=True)
+install_registry_hook()
+governed = governed_tool_names()
+preload_governed_builtins(governed)   # GOVERNED_BUILTIN_MODULES
+
+for entry in registry._snapshot_entries():
+    if entry.name not in governed:
+        continue
+    ctx.register_tool(
+        name=entry.name,
+        schema=inject_reason(entry.schema, tool_name=entry.name),
+        handler=wrap_handler(...),
+        override=True,
+        ...
+    )
 ```
 
 That path:
 
-1. Imports `terminal_tool` **early** (side effect: first registry entry).
-2. **Replaces** it immediately with the gated schema and handler via `override=True`.
-3. When `discover_builtin_tools()` runs later, `terminal_tool` is already imported —
-   module-level `registry.register(...)` does **not** run again, so the gated entry persists.
+1. Imports only Hermes modules needed for **governed** names (see
+   [`builtin_preload.py`](../integrations/hermes/plugin/intentframe-gate/builtin_preload.py)).
+2. Populates the registry **before** the snapshot loop runs.
+3. Wraps each governed entry generically — no terminal-specific branch in `register()`.
+4. When `discover_builtin_tools()` runs later, governed modules are already imported —
+   module-level `registry.register(...)` does **not** run again, so gated entries persist.
 
 ```mermaid
 flowchart LR
     subgraph working["Working path (current fix)"]
         W1[Plugin register]
         W2[install_registry_hook]
-        W3["build_terminal_schema()<br/>+ ctx.register_tool override"]
-        W4["wrapped = ['terminal']<br/>handler gated"]
+        W3["preload_governed_builtins<br/>import terminal_tool, …"]
+        W4["snapshot loop<br/>wrapped = governed names"]
         W5[discover_builtin_tools]
-        W6[terminal_tool already imported — no overwrite]
+        W6[governed modules already imported — no overwrite]
         W7["get_definitions includes terminal<br/>OpenAI Tools has terminal"]
         W8["LLM calls terminal<br/>attempt 1/3"]
     end
@@ -234,17 +264,17 @@ flowchart LR
 
 ### Runtime evidence (post-fix)
 
-After restoring `_register_terminal_override()` in
-[`__init__.py`](../integrations/hermes/plugin/intentframe-gate/__init__.py):
+After adding selective preload (branch `fix-plugin-new-mechanism`, 23 Jun 2026):
 
 | Signal | Value |
 |--------|-------|
-| `terminal_explicit` | `true` |
-| `wrapped` | `["terminal"]` |
-| `terminal_in_registry` | `true` |
-| `terminal_handler_gated` | `true` |
+| `wrapped` | `["terminal"]` when only `terminal` governed |
+| `terminal_in_registry` at plugin register | `true` |
+| `GET /v1/toolsets` | `terminal: ['process', 'terminal']` — no `read_terminal` leak |
 | ALLOW probe | `tool_calls: ["terminal"]`, `has_terminal: true` on attempt 1/3 |
 | E2E | Passed pass 1, 2a, 2b |
+
+Unit tests: [`tests/hermes_plugin/test_builtin_preload.py`](../tests/hermes_plugin/test_builtin_preload.py).
 
 ---
 
@@ -262,11 +292,11 @@ After restoring `_register_terminal_override()` in
   intentframe-terminal (old)     intentframe-gate (broken)    intentframe-gate (fixed)
   ──────────────────────────     ─────────────────────────    ─────────────────────────
   register():                    register():                  register():
-    build_terminal_schema()        hook only                    hook
-    ctx.register_tool ✓            snapshot → empty ✗           explicit terminal ✓
-                                   wrapped = []                 snapshot (other tools)
+    import terminal_tool           hook only                    hook
+    ctx.register_tool ✓            snapshot → empty ✗           preload governed modules ✓
+                                   wrapped = []                 snapshot wrap governed ✓
   discover_builtin_tools():      discover_builtin_tools():    discover_builtin_tools():
-    terminal_tool already          terminal not in registry     terminal_tool already
+    terminal_tool already          terminal not in registry     governed modules already
     imported — no overwrite        at get_definitions time      imported — no overwrite
   OpenAI Tools: has terminal     OpenAI Tools: NO terminal    OpenAI Tools: has terminal
   E2E: ALLOW attempt 1/3 ✓       E2E: fails all 3 attempts ✗  E2E: ALLOW attempt 1/3 ✓
@@ -279,36 +309,39 @@ After restoring `_register_terminal_override()` in
 [`integrations/hermes/plugin/intentframe-gate/__init__.py`](../integrations/hermes/plugin/intentframe-gate/__init__.py):
 
 1. **`install_registry_hook()`** — gate future `registry.register` calls (MCP refresh).
-2. **`_register_terminal_override(ctx)`** — when `terminal` is governed, explicit
-   `ctx.register_tool(..., override=True)` (same contract as old `intentframe-terminal`).
-3. **Snapshot loop** — for other governed tools already in the registry (e.g. CLI
-   paths where builtins loaded first).
-
-Other files unchanged in role:
+2. **`preload_governed_builtins(governed)`** — import governed Hermes builtin modules
+   before snapshot (gateway load-order fix).
+3. **Snapshot loop** — generic wrap for all governed names with `override=True`.
 
 | File | Role |
 |------|------|
-| [`schema.py`](../integrations/hermes/plugin/intentframe-gate/schema.py) | `build_terminal_schema()` for terminal; `inject_reason()` for other tools |
+| [`builtin_preload.py`](../integrations/hermes/plugin/intentframe-gate/builtin_preload.py) | `GOVERNED_BUILTIN_MODULES` map + selective `importlib.import_module` |
+| [`schema.py`](../integrations/hermes/plugin/intentframe-gate/schema.py) | `inject_reason()` — terminal-specific reason text branch |
 | [`gate.py`](../integrations/hermes/plugin/intentframe-gate/gate.py) | Validate via adapter, strip `reason`, delegate |
 | [`registry_hook.py`](../integrations/hermes/plugin/intentframe-gate/registry_hook.py) | Patch `registry.register` for dynamic tools |
+
+When adding a governed Hermes **builtin**, add its import module to
+`GOVERNED_BUILTIN_MODULES` (see [`test_builtin_preload.py`](../tests/hermes_plugin/test_builtin_preload.py)).
 
 ---
 
 ## Implications for other governed tools
 
-| Tool | Gateway E2E today | Registration note |
-|------|-------------------|-------------------|
-| `terminal` | Required explicit override | **Must** use `_register_terminal_override` — do not rely on snapshot + hook alone |
-| `process`, `write_file`, `patch`, `delete_file` | Probed when in scoped yaml | Snapshot + hook usually sufficient once builtins load; watch for same load-order gap if E2E flakes |
+| Tool | Gateway E2E | Registration note |
+|------|-------------|-------------------|
+| `terminal`, `process`, `write_file`, `patch` | Probed when in scoped yaml | Listed in `GOVERNED_BUILTIN_MODULES` — preload + snapshot |
+| `delete_file` | Probed when in scoped yaml | No Hermes 0.17 standalone import module — rely on hook / MCP path |
 
-If a non-terminal governed tool fails with “model never calls tool X”:
+If a governed tool fails with “model never calls tool X”:
 
 1. Check an **OpenAI trace** (or agent init logs) — is X in the **Tools** parameter?
 2. If X is on `/v1/toolsets` but **not** in the OpenAI Tools list, the registry /
    `get_definitions()` path dropped it (missing entry or failed `check_fn`).
-3. Check plugin register logs for `wrapped` and consider an explicit
-   `ctx.register_tool(..., override=True)` for that tool name (same pattern as
-   `terminal`).
+3. Check plugin register logs for `wrapped` — empty means preload map may be missing X.
+4. Add X to `GOVERNED_BUILTIN_MODULES` if Hermes registers it at module import time.
+
+**Hermes-native long-term fix:** gateway could call `discover_builtin_tools()` before
+`discover_plugins()` (upstream). Until then, the plugin owns selective preload.
 
 ---
 
@@ -322,8 +355,11 @@ HERMES_E2E_GOVERNED_TOOLS=terminal RUN_HERMES_GATEWAY_E2E=1 \
 
 Expect:
 
+- `GET /v1/toolsets` — `terminal: ['process', 'terminal']` (no `read_terminal`)
 - `POST /v1/responses ALLOW (attempt 1/3)` on passes 1, 2a, 2b
 - `Hermes gateway E2E passed (pass 1, 2a, 2b)`
+
+See also: [`tests/hermes_gateway/README.md`](../tests/hermes_gateway/README.md).
 
 Compare with bisect: checkout commit before `intentframe-gate` refactor
 (`intentframe-terminal` only) — same model and Hermes version should also pass
@@ -333,9 +369,11 @@ attempt 1/3; that isolates the regression to plugin registration, not the LLM.
 
 ## References
 
-- Plugin: [`integrations/hermes/plugin/intentframe-gate/`](../integrations/hermes/plugin/intentframe-gate/)
+- Plugin README: [`integrations/hermes/plugin/intentframe-gate/README.md`](../integrations/hermes/plugin/intentframe-gate/README.md)
+- Gating overview: [`docs/agent-tool-gating.md`](./agent-tool-gating.md)
 - E2E harness: [`tests/hermes_gateway/`](../tests/hermes_gateway/),
   [`tests/scripts/test-hermes-gateway-e2e.sh`](../tests/scripts/test-hermes-gateway-e2e.sh)
+- Preload unit tests: [`tests/hermes_plugin/test_builtin_preload.py`](../tests/hermes_plugin/test_builtin_preload.py)
 - Hermes gateway plugin discovery:
   [`gateway/run.py`](../external-reference-only-libs/hermes-agent/gateway/run.py)
   (explicit `discover_plugins()` before lazy `model_tools`)

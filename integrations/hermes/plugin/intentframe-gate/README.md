@@ -15,6 +15,7 @@ A tool is **governed** when it appears in `governance/tools.yaml` with
 exposes the tool on `/v1/toolsets`.
 
 Full terminology: [`docs/agent-tool-gating.md`](../../../docs/agent-tool-gating.md#terminology-what-governed-means).
+Gateway startup / preload: [`docs/hermes-plugin-registration-order.md`](../../../docs/hermes-plugin-registration-order.md).
 
 ## Governed tools (v1)
 
@@ -35,7 +36,21 @@ For each **governed** tool:
 2. Handler validates via adapter before delegating to Hermes (layer 2)
 3. Adapter maps tool args to IntentFrame action(s) and calls the bridge
 
-`registry.register` is hooked so MCP refresh cannot silently reinstall unwrapped handlers.
+At plugin load (`register()`):
+
+1. `install_registry_hook()` — gate future `registry.register` (MCP refresh)
+2. `preload_governed_builtins(governed)` — selective Hermes module import
+3. Snapshot loop — wrap governed registry entries with `override=True`
+
+On gateway startup, plugins load **before** Hermes builtins. [`builtin_preload.py`](builtin_preload.py)
+imports only modules in `GOVERNED_BUILTIN_MODULES` for **governed** tool names so
+the snapshot loop can wrap them without calling full `discover_builtin_tools()`
+(which would pull in extras like `read_terminal`). Details:
+[`docs/hermes-plugin-registration-order.md`](../../../docs/hermes-plugin-registration-order.md).
+
+When adding a governed Hermes builtin, add its import module to
+`GOVERNED_BUILTIN_MODULES` and extend
+[`tests/hermes_plugin/test_builtin_preload.py`](../../../tests/hermes_plugin/test_builtin_preload.py).
 
 ## Env
 

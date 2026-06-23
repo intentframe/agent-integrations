@@ -25,6 +25,7 @@ RUN_HERMES_GATEWAY_E2E=1 ./tests/scripts/test-hermes-gateway-e2e.sh
 
 **Governed tools** = IntentFrame plugin gate active (see
 [`docs/agent-tool-gating.md`](../../docs/agent-tool-gating.md#terminology-what-governed-means)).
+Plugin registration / preload: [`docs/hermes-plugin-registration-order.md`](../../docs/hermes-plugin-registration-order.md).
 This E2E harness does **not** toggle Hermes `/v1/toolsets`.
 
 By default the test writes a **throwaway all-governed** governance yaml and sets

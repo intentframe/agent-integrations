@@ -110,7 +110,7 @@ returns `{ validated_only: true }` without executing on either Linux or macOS.
 
 | Component | Location |
 |-----------|----------|
-| Plugin | `plugin/intentframe-gate/` (legacy key `intentframe-terminal` migrated on integrate) |
+| Plugin | `plugin/intentframe-gate/` (legacy key `intentframe-terminal` migrated on integrate; see [`hermes-plugin-registration-order.md`](./hermes-plugin-registration-order.md) for gateway preload) |
 | Governance loader | `shared/` → `hermes-governance` package |
 | Mapper registry | `adapter/src/hermes_adapter/mapper.py` |
 | Multi-intent validate | `adapter/src/hermes_adapter/service.py` — **all** mapped intents must ALLOW |
