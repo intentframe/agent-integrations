@@ -147,6 +147,7 @@ step "Hermes plugin unit tests"
 (cd "$REPO_ROOT" && uv run --with httpx --with pyyaml --package intentframe-integrations-cli python tests/hermes_plugin/test_gate.py)
 (cd "$REPO_ROOT" && uv run --with httpx --with pyyaml --package intentframe-integrations-cli python tests/hermes_plugin/test_registry_hook.py)
 (cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/hermes_plugin/test_integrate.py)
+(cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/hermes_plugin/test_builtin_preload.py)
 
 step "Integrations CLI unit tests"
 (cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_runtime_lifecycle.py)
@@ -164,6 +165,7 @@ step "Hermes gateway unit tests"
 (cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_hermes_reference_contract.py)
 (cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_api_client.py)
 (cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_governed_tool_coverage.py)
+(cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_toolsets_contract.py)
 
 step "Hermes live integration (adapter + plugin gate)"
 bash "${SCRIPT_DIR}/test-hermes-integration.sh"
