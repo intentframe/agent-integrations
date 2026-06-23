@@ -623,4 +623,8 @@ def doctor_hermes(
 
 
 def load_hermes_pack() -> IntegrationPack:
+    """Parse Hermes agent.json only — no env side effects.
+
+    CLI commands use ``integration_pack.load_and_activate_pack("hermes")`` instead.
+    """
     return load_integration_pack(agent_config_path("hermes"))

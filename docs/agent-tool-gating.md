@@ -365,6 +365,11 @@ intentframe-integrations policy reset hermes
 Policy changes apply immediately (no gateway restart). Use `integrate hermes --reset-policy`
 to restore the shipped default.
 
+**Env parity:** `policy show|reload|set|reset` call `load_and_activate_pack()` before
+validating policy — same `agent.json` env defaults (`setdefault`) and Hermes artifact
+seeding as `start hermes`. Explicit shell exports (e.g. test harness
+`HERMES_GOVERNANCE_YAML`) always win over `agent.json`.
+
 **Tests:** catalog-wide integration tests generate a throwaway all-governed yaml
 from the default template via `HERMES_GOVERNANCE_YAML`; they never mutate runtime
 user config. Gateway E2E accepts `HERMES_E2E_GOVERNED_TOOLS=terminal,process` to

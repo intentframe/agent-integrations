@@ -133,14 +133,18 @@ There is no user-facing `sync` command. Runtime CLI never rewrites repo template
 
 ### Governance env contract
 
-`agent.json` declares a default `HERMES_GOVERNANCE_YAML` (runtime sandbox path above).
-The CLI propagates governance config to child processes as follows:
+`agent.json` declares defaults for `HERMES_GOVERNANCE_YAML`, `IF_DYNAMIC_BUNDLE_MANIFEST`,
+and `IF_AGENT_ADAPTER_SOCKET`. All pack-loading CLI commands use
+`load_and_activate_pack()` (`integration_pack.py`): apply env via `setdefault`, then
+seed Hermes runtime governance artifacts if missing.
 
 | Step | Behavior |
 |------|----------|
 | `integrate hermes` | Prints `export …` using the **effective** value (`os.environ` overrides `agent.json`). Copies governance yaml, actions manifest, and policy template to runtime on first use. |
-| `start hermes` (adapter) | `_adapter_env()` copies the parent environment and `setdefault`s `pack.agent.env` keys — an existing `HERMES_GOVERNANCE_YAML` in the shell is preserved. |
+| `start hermes` | `load_and_activate_pack` → seeds manifest/governance if missing → starts backend (dynamic bundle reads manifest) + adapter. |
+| `policy show\|reload\|set\|reset hermes` | Same pack activation before local policy validation — registers generic action IDs (e.g. `HERMES_CRONJOB`) from manifest. No backend restart. |
 | `gateway start hermes` | `build_gateway_env()` uses the same `setdefault` pattern; logs `Hermes governance config: …` on startup. |
+| `start hermes` (adapter child) | `_adapter_env()` copies parent env and `setdefault`s `pack.agent.env` keys. |
 
 | Env | Points to | Read by |
 |-----|-----------|---------|
@@ -243,7 +247,13 @@ Deterministic adapter + plugin gate probes (no LLM) against a running Hermes sta
 
 Covers all catalog tools: native tools (`terminal`, `process`, `write_file`, `patch`)
 including V4A `patch` multi-intent write+delete, plus generic tools (e.g. `cronjob`)
-via semantic smoke. Requires `OPENAI_API_KEY` (backend startup).
+via semantic smoke. Also runs `policy show` + `policy reload` (live registry smoke —
+validates generic action IDs via `agent.json` manifest defaults without exporting
+`IF_DYNAMIC_BUNDLE_MANIFEST`). Requires `OPENAI_API_KEY` (backend startup).
+
+Unit regression for policy env parity (no live stack):
+`tests/intentframe_integrations/test_policy_manage.py` and
+`tests/intentframe_integrations/test_integration_pack.py`.
 
 ## Gateway E2E test (opt-in)
 

@@ -601,6 +601,37 @@ tool in yaml stops preloading/wrapping it on next gateway restart.
 
 ---
 
+## Pack activation and env precedence
+
+All CLI commands that need an agent profile call `load_and_activate_pack()` in
+`intentframe_integrations/integration_pack.py`:
+
+1. Load `integrations/<agent>/agent.json`
+2. Apply `env` keys via `os.environ.setdefault` — **explicit shell exports win**
+3. For Hermes: seed runtime `governance/tools.yaml` and `generic_actions.manifest`
+   if missing (paths in env must point at real files)
+
+This applies to `start`, `integrate`, `doctor`, `gateway start`, `run`, and every
+`policy *` command. It keeps three layers aligned:
+
+| Priority | Source | Example |
+|----------|--------|---------|
+| 1 (wins) | Explicit `export` in shell / test harness | `HERMES_GOVERNANCE_YAML=/tmp/e2e.yaml` |
+| 2 | `agent.json` `env` defaults | `IF_DYNAMIC_BUNDLE_MANIFEST=~/.intentframe/.../generic_actions.manifest` |
+| 3 | Seeded runtime files | Copied from repo templates on first use |
+
+**Why policy commands need this:** `policy reload` validates policy locally via
+`validate_policy_with_bundles()` — it rebuilds the bundle registry from the CLI
+process env. Generic action IDs (e.g. `HERMES_CRONJOB`) register only when
+`IF_DYNAMIC_BUNDLE_MANIFEST` points at a manifest file. Without pack activation,
+validation fails even though the running backend registered those actions at boot.
+
+Regression tests: `tests/intentframe_integrations/test_policy_manage.py`,
+`tests/intentframe_integrations/test_integration_pack.py`. Live smoke:
+`tests/scripts/test-hermes-integration.sh` (`policy show` + `policy reload`).
+
+---
+
 ## Testing pyramid
 
 Run cheap tests first; full E2E last.
@@ -619,6 +650,10 @@ uv run --package intentframe-integrations-cli python tests/intentframe_integrati
 
 # Probe symbol coverage for all catalog tools
 uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_governed_tool_coverage.py
+
+# Pack activation + policy env parity (HERMES_CRONJOB / manifest defaults)
+uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_integration_pack.py
+uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_policy_manage.py
 ```
 
 Extend `test_builtin_preload.py` when adding `GOVERNED_BUILTIN_MODULES` entries.
@@ -664,6 +699,16 @@ Generic catalog tools (e.g. `cronjob`) are live-tested only — no gateway LLM p
 Probe matrix: [`tests/hermes_gateway/README.md`](../tests/hermes_gateway/README.md).
 Status snapshot: [`hermes-intentframe-state-report.md`](./hermes-intentframe-state-report.md).
 
+### Layer 5 — Live adapter + plugin integration (all catalog tools)
+
+```bash
+./tests/scripts/test-hermes-integration.sh
+```
+
+Requires `OPENAI_API_KEY`. Starts Hermes stack, runs `policy show` + `policy reload`
+(live registry smoke), then deterministic adapter + plugin gate probes for every
+catalog tool (native ALLOW/BLOCK + generic semantic smoke for e.g. `cronjob`).
+
 ---
 
 ## Troubleshooting
@@ -679,6 +724,8 @@ Status snapshot: [`hermes-intentframe-state-report.md`](./hermes-intentframe-sta
 | Stale governance after edit | Process not restarted | restart adapter + gateway |
 | `patch replace ALLOW` fails Pass 2a (overwrite BLOCK) | Same marker/file reused across passes | Pass-unique marker + `seed_patch_replace_target` |
 | `patch replace BLOCK`: path under `/tmp/…` | LLM rewrote `/etc/…` | Explicit block prompt in `run_patch_replace_block_once` |
+| `policy reload`: `HERMES_*` has no registered ActionBundle | CLI env missing manifest | Ensure `agent.json` has `IF_DYNAMIC_BUNDLE_MANIFEST`; policy commands use `load_and_activate_pack`. Run `test_policy_manage.py`. |
+| `start hermes`: BundleConfigError (manifest missing) | Runtime file not seeded | `load_and_activate_pack` seeds on start; run `integrate hermes` once or check `~/.intentframe/integrations/hermes/governance/` |
 
 **Debug order:**
 

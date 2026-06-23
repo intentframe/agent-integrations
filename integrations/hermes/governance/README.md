@@ -14,6 +14,8 @@
   Does not touch manifest, policy, or repo files.
 - **`policy set|reload|reset hermes`** — edits runtime `policy.yaml` and loads into
   policy-registry immediately. **No** gateway or backend restart needed.
+  CLI applies `agent.json` env (including `IF_DYNAMIC_BUNDLE_MANIFEST`) via
+  `load_and_activate_pack` before validating policy against registered bundles.
 
 Governance and policy are **independent**: disabling a tool stops Hermes from sending
 intents; policy rows for that action ID can remain without harm.

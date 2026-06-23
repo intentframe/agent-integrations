@@ -41,6 +41,8 @@ HERMES_STARTED=1
 export IF_AGENT_ADAPTER_SOCKET="${ADAPTER_SOCKET}"
 test -S "${ADAPTER_SOCKET}"
 
+# Policy reload validates bundles in-process — must see agent.json manifest defaults
+# (IF_DYNAMIC_BUNDLE_MANIFEST) without this script exporting them explicitly.
 echo "==> policy show + reload hermes (live registry smoke)"
 (cd "$REPO_ROOT" && "$IF_INTEGRATIONS" policy show hermes)
 (cd "$REPO_ROOT" && "$IF_INTEGRATIONS" policy reload hermes)

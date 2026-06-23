@@ -286,9 +286,9 @@ class TestGatewayConfig(unittest.TestCase):
 
 
 def _apply_env(pack: object) -> None:
-    from intentframe_integrations.cli import _apply_agent_env
+    from intentframe_integrations.integration_pack import apply_agent_env
 
-    _apply_agent_env(pack)  # type: ignore[arg-type]
+    apply_agent_env(pack)  # type: ignore[arg-type]
 
 
 def main() -> int:

@@ -439,6 +439,7 @@ Add tests that simulate re-registration clobber.
 ### Per-deployment overrides
 
 - `HERMES_GOVERNANCE_YAML` — alternate governance yaml (which tools are **IntentFrame-governed**). Set in the parent shell before `start` / `gateway start`; CLI child env builders preserve it over `agent.json` defaults.
+- `IF_DYNAMIC_BUNDLE_MANIFEST` — path to runtime `generic_actions.manifest` (generic `HERMES_*` action IDs). Default in `agent.json`; CLI applies via `load_and_activate_pack` for `start` and all `policy *` commands. Explicit shell export wins (`setdefault`).
 - `HERMES_E2E_GOVERNED_TOOLS` — gateway E2E only; comma-separated subset for LLM probes (not Hermes toolsets). E2E also asserts env parity via `assert_governance_env_contract`.
 - **Runtime policy** — `~/.intentframe/integrations/hermes/policy.yaml` (copied from shipped template on first `integrate` / `start`). Edit locally, then `bin/intentframe-integrations policy reload hermes`. Use `policy set`, `policy reset`, or `integrate hermes --reset-policy` to install or restore defaults.
 
