@@ -14,6 +14,8 @@ Hermes does **not** ship an IntentFrame executor pack or runtime. This folder pr
 Docs: [`docs/agent-tool-gating.md`](../../docs/agent-tool-gating.md),
 [`docs/hermes-intentframe-integration-guide.md`](../../docs/hermes-intentframe-integration-guide.md)
 (integrate, add/change tools, testing),
+[`docs/hermes-intentframe-state-report.md`](../../docs/hermes-intentframe-state-report.md)
+(current snapshot),
 [`docs/hermes-plugin-registration-order.md`](../../docs/hermes-plugin-registration-order.md)
 (gateway preload + snapshot),
 [`docs/NATIVE_KIT_INTEGRATION.md`](../../docs/NATIVE_KIT_INTEGRATION.md)
@@ -191,3 +193,8 @@ RUN_HERMES_GATEWAY_E2E=1 \
 
 Requires `OPENAI_API_KEY`. Covers ALLOW/BLOCK for all four Hermes governed tools (`terminal`, `process`,
 `write_file`, `patch`), including V4A mixed write+delete multi-intent `patch` probes.
+
+Full run (passes 1, 2a, 2b) is green as of 2026-06-23. The harness seeds `patch replace`
+targets, uses pass-unique markers, and explicit block prompts — see
+[Probe harness determinism](../../tests/hermes_gateway/README.md#probe-harness-determinism).
+Integration snapshot: [`docs/hermes-intentframe-state-report.md`](../../docs/hermes-intentframe-state-report.md).

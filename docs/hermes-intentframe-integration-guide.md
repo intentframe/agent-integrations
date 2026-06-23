@@ -6,6 +6,7 @@
 
 Related:
 
+- [`hermes-intentframe-state-report.md`](./hermes-intentframe-state-report.md) — current integration snapshot (catalog, tests, limitations)
 - [`hermes-plugin-registration-order.md`](./hermes-plugin-registration-order.md) — load-order bug, preload fix, evidence
 - [`agent-tool-gating.md`](./agent-tool-gating.md) — portable gating pattern
 - [`NATIVE_KIT_INTEGRATION.md`](./NATIVE_KIT_INTEGRATION.md) — native-kit bundles, policy alignment
@@ -489,6 +490,16 @@ Add probe functions to `tests/hermes_gateway/test_gateway_e2e.py` and register s
 in `tests/hermes_governance_fixtures.py` (`GATEWAY_E2E_PROBE_SYMBOLS`). Coverage test
 enforces parity:
 
+**Harness determinism (required for reliable E2E):**
+
+| Probe type | Harness setup |
+|------------|---------------|
+| `patch replace ALLOW` | Call `seed_patch_replace_target(sandbox_home, marker)` before each attempt — file must contain `"a"` |
+| Multi-pass runs | Use pass-unique markers (`…-{run_id}-p1|p2a|p2b`) so Pass 2a does not reuse Pass 1 files |
+| BLOCK (`/etc/…`, `sudo`, V4A `/etc` delete) | Explicit prompts in `api_client.py` — path/data/patch verbatim, one tool call, no sandbox rewrite |
+
+Details: [`tests/hermes_gateway/README.md`](../tests/hermes_gateway/README.md#probe-harness-determinism).
+
 ```25:29:tests/hermes_gateway/test_governed_tool_coverage.py
     def test_gateway_probe_registry_covers_catalog(self) -> None:
         self.assertEqual(
@@ -595,8 +606,10 @@ RUN_HERMES_GATEWAY_E2E=1 ./tests/scripts/test-hermes-gateway-e2e.sh
 
 Runs ALLOW/BLOCK/semantic probes for `terminal`, `process`, `write_file`, `patch`
 (including V4A delete via `patch`) across greenfield, idempotent, and external-`HERMES_BIN` paths.
+Full run is green as of 2026-06-23 (all passes, probes typically attempt 1).
 
 Probe matrix: [`tests/hermes_gateway/README.md`](../tests/hermes_gateway/README.md).
+Status snapshot: [`hermes-intentframe-state-report.md`](./hermes-intentframe-state-report.md).
 
 ---
 
@@ -611,6 +624,8 @@ Probe matrix: [`tests/hermes_gateway/README.md`](../tests/hermes_gateway/README.
 | `read_terminal` in terminal toolset | Full builtin discovery in plugin | Use selective preload only |
 | Gateway health timeout | Crash on boot | sandbox `gateway.log` |
 | Stale governance after edit | Process not restarted | restart adapter + gateway |
+| `patch replace ALLOW` fails Pass 2a (overwrite BLOCK) | Same marker/file reused across passes | Pass-unique marker + `seed_patch_replace_target` |
+| `patch replace BLOCK`: path under `/tmp/…` | LLM rewrote `/etc/…` | Explicit block prompt in `run_patch_replace_block_once` |
 
 **Debug order:**
 
@@ -635,4 +650,5 @@ Probe matrix: [`tests/hermes_gateway/README.md`](../tests/hermes_gateway/README.
 | Hermes registry | [`external-reference-only-libs/hermes-agent/tools/registry.py`](../external-reference-only-libs/hermes-agent/tools/registry.py) |
 | Hermes gateway startup | [`external-reference-only-libs/hermes-agent/gateway/run.py`](../external-reference-only-libs/hermes-agent/gateway/run.py) |
 | E2E harness | [`tests/hermes_gateway/`](../tests/hermes_gateway/) |
+| Integration state report | [`hermes-intentframe-state-report.md`](./hermes-intentframe-state-report.md) |
 | Load-order deep dive | [`hermes-plugin-registration-order.md`](./hermes-plugin-registration-order.md) |

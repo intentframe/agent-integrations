@@ -86,11 +86,25 @@ to scope LLM probes.
 | `terminal` | `printf '<marker>'` | `sudo echo …` | — |
 | `process` | `action: list` | `action: run`, `data` contains `sudo` | — |
 | `write_file` | path under `~/…` | path under `/etc/…` | — |
-| `patch` (replace) | replace under `~/…` | replace under `/etc/…` | — |
+| `patch` (replace) | replace under `~/…` (harness seeds file with `"a"` first) | replace under `/etc/…` | — |
 | `patch` (V4A mixed) | — | Update `~/…` + Delete `/etc/…` (fail-closed batch) | Update `~/…` + Delete `~/…` (per-intent AE/Guardian; batch fails if any op BLOCKs) |
 
 Multi-intent `patch` calls map to multiple IntentFrame `/validate` requests inside the adapter;
 the plugin still sees one allow/block for the single Hermes tool call.
+
+### Probe harness determinism
+
+E2E probes use explicit LLM prompts to validate the **gateway → plugin → adapter →
+IntentFrame** chain, not open-ended agent behavior. Harness setup (not policy weakening):
+
+| Mechanism | Where | Why |
+|-----------|-------|-----|
+| **`seed_patch_replace_target()`** | `tests/hermes_tool_probes.py`; called from `run_patch_replace_allow_with_retries` | `patch replace` requires an existing file with `old_string`; harness writes `"a"` before each attempt |
+| **Pass-unique markers** | `_pass_marker_slug()` in `test_gateway_e2e.py` → suffix `-p1`, `-p2a`, `-p2b` | Pass 2a reuses Pass 1 sandbox; unique markers avoid overwrite BLOCK on stale files |
+| **Explicit block prompts** | `run_write_file_block_once`, `run_process_block_once`, `run_patch_replace_block_once`, `run_patch_v4a_mixed_block_once` in `api_client.py` | Keep `/etc/…`, `sudo`, and V4A delete paths verbatim; one tool call; no rewrite to `~/` or `/tmp` |
+
+Block assertions still require blocked tool output and the expected path/command shape.
+Allow assertions still fail on blocked output.
 
 ## Sandbox isolation
 
@@ -134,9 +148,13 @@ On failure, `format_diagnostics()` in `cli_runner.py` also lists these paths (wi
 When `/v1/responses` reaches the plugin and adapter:
 
 1. Adapter handshake on first validate
-2. Four intent evaluations for the two ALLOW/BLOCK probes (two tool calls each in a typical run)
+2. One or more intent evaluations per governed tool call (multi-intent `patch` emits several)
 
-If the LLM fails before emitting a `terminal` function call, **IntentFrame logs may be empty**
+With the default all-governed yaml, a full pass runs many probes (terminal, process,
+write_file, patch replace + block + V4A semantic + V4A block), so expect **multiple**
+intent blocks in `intentframe-server.log` — not a fixed count of four.
+
+If the LLM fails before emitting a tool `function_call`, **IntentFrame logs may be empty**
 for that request — tail `gateway.log` and OpenAI error text in test output instead.
 
 ## Hermes LLM config (test-only seed)
@@ -176,9 +194,12 @@ Hermes gateway before trusting stale PID files.
 | Pass 2a idempotency failure | CLI stdout not captured | Fixed in `cli_runner.run_cli()` |
 | Stale gateway after stop | PID reuse / wrong process | `_pid_is_hermes_gateway()` in `hermes_gateway.py` |
 | Wrong governed set at runtime | Parent env not propagated to adapter/gateway | E2E `assert_governance_env_contract` failure; check `gateway start` stderr for `Hermes governance config:` line |
+| `patch replace ALLOW` fails Pass 2a (overwrite BLOCK) | Same marker/file reused across passes | Pass-unique marker + `seed_patch_replace_target` (see [Probe harness determinism](#probe-harness-determinism)) |
+| `patch replace BLOCK`: path under `/tmp/…` | LLM rewrote `/etc/…` after block | Explicit block prompt in `run_patch_replace_block_once` |
 
 ## Related docs
 
+- [`docs/hermes-intentframe-state-report.md`](../../docs/hermes-intentframe-state-report.md) — current integration snapshot
 - [`docs/hermes-intentframe-integration-guide.md`](../../docs/hermes-intentframe-integration-guide.md) — integrate, add tools, testing pyramid
 - [`docs/hermes-plugin-registration-order.md`](../../docs/hermes-plugin-registration-order.md) — gateway preload + load order
 - `integrations/hermes/README.md` — integration architecture and manual checklist
