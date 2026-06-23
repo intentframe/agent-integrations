@@ -67,9 +67,6 @@ def main() -> int:
 
     for tool_name in sorted(governed):
         if tool_name not in by_name:
-            if tool_name == "delete_file":
-                report["governed_tools"][tool_name] = {"present": False, "note": "no Hermes 0.17 tool"}
-                continue
             errors.append(f"governed tool {tool_name!r} missing from get_tool_definitions()")
             continue
 

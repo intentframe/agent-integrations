@@ -7,8 +7,11 @@
 This doc captures the design reasoning behind the Hermes integration and
 generalizes it to other agents (Python and TypeScript SDKs). It is the
 conceptual companion to the Hermes integration docs in
-[`integrations/hermes/README.md`](../integrations/hermes/README.md) and builds on IntentFrame's adoption guidance
-in
+[`integrations/hermes/README.md`](../integrations/hermes/README.md),
+[`hermes-intentframe-integration-guide.md`](./hermes-intentframe-integration-guide.md)
+(end-to-end integration and tool changes),
+[`hermes-plugin-registration-order.md`](./hermes-plugin-registration-order.md)
+(gateway preload + snapshot), and builds on IntentFrame's adoption guidance in
 [`do-i-have-to-rewrite-tools.md`](../external-reference-only-libs/intentframe/docs/executor/do-i-have-to-rewrite-tools.md).
 
 ---
@@ -246,31 +249,39 @@ Hermes internals — so enumerating the registry is no new coupling.
 ### Current state: contract-driven multi-tool gate (v1)
 
 The shipped plugin **`intentframe-gate`** wraps a curated allowlist from
-[`governance/tools.yaml`](../integrations/hermes/governance/tools.yaml). v1 governs five Hermes
+[`governance/tools.yaml`](../integrations/hermes/governance/tools.yaml). v1 governs four Hermes
 tools (reads stay ungoverned):
 
 | Hermes tool | IntentFrame action(s) |
 |-------------|----------------------|
 | `terminal`, `process` | `RUN_COMMAND` |
 | `write_file`, `patch` (update/add) | `WRITE_HOST_FILE` |
-| `delete_file`, `patch` (V4A delete) | `DELETE_HOST_FILE` |
+| `patch` (V4A delete) | `DELETE_HOST_FILE` |
 
-Wiring (same two layers per tool):
+Wiring (schema/handler layers plus registration order):
 
 - [`plugin/intentframe-gate/schema.py`](../integrations/hermes/plugin/intentframe-gate/schema.py)
   — `inject_reason()` on each governed schema (layer 1).
 - [`plugin/intentframe-gate/gate.py`](../integrations/hermes/plugin/intentframe-gate/gate.py)
   — validate via adapter, strip `reason`, delegate on ALLOW (layer 2).
+- [`plugin/intentframe-gate/builtin_preload.py`](../integrations/hermes/plugin/intentframe-gate/builtin_preload.py)
+  — selective import of governed Hermes builtin modules before snapshot (gateway
+  load-order fix; see [`hermes-plugin-registration-order.md`](./hermes-plugin-registration-order.md)).
 - [`plugin/intentframe-gate/__init__.py`](../integrations/hermes/plugin/intentframe-gate/__init__.py)
-  — snapshot registry, wrap only governed names with `override=True`, hook
-  `registry.register` so MCP refresh cannot reinstall unwrapped handlers.
+  — `install_registry_hook()` → `preload_governed_builtins(governed)` → snapshot
+  wrap only governed names with `override=True`.
+- [`plugin/intentframe-gate/registry_hook.py`](../integrations/hermes/plugin/intentframe-gate/registry_hook.py)
+  — hook `registry.register` so MCP refresh cannot reinstall unwrapped handlers.
 
 The plugin loads the same contract as the adapter (`hermes-governance` / bundled
-YAML). Adding a tool is mostly **config + mapper + policy**, not new plugin code.
+YAML). Adding a tool is mostly **config + mapper + policy**, plus an entry in
+`GOVERNED_BUILTIN_MODULES` when Hermes registers the tool at module import time.
 
 **History (before v1):** the first proof gated only `terminal` via
-`intentframe-terminal` with a terminal-specific wrapper. That plugin was replaced
-by the generic loop above; there is no legacy migration path.
+`intentframe-terminal`, which imported `tools.terminal_tool` at plugin load (early
+preload + wrap). The generic `intentframe-gate` loop generalizes that via
+[`builtin_preload.py`](../integrations/hermes/plugin/intentframe-gate/builtin_preload.py);
+there is no legacy migration path.
 
 ### Why toolset filtering fails (the evidence)
 
@@ -287,7 +298,7 @@ Hermes' own toolsets mix reads and writes — proof that you must select by name
 
 [`adapter/src/hermes_adapter/mapper.py`](../integrations/hermes/adapter/src/hermes_adapter/mapper.py)
 dispatches through the governance contract — each entry names a `mapper` kind
-(`terminal`, `process`, `write_file`, `delete_file`, `patch`):
+(`terminal`, `process`, `write_file`, `patch`):
 
 ```python
 def map_tool(tool, args):
@@ -532,6 +543,8 @@ incrementally with policy review each time.
 - IntentFrame adoption guidance:
   [`do-i-have-to-rewrite-tools.md`](../external-reference-only-libs/intentframe/docs/executor/do-i-have-to-rewrite-tools.md)
 - Hermes integration: [`integrations/hermes/README.md`](../integrations/hermes/README.md)
+- **Hermes + IntentFrame integration guide:** [`hermes-intentframe-integration-guide.md`](./hermes-intentframe-integration-guide.md)
+- Gateway load order (preload + snapshot): [`hermes-plugin-registration-order.md`](./hermes-plugin-registration-order.md)
 - Current plugin: [`hermes/plugin/intentframe-gate/`](../integrations/hermes/plugin/intentframe-gate/)
 - Mapper bottleneck:
   [`hermes/adapter/src/hermes_adapter/mapper.py`](../integrations/hermes/adapter/src/hermes_adapter/mapper.py)

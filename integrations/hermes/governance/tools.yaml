@@ -25,13 +25,6 @@ tools:
     mapper: write_file
     blocked_response: generic_json
 
-  delete_file:
-    enabled: true
-    action: DELETE_HOST_FILE
-    risk: local_delete
-    mapper: delete_file
-    blocked_response: generic_json
-
   patch:
     enabled: true
     action: WRITE_HOST_FILE

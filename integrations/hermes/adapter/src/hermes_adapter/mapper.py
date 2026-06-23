@@ -128,19 +128,6 @@ def map_write_file(args: dict[str, Any]) -> list[IntentDict]:
     ]
 
 
-def map_delete_file(args: dict[str, Any]) -> list[IntentDict]:
-    path = _require_str(args, "path")
-    reason = validate_reason(args.get("reason"))
-    return [
-        _host_file_intent(
-            action="DELETE_HOST_FILE",
-            path=path,
-            reason=reason,
-            irreversible=True,
-        )
-    ]
-
-
 def _parse_v4a_operations(patch_content: str) -> list[PatchOperation]:
     matches = list(_V4A_OP_RE.finditer(patch_content))
     if not matches:
@@ -282,7 +269,6 @@ MAPPERS: dict[str, MapperFn] = {
     "terminal": map_terminal,
     "process": map_process,
     "write_file": map_write_file,
-    "delete_file": map_delete_file,
     "patch": map_patch,
 }
 

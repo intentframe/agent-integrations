@@ -57,6 +57,7 @@ jobs:
           uv run --with httpx --with pyyaml --package intentframe-integrations-cli python tests/hermes_plugin/test_gate.py
           uv run --with httpx --with pyyaml --package intentframe-integrations-cli python tests/hermes_plugin/test_registry_hook.py
           uv run --package intentframe-integrations-cli python tests/hermes_plugin/test_integrate.py
+          uv run --package intentframe-integrations-cli python tests/hermes_plugin/test_builtin_preload.py
 
       - name: Integrations CLI unit tests
         run: |
@@ -77,6 +78,7 @@ jobs:
           uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_hermes_reference_contract.py
           uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_api_client.py
           uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_governed_tool_coverage.py
+          uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_toolsets_contract.py
 
   typescript:
     name: TypeScript build

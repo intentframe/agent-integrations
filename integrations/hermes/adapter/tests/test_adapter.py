@@ -69,15 +69,6 @@ class TestMapper(unittest.TestCase):
         self.assertEqual(intents[0]["path"], "~/notes.txt")
         self.assertEqual(intents[0]["content"], "hello")
 
-    def test_map_delete_file(self) -> None:
-        from hermes_adapter.mapper import map_delete_file
-
-        intents = map_delete_file({"path": "~/notes.txt", "reason": "Remove notes"})
-        self.assertEqual(intents[0]["action"], "DELETE_HOST_FILE")
-        self.assertEqual(intents[0]["path"], "~/notes.txt")
-        self.assertNotIn("content", intents[0])
-        self.assertTrue(intents[0]["irreversible"])
-
     def test_map_patch_replace(self) -> None:
         from hermes_adapter.mapper import map_patch
 
@@ -198,9 +189,9 @@ class TestMapper(unittest.TestCase):
         tools = supported_tools()
         self.assertIn("terminal", tools)
         self.assertIn("write_file", tools)
-        self.assertIn("delete_file", tools)
+        self.assertIn("patch", tools)
         self.assertEqual(tools["write_file"], "WRITE_HOST_FILE")
-        self.assertEqual(tools["delete_file"], "DELETE_HOST_FILE")
+        self.assertEqual(tools["patch"], "WRITE_HOST_FILE")
 
     def test_unknown_tool(self) -> None:
         from hermes_adapter.mapper import ValidationError, map_tool

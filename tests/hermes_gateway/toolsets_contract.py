@@ -21,13 +21,6 @@ from hermes_governance_fixtures import template_governed_tool_names  # noqa: E40
 # Hermes 0.17 hermes-api-server composite (toolsets.py) — names the model may see.
 API_SERVER_COMPOSITE_TOOLSET = "hermes-api-server"
 
-# Governed tools in governance/tools.yaml that are not standalone Hermes 0.17 registry tools.
-GOVERNED_TOOLS_NOT_ON_API_SERVER = frozenset({"delete_file"})
-
-
-def governed_tools_on_api_server() -> frozenset[str]:
-    return template_governed_tool_names() - GOVERNED_TOOLS_NOT_ON_API_SERVER
-
 # Ungoverned tools that explain LLM tool-selection noise in gateway E2E.
 UNGATED_DISTRACTOR_TOOLS = frozenset(
     {"vision_analyze", "execute_code", "skill_manage"}
@@ -170,7 +163,7 @@ def assert_intentframe_gate_toolsets_surface(body: dict[str, Any]) -> ToolsetsSn
                 f"  actual:   {sorted(actual)}"
             )
 
-    missing_governed = sorted(governed_tools_on_api_server() - snapshot.enabled_tool_names)
+    missing_governed = sorted(template_governed_tool_names() - snapshot.enabled_tool_names)
     if missing_governed:
         raise AssertionError(
             f"Governed tools missing from enabled api_server surface: {missing_governed}"
@@ -181,17 +174,6 @@ def assert_intentframe_gate_toolsets_surface(body: dict[str, Any]) -> ToolsetsSn
         raise AssertionError(
             f"Expected ungoverned distractor tools on api_server surface "
             f"(LLM may pick these instead of terminal): {missing_distractors}"
-        )
-
-    unexpected_governed_missing = sorted(
-        template_governed_tool_names()
-        - governed_tools_on_api_server()
-        - GOVERNED_TOOLS_NOT_ON_API_SERVER
-    )
-    if unexpected_governed_missing:
-        raise AssertionError(
-            f"template_governed_tool_names includes tools not classified for api_server: "
-            f"{unexpected_governed_missing}"
         )
 
     return snapshot
