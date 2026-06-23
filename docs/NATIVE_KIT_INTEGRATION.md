@@ -71,6 +71,7 @@ Configured in [`governance/tools.yaml`](../integrations/hermes/governance/tools.
 | `process` | `RUN_COMMAND` | `process` | Synthetic `process:…` command string |
 | `write_file` | `WRITE_HOST_FILE` | `write_file` | Path + content |
 | `patch` | `WRITE_HOST_FILE`, `DELETE_HOST_FILE` | `patch` | Multi-intent from V4A diff |
+| `cronjob` | `HERMES_CRONJOB` | `generic` | Semantic-only via dynamic bundle (AE + Guardian) |
 
 **Ungoverned by design (v1):** reads — `read_file`, `search_files`, `browser_snapshot`,
 `web_search`, etc. Ungoverned read + ungoverned outbound channel is an exfil risk;
@@ -81,11 +82,17 @@ document explicitly if you leave reads open.
 [`agent.json`](../integrations/hermes/agent.json):
 
 ```json
-"action_types": ["RUN_COMMAND", "WRITE_HOST_FILE", "DELETE_HOST_FILE"]
+"action_types": ["RUN_COMMAND", "WRITE_HOST_FILE", "DELETE_HOST_FILE", "HERMES_CRONJOB"]
 ```
 
-Every governed action must appear here **and** in `policy.yaml` **and** in
-`executor.yaml` `supported_actions` for validate-only.
+Every governed action must appear here **and** in shipped `policy.yaml` **and** in
+`executor.yaml` `supported_actions` for validate-only. Generic action IDs are also
+listed in committed `governance/generic_actions.manifest` (static superset; copied to runtime
+on `integrate hermes`). Golden test:
+`tests/intentframe_integrations/test_actions_manifest.py`.
+
+User governance toggles (`enabled` in runtime `tools.yaml`) do **not** change manifest,
+policy, or repo templates. Governance and policy are independent gates.
 
 ### Policy (seed)
 
@@ -99,7 +106,7 @@ Every governed action must appear here **and** in `policy.yaml` **and** in
 
 | Profile | Path | Role |
 |---------|------|------|
-| Core | `if-integration-backend/.../profiles/core.yaml` | `bundles: [native]` → loads all native-kit action + domain bundles |
+| Core | `if-integration-backend/.../profiles/core.yaml` | `bundles: [native, dynamic]` — native-kit deterministic bundles + generic dynamic bundle (reads `IF_DYNAMIC_BUNDLE_MANIFEST`) |
 | Executor | `if-integration-backend/.../profiles/executor.yaml` | `validate_only` adapter; `supported_actions` list |
 
 [`ValidateOnlyAdapter`](../if-integration-backend/src/if_security_backend/executor_pack/validate_adapter.py)
@@ -432,6 +439,7 @@ Add tests that simulate re-registration clobber.
 ### Per-deployment overrides
 
 - `HERMES_GOVERNANCE_YAML` — alternate governance yaml (which tools are **IntentFrame-governed**). Set in the parent shell before `start` / `gateway start`; CLI child env builders preserve it over `agent.json` defaults.
+- `IF_DYNAMIC_BUNDLE_MANIFEST` — path to runtime `generic_actions.manifest` (generic `HERMES_*` action IDs). Default in `agent.json`; CLI applies via `load_and_activate_pack` for `start` and all `policy *` commands. Explicit shell export wins (`setdefault`).
 - `HERMES_E2E_GOVERNED_TOOLS` — gateway E2E only; comma-separated subset for LLM probes (not Hermes toolsets). E2E also asserts env parity via `assert_governance_env_contract`.
 - **Runtime policy** — `~/.intentframe/integrations/hermes/policy.yaml` (copied from shipped template on first `integrate` / `start`). Edit locally, then `bin/intentframe-integrations policy reload hermes`. Use `policy set`, `policy reset`, or `integrate hermes --reset-policy` to install or restore defaults.
 

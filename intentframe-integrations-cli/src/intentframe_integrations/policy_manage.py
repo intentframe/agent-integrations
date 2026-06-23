@@ -1,4 +1,12 @@
-"""Load runtime policy YAML into policy-registry (validate + upsert)."""
+"""Load runtime policy YAML into policy-registry (validate + upsert).
+
+Policy changes apply immediately via policy-registry UDS — no gateway or adapter
+restart. Does not modify governance/tools.yaml or generic_actions.manifest.
+
+All public entrypoints call ``load_and_activate_pack`` first so local bundle
+validation sees the same ``IF_DYNAMIC_BUNDLE_MANIFEST`` env the backend used at
+boot (required for generic action IDs such as ``HERMES_CRONJOB``).
+"""
 
 from __future__ import annotations
 
@@ -7,8 +15,7 @@ from pathlib import Path
 
 import yaml
 
-from intentframe_integrations.integration_pack import IntegrationPack, load_integration_pack
-from intentframe_integrations.paths import agent_config_path
+from intentframe_integrations.integration_pack import IntegrationPack, load_and_activate_pack
 from intentframe_integrations.policy_contract import (
     ensure_runtime_policy_yaml,
     install_policy_from_path,
@@ -32,10 +39,6 @@ class PolicyShowReport:
     registry_loaded: bool
     registry_action_count: int | None
     registry_message: str
-
-
-def _load_pack(agent: str) -> IntegrationPack:
-    return load_integration_pack(agent_config_path(agent))
 
 
 def _resolve_policy_path(yaml_path: Path) -> Path:
@@ -64,12 +67,16 @@ def _validate_policy_agent_id(yaml_path: Path, expected_agent_id: str) -> None:
 
 
 def validate_policy_file(pack: IntegrationPack, yaml_path: Path) -> None:
-    """Validate policy yaml structure and bundle semantics without registry writes."""
+    """Validate policy yaml structure and bundle semantics without registry writes.
+
+    Rebuilds bundle registry from the current process env — caller must have
+    activated the pack (``load_and_activate_pack``) so generic actions register.
+    """
     path = _resolve_policy_path(yaml_path)
     _validate_policy_agent_id(path, pack.agent.agent_id)
 
     from intentframe_bundle_sdk.loader import validate_policy_with_bundles
-    from if_security_backend.runtime.policy import DEFAULT_BUNDLE
+    from if_security_backend.runtime.bundles import load_core_bundle_packages
     from policy_registry.seeds import load_policy_seed
 
     try:
@@ -78,7 +85,7 @@ def validate_policy_file(pack: IntegrationPack, yaml_path: Path) -> None:
             user_id=pack.agent.user_id,
             agent_id=pack.agent.agent_id,
         )
-        validate_policy_with_bundles(policy, [DEFAULT_BUNDLE])
+        validate_policy_with_bundles(policy, load_core_bundle_packages())
     except Exception as exc:
         raise PolicyError(str(exc)) from exc
 
@@ -133,7 +140,7 @@ def _registry_status(pack: IntegrationPack) -> tuple[bool, int | None, str]:
 
 
 def policy_show(agent: str) -> PolicyShowReport:
-    pack = _load_pack(agent)
+    pack = load_and_activate_pack(agent)
     runtime = policy_yaml_runtime_path(pack.agent.agent_id)
     try:
         shipped = shipped_policy_template_path(pack)
@@ -166,7 +173,7 @@ def format_policy_show(report: PolicyShowReport) -> str:
 
 def policy_reload(agent: str) -> Path:
     """Re-read runtime policy file and upsert into policy-registry."""
-    pack = _load_pack(agent)
+    pack = load_and_activate_pack(agent)
     try:
         path = ensure_runtime_policy_yaml(pack)
     except FileNotFoundError as exc:
@@ -177,7 +184,7 @@ def policy_reload(agent: str) -> Path:
 
 def policy_set(agent: str, src: Path) -> Path:
     """Validate external policy, copy to runtime, and load into registry."""
-    pack = _load_pack(agent)
+    pack = load_and_activate_pack(agent)
     source = src.expanduser().resolve()
     validate_policy_file(pack, source)
     path = install_policy_from_path(pack, source)
@@ -187,7 +194,7 @@ def policy_set(agent: str, src: Path) -> Path:
 
 def policy_reset(agent: str) -> Path:
     """Restore shipped default to runtime location and load into registry."""
-    pack = _load_pack(agent)
+    pack = load_and_activate_pack(agent)
     try:
         path = reset_runtime_policy_yaml(pack)
     except FileNotFoundError as exc:

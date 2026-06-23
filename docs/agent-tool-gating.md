@@ -317,8 +317,19 @@ closed**. Every governed name needs a matching mapper kind and policy.
 **Wrapping is easy; meaningful per-tool mapping + policy is the work.**
 
 Drift is prevented by a **shared contract**: `governance/tools.yaml` +
-`hermes-governance` loader; adapter exposes `supported_tools()` for doctor/sync
-checks.
+`hermes-governance` loader; adapter exposes `supported_tools()` for doctor checks.
+Dev-maintained `governance/generic_actions.manifest` lists all generic-mapper action IDs
+(full catalog superset); golden test
+[`test_actions_manifest.py`](../tests/intentframe_integrations/test_actions_manifest.py)
+enforces parity (replaces planned `sync hermes` — see
+[`governance/README.md`](../integrations/hermes/governance/README.md#derived-artifacts-sync-replacement)).
+There is no user-facing `sync` command — runtime CLI never
+rewrites repo templates.
+
+**Governance and policy are independent gates.** Disabling a tool stops Hermes
+from sending intents; manifest and policy rows for that action ID can remain
+harmlessly. User toggles governance only in runtime `tools.yaml`; policy only via
+policy CLI.
 
 Each tool entry may set `enabled: true|false` (default `true`). In this yaml,
 **`enabled` means IntentFrame-governed**, not “Hermes tool enabled.” Only entries
@@ -355,6 +366,11 @@ intentframe-integrations policy reset hermes
 
 Policy changes apply immediately (no gateway restart). Use `integrate hermes --reset-policy`
 to restore the shipped default.
+
+**Env parity:** `policy show|reload|set|reset` call `load_and_activate_pack()` before
+validating policy — same `agent.json` env defaults (`setdefault`) and Hermes artifact
+seeding as `start hermes`. Explicit shell exports (e.g. test harness
+`HERMES_GOVERNANCE_YAML`) always win over `agent.json`.
 
 **Tests:** catalog-wide integration tests generate a throwaway all-governed yaml
 from the default template via `HERMES_GOVERNANCE_YAML`; they never mutate runtime

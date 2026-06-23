@@ -1,4 +1,13 @@
-"""Default governance template path and runtime user config materialization."""
+"""Default governance template paths and runtime user config materialization.
+
+Repo templates (dev-maintained): governance/tools.yaml, governance/generic_actions.manifest.
+Derived lists (agent.json, executor.yaml, policy rows) are hand-edited by devs when
+tools.yaml changes; drift is caught by tests/intentframe_integrations/test_actions_manifest.py
+(no sync CLI — see integrations/hermes/governance/README.md).
+Runtime copies (~/.intentframe/...): seeded on first integrate; never overwritten
+unless the user runs --reset-governance or deletes the file. User toggles tool
+governance via CLI; that only edits runtime tools.yaml enabled flags.
+"""
 
 from __future__ import annotations
 
@@ -13,11 +22,76 @@ from intentframe_integrations.paths import repo_root
 
 HERMES_AGENT_ID = "hermes"
 DEFAULT_GOVERNANCE_TEMPLATE_RELATIVE = Path("integrations") / "hermes" / "governance" / "tools.yaml"
+DEFAULT_GENERIC_ACTIONS_MANIFEST_RELATIVE = (
+    Path("integrations") / "hermes" / "governance" / "generic_actions.manifest"
+)
 
 
 def default_governance_template_path() -> Path:
     """Default tools.yaml shipped with the repo (reference template only)."""
     return repo_root() / DEFAULT_GOVERNANCE_TEMPLATE_RELATIVE
+
+
+def default_actions_manifest_template_path() -> Path:
+    """Committed generic_actions.manifest shipped with the repo (dev-generated, static).
+
+    Holds the full catalog of generic-mapper action IDs (enabled or not). It is a
+    superset that never changes when a user toggles tool governance — only when a
+    developer adds a tool to the catalog and regenerates it.
+    """
+    return repo_root() / DEFAULT_GENERIC_ACTIONS_MANIFEST_RELATIVE
+
+
+def catalog_generic_action_ids() -> frozenset[str]:
+    """All generic-mapper action IDs in the default catalog (ignores enabled)."""
+    template = default_governance_template_path()
+    if not template.is_file():
+        raise FileNotFoundError(f"Default governance template missing: {template}")
+    raw = yaml.safe_load(template.read_text(encoding="utf-8")) or {}
+    tools = raw.get("tools")
+    if not isinstance(tools, dict) or not tools:
+        raise ValueError(f"Default governance template has no tools mapping: {template}")
+    actions: set[str] = set()
+    for spec in tools.values():
+        if not isinstance(spec, dict):
+            continue
+        if spec.get("mapper") != "generic":
+            continue
+        action = str(spec.get("action", "")).strip()
+        if action:
+            actions.add(action)
+    return frozenset(actions)
+
+
+def format_manifest(action_ids: frozenset[str]) -> str:
+    """Canonical manifest serialization (comma-separated, sorted)."""
+    return ", ".join(sorted(action_ids))
+
+
+def actions_manifest_runtime_path(agent_id: str = HERMES_AGENT_ID) -> Path:
+    """User-runtime manifest path (copied from the committed template on install)."""
+    return governance_yaml_runtime_path(agent_id).parent / "generic_actions.manifest"
+
+
+def ensure_runtime_actions_manifest(agent_id: str = HERMES_AGENT_ID) -> Path:
+    """Return runtime manifest, copying the committed template on first use only.
+
+    Never regenerates from tools.yaml — dev updates the repo template and golden test.
+    """
+    runtime = actions_manifest_runtime_path(agent_id)
+    if runtime.is_file():
+        return runtime
+
+    template = default_actions_manifest_template_path()
+    if not template.is_file():
+        raise FileNotFoundError(
+            f"Runtime actions manifest missing at {runtime} and no committed "
+            f"template at {template}"
+        )
+
+    runtime.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(template, runtime)
+    return runtime
 
 
 def governance_yaml_runtime_path(agent_id: str = HERMES_AGENT_ID) -> Path:

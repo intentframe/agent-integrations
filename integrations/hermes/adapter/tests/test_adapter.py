@@ -199,6 +199,24 @@ class TestMapper(unittest.TestCase):
         with self.assertRaises(ValidationError):
             map_tool("read_file", {"reason": "noop"})
 
+    def test_map_generic_cronjob(self) -> None:
+        from hermes_adapter.mapper import map_generic, map_tool
+
+        args = {"action": "list", "reason": "List scheduled jobs for audit"}
+        intents = map_generic("cronjob", args, action="HERMES_CRONJOB")
+        self.assertEqual(len(intents), 1)
+        intent = intents[0]
+        self.assertEqual(intent["action"], "HERMES_CRONJOB")
+        self.assertEqual(intent["target"], "cronjob")
+        self.assertEqual(intent["hermes_tool"], "cronjob")
+        self.assertEqual(intent["hermes_args"], {"action": "list"})
+
+        mapped = map_tool(
+            "cronjob",
+            {"action": "list", "reason": "List scheduled jobs for audit"},
+        )
+        self.assertEqual(mapped, intents)
+
 
 class TestValidateService(unittest.TestCase):
     def test_allow(self) -> None:

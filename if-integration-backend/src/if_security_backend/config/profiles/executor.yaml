@@ -1,42 +1,33 @@
-# Generic validate-only executor profile (noop adapter for configured action types).
-
 packs:
-  - posix
-  - validate_only
-
+- posix
+- validate_only
 transport:
   type: unix_socket
   options:
     socket_path: ~/.intentframe/run/executor.sock
-
 auth:
   type: guardian_hmac
   options:
-    secret_key: "if_backend_dev_only_change_in_prod"
-
+    secret_key: if_backend_dev_only_change_in_prod
 credentials:
   backend: service
   options: {}
-
 worker_pool:
   max_workers: 2
   default_timeout_seconds: 30.0
-
 adapters:
   enabled:
-    - validate_only
-
+  - validate_only
 pack_options:
   validate_only:
     supported_actions:
-      - RUN_COMMAND
-      - WRITE_HOST_FILE
-      - DELETE_HOST_FILE
-
+    - DELETE_HOST_FILE
+    - HERMES_CRONJOB
+    - RUN_COMMAND
+    - WRITE_HOST_FILE
 storage:
   database_path: null
   log_path: null
-
 logging:
   level: INFO
   format: console

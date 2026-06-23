@@ -77,9 +77,9 @@ RUN_HERMES_GATEWAY_E2E=1 ./scripts/e2e.sh
 | **2b** | External Hermes via `HERMES_BIN`, then `integrate` and gateway E2E |
 
 Each pass runs HTTP assertions against the gateway API for **IntentFrame-governed**
-tools only (see `runtime_governed_tool_names()` in `_run_api_allow_block`). With
-the default temp yaml that is all catalog tools; use `HERMES_E2E_GOVERNED_TOOLS`
-to scope LLM probes.
+native-mapper tools only. Generic-mapper catalog tools (e.g. `cronjob`) are covered
+by live adapter/plugin semantic smoke — no gateway LLM probe. With the default temp
+yaml all catalog tools are governed; use `HERMES_E2E_GOVERNED_TOOLS` to scope LLM probes.
 
 | Tool | Deterministic ALLOW probe | Deterministic BLOCK probe | Semantic (ALLOW or BLOCK) |
 |------|---------------------------|---------------------------|---------------------------|
@@ -88,6 +88,7 @@ to scope LLM probes.
 | `write_file` | path under `~/…` | path under `/etc/…` | — |
 | `patch` (replace) | replace under `~/…` (harness seeds file with `"a"` first) | replace under `/etc/…` | — |
 | `patch` (V4A mixed) | — | Update `~/…` + Delete `/etc/…` (fail-closed batch) | Update `~/…` + Delete `~/…` (per-intent AE/Guardian; batch fails if any op BLOCKs) |
+| `cronjob` (generic) | — | — | live only: `action: list` (no gateway LLM E2E) |
 
 Multi-intent `patch` calls map to multiple IntentFrame `/validate` requests inside the adapter;
 the plugin still sees one allow/block for the single Hermes tool call.
@@ -250,8 +251,8 @@ noise; still sends the full `tools=` list upstream).
 | Surface | What it proves |
 |---------|----------------|
 | `GET /v1/toolsets` | Hermes **config** tool names for api_server (e.g. ~31) |
-| `probe_hermes_tool_schemas.py` | **Registry** schemas after plugin load (e.g. ~16 defs); governed `reason` + gate |
-| Request dump + round-trip assert | **OpenAI `chat.completions` payload** (e.g. ~17 tools in `tools=`) |
+| `probe_hermes_tool_schemas.py` | **Registry** schemas for native-mapper governed tools (`reason` + gate); generic tools skipped |
+| Request dump + round-trip assert | **OpenAI `chat.completions` payload** — native governed tools with required `reason` in `tools=` |
 
 The registry count and toolsets count differ by design — not every listed toolset
 name becomes a registry definition on the LLM path. See
@@ -262,7 +263,7 @@ name becomes a registry definition on the LLM path. See
 | Helper | Checks |
 |--------|--------|
 | `assert_gateway_openai_roundtrip()` | Gateway `status: completed` and `usage.total_tokens > 0` |
-| `assert_provider_tools_surface()` | Governed tools in dump `request.body.tools` with required `reason` |
+| `assert_provider_tools_surface()` | Native-mapper governed tools in dump `request.body.tools` with required `reason` |
 
 The request dump is written at **preflight** (before the HTTP call to OpenAI). Token
 usage from the gateway response proves the call **completed** — the dump alone only

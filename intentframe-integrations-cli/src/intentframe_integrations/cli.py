@@ -1,4 +1,8 @@
-"""intentframe-integrations — user-facing orchestrator for agent profiles."""
+"""intentframe-integrations — user-facing orchestrator for agent profiles.
+
+Commands that need agent env or Hermes runtime artifacts use
+``load_and_activate_pack*`` from ``integration_pack`` (not raw ``load_integration_pack``).
+"""
 
 from __future__ import annotations
 
@@ -32,7 +36,6 @@ from intentframe_integrations.hermes_integrate import (
     doctor_hermes,
     format_env_exports,
     integrate_hermes,
-    load_hermes_pack,
 )
 from intentframe_integrations.hermes_governance_edit import (
     GovernanceEditError,
@@ -40,7 +43,12 @@ from intentframe_integrations.hermes_governance_edit import (
     runtime_governed_tool_names,
     set_tool_enabled,
 )
-from intentframe_integrations.integration_pack import IntegrationPack, load_integration_pack
+from intentframe_integrations.integration_pack import (
+    IntegrationPack,
+    load_and_activate_pack,
+    load_and_activate_pack_from_path,
+    load_integration_pack,
+)
 from intentframe_integrations.policy_contract import ensure_runtime_policy_yaml
 from intentframe_integrations.policy_manage import (
     PolicyError,
@@ -56,17 +64,6 @@ from intentframe_integrations.runtime_lifecycle import (
     ensure_backend_for_pack,
     iter_agent_configs,
 )
-
-
-def _apply_agent_env(pack: IntegrationPack) -> None:
-    os.environ.setdefault("INTENTFRAME_USER_ID", pack.agent.user_id)
-    os.environ.setdefault("INTENTFRAME_AGENT_ID", pack.agent.agent_id)
-    for key, value in pack.agent.env.items():
-        os.environ.setdefault(key, os.path.expanduser(value))
-
-
-def _load_pack(agent: str) -> IntegrationPack:
-    return load_integration_pack(agent_config_path(agent))
 
 
 def _run_backend(argv: list[str]) -> int:
@@ -85,8 +82,6 @@ def _require_openai_api_key() -> int | None:
 
 def _seed_agent_config(cfg: Path, *, skip_if_exists: bool) -> int:
     if cfg.is_file():
-        pack = load_integration_pack(cfg)
-        _apply_agent_env(pack)
         paths = [cfg]
     elif cfg.is_dir():
         paths = sorted(cfg.rglob("agent.json"))
@@ -98,7 +93,8 @@ def _seed_agent_config(cfg: Path, *, skip_if_exists: bool) -> int:
         return 1
 
     for path in paths:
-        pack = load_integration_pack(path)
+        # Seed policy path + agent env before delegating to backend seed-policy.
+        pack = load_and_activate_pack_from_path(path)
         try:
             runtime_policy = ensure_runtime_policy_yaml(pack)
         except FileNotFoundError as exc:
@@ -133,6 +129,7 @@ def _start_adapter_for_pack(pack: IntegrationPack) -> int:
 
 def _start_adapters_for_configs(configs: list[Path]) -> int:
     for path in configs:
+        # Adapter-only path: parent ``start --agent-config <dir>`` already started backend.
         pack = load_integration_pack(path)
         if pack.adapter is None:
             continue
@@ -180,8 +177,8 @@ def _cmd_start(agent: str, *, seed: bool, skip_if_exists: bool) -> int:
     if (ec := _require_openai_api_key()) is not None:
         return ec
 
-    pack = _load_pack(agent)
-    _apply_agent_env(pack)
+    # Env + Hermes manifest seed before backend inherits os.environ.
+    pack = load_and_activate_pack(agent)
 
     ec = _start_pack(pack, seed=seed, skip_if_exists=skip_if_exists)
     if ec:
@@ -213,8 +210,7 @@ def _cmd_start_config(
         return 1
 
     if cfg.is_file():
-        pack = load_integration_pack(cfg)
-        _apply_agent_env(pack)
+        pack = load_and_activate_pack_from_path(cfg)
         ec = _start_pack(pack, seed=seed, skip_if_exists=skip_if_exists)
         if ec:
             return ec
@@ -256,7 +252,7 @@ def _cmd_status() -> int:
     ec = _run_backend(["status"])
     for agent in list_agents():
         try:
-            pack = _load_pack(agent)
+            pack = load_and_activate_pack(agent)
         except (FileNotFoundError, ValueError):
             continue
         if pack.adapter is not None:
@@ -288,8 +284,7 @@ def _cmd_doctor(
     require_integration: bool = True,
 ) -> int:
     if agent == "hermes":
-        pack = load_hermes_pack()
-        _apply_agent_env(pack)
+        pack = load_and_activate_pack("hermes")
         report = doctor_hermes(
             pack,
             require_hermes=require_hermes,
@@ -302,7 +297,7 @@ def _cmd_doctor(
             print(format_env_exports(pack), file=sys.stderr)
         return 0 if report.ok else 1
 
-    pack = _load_pack(agent)
+    pack = load_and_activate_pack(agent)
     bridge_socket = Path(os.path.expanduser("~/.intentframe/backend/bridge.sock"))
 
     print(f"Repo agent config: {pack.agent.source_path}")
@@ -377,8 +372,7 @@ def _cmd_integrate(
         print(f"ERROR: integrate is only implemented for hermes (got {agent!r})", file=sys.stderr)
         return 1
 
-    pack = load_hermes_pack()
-    _apply_agent_env(pack)
+    pack = load_and_activate_pack("hermes")
     try:
         result = integrate_hermes(
             pack,
@@ -436,8 +430,7 @@ def _cmd_gateway_start(
         print(f"ERROR: gateway start is only implemented for hermes (got {agent!r})", file=sys.stderr)
         return 1
 
-    pack = load_hermes_pack()
-    _apply_agent_env(pack)
+    pack = load_and_activate_pack("hermes")
 
     if resolve_hermes_bin() is None:
         print(
@@ -538,8 +531,7 @@ def _cmd_run(agent: str, *, gateway_args: list[str]) -> int:
     if (ec := _require_openai_api_key()) is not None:
         return ec
 
-    pack = load_hermes_pack()
-    _apply_agent_env(pack)
+    pack = load_and_activate_pack("hermes")
 
     ec = _ensure_runtime(pack)
     if ec:

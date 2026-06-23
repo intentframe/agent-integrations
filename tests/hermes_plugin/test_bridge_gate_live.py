@@ -17,6 +17,7 @@ for path in (TESTS_DIR, ADAPTER_TESTS):
 
 from _loader import load_plugin_module  # noqa: E402
 from live_fixtures import (  # noqa: E402
+    CRONJOB_SEMANTIC_ARGS,
     PATCH_ALLOW_REPLACE_ARGS,
     PATCH_BLOCK_REPLACE_ARGS,
     PATCH_V4A_BLOCK_ARGS,
@@ -118,6 +119,10 @@ class TestLiveBridgeGate(unittest.TestCase):
     def test_block_patch_v4a_mixed_system_delete(self) -> None:
         delegate = MagicMock()
         self._assert_blocked("patch", PATCH_V4A_BLOCK_ARGS, delegate=delegate)
+
+    def test_cronjob_semantic(self) -> None:
+        delegate = MagicMock(return_value='{"status": "ok"}')
+        self._assert_semantic_gate("cronjob", CRONJOB_SEMANTIC_ARGS, delegate=delegate)
 
 
 def main() -> int:

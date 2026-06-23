@@ -8,6 +8,7 @@ from hermes_governance.loader import (
     load_tool_catalog,
     supported_actions,
     supported_tools,
+    generic_mapper_action_ids,
 )
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     "load_tool_catalog",
     "supported_actions",
     "supported_tools",
+    "generic_mapper_action_ids",
 ]

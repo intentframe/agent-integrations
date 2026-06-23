@@ -17,7 +17,11 @@ _TESTS_DIR = HERE.parent
 if str(_TESTS_DIR) not in sys.path:
     sys.path.insert(0, str(_TESTS_DIR))
 
-from hermes_governance_fixtures import template_governed_tool_names  # noqa: E402
+from hermes_governance_fixtures import (  # noqa: E402
+    gateway_e2e_probe_tool_names,
+    live_semantic_probe_tool_names,
+    template_governed_tool_names,
+)
 from governance_e2e_setup import (  # noqa: E402
     assert_governance_env_contract,
     cleanup_e2e_governance_yaml,
@@ -261,18 +265,21 @@ def _run_api_allow_block(env: IsolatedEnv, *, label: str) -> None:
             marker=v4a_marker,
         )
 
-    expected_ran = set(governed)
+    expected_ran = governed & gateway_e2e_probe_tool_names()
+    live_semantic_governed = sorted(governed & live_semantic_probe_tool_names())
     if probes_ran != expected_ran:
         raise AssertionError(
             f"{label} probe execution mismatch.\n"
             f"  expected RUN: {sorted(expected_ran)}\n"
             f"  actual RUN:   {sorted(probes_ran)}\n"
-            f"  expected SKIP: {probes_skipped}"
+            f"  expected SKIP: {probes_skipped}\n"
+            f"  live-only semantic (no gateway LLM probe): {live_semantic_governed}"
         )
 
     step(
         f"{label} probe summary: RUN={sorted(probes_ran)} "
-        f"SKIP={probes_skipped}"
+        f"SKIP={probes_skipped} "
+        f"LIVE_SEMANTIC_ONLY={live_semantic_governed}"
     )
 
     unexpected_catalog = governed - template_governed_tool_names()

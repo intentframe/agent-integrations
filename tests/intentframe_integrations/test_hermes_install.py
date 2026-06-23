@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 import json
 import os
 import sys
@@ -36,6 +37,7 @@ from intentframe_integrations.hermes_install import (  # noqa: E402
 from intentframe_integrations.hermes_integrate import (  # noqa: E402
     doctor_hermes,
     format_env_exports,
+    governance_doctor_lines,
     integrate_hermes,
     is_plugin_enabled,
     load_hermes_pack,
@@ -175,6 +177,23 @@ class TestDoctorStages(unittest.TestCase):
                 joined = "\n".join(report.lines)
                 self.assertIn("plugin install: missing", joined)
 
+    def test_governance_doctor_warns_when_manifest_env_missing(self) -> None:
+        pack = load_hermes_pack()
+        agent = replace(
+            pack.agent,
+            env={
+                key: value
+                for key, value in pack.agent.env.items()
+                if key != "IF_DYNAMIC_BUNDLE_MANIFEST"
+            },
+        )
+        lines, ok = governance_doctor_lines(replace(pack, agent=agent))
+        self.assertFalse(ok)
+        self.assertIn(
+            "IF_DYNAMIC_BUNDLE_MANIFEST not set in agent.json",
+            "\n".join(lines),
+        )
+
     def test_full_doctor_passes_after_integrate(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp) / "home"
@@ -267,9 +286,9 @@ class TestGatewayConfig(unittest.TestCase):
 
 
 def _apply_env(pack: object) -> None:
-    from intentframe_integrations.cli import _apply_agent_env
+    from intentframe_integrations.integration_pack import apply_agent_env
 
-    _apply_agent_env(pack)  # type: ignore[arg-type]
+    apply_agent_env(pack)  # type: ignore[arg-type]
 
 
 def main() -> int:

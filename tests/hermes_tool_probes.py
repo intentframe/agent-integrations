@@ -111,3 +111,8 @@ def patch_v4a_block_args(*, marker: str, reason: str = "E2E V4A patch update hom
         "patch": patch_v4a_block_content(marker=marker),
         "reason": reason,
     }
+
+
+def cronjob_semantic_args(*, reason: str = "List scheduled jobs for audit") -> dict[str, str]:
+    """Low-risk cronjob intent — AE/Guardian outcome is semantic (ALLOW or BLOCK)."""
+    return {"action": "list", "reason": reason}

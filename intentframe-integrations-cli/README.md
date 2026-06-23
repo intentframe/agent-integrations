@@ -29,6 +29,8 @@ intentframe-integrations policy reset hermes
 
 `governance enable|disable` toggles **IntentFrame governance** for a catalog tool
 (yaml `enabled: true/false`). It does not enable or disable Hermes native tools.
+After toggling, **restart Hermes gateway + adapter** (governance is loaded at process
+start). IntentFrame backend does not need restart.
 See [`docs/agent-tool-gating.md`](../docs/agent-tool-gating.md#terminology-what-governed-means).
 
 **Policy** lives at `~/.intentframe/integrations/<agent>/policy.yaml` (copied from the
@@ -36,6 +38,29 @@ shipped template on first `integrate` or `start`). Edit that file, then
 `policy reload <agent>`. Use `policy set` to install an external yaml, or
 `policy reset` to restore the shipped default. Changes apply immediately — no
 gateway restart needed.
+
+**Pack activation** — every command that loads an agent profile through
+`load_and_activate_pack()` (in `integration_pack.py`) applies the same runtime
+setup:
+
+1. Load `agent.json` → `IntegrationPack`
+2. Apply `agent.json` `env` via `os.environ.setdefault` (explicit shell exports win)
+3. For Hermes: seed runtime `governance/tools.yaml` and `generic_actions.manifest`
+   if missing (so manifest paths in env always point at real files)
+
+Used by `start`, `integrate`, `doctor`, `gateway start`, `run`, and all
+`policy *` commands. Policy validation rebuilds bundle registry from the CLI
+process environment — it must see the same manifest path the backend used at boot.
+
+**Runtime artifacts** (copied on first `integrate` or seeded on first `start`, never auto-overwritten):
+
+- `governance/tools.yaml` — user toggles via `governance enable|disable`
+- `governance/generic_actions.manifest` — static dev-shipped superset of generic action IDs
+- `policy.yaml` — user edits via policy CLI
+
+There is no `sync` command — dev-maintained repo templates plus golden test
+`tests/intentframe_integrations/test_actions_manifest.py`. See
+[`integrations/hermes/governance/README.md`](../integrations/hermes/governance/README.md#derived-artifacts-sync-replacement).
 
 Run from repo root via `bin/intentframe-integrations` or:
 
@@ -77,7 +102,8 @@ Hermes binary resolution order:
 
 1. `install hermes` — Hermes Agent CLI (managed venv, pinned version)
 2. `start hermes` — backend bridge + adapter sidecar (`~/.intentframe/integrations/hermes/`)
-3. `integrate hermes` — plugin symlink + adapter venv sync + config merge
+3. `integrate hermes` — plugin symlink + adapter venv sync + copy runtime governance,
+   actions manifest, and policy templates (first use only)
 4. `gateway start hermes` — launch Hermes gateway (optionally with API server)
 5. `stop` — stop gateway started by orchestrator, adapters, and backend runtime
 
@@ -92,8 +118,11 @@ adapter sync, and gateway lifecycle.
 
 | Variable | Set by | Effect |
 |----------|--------|--------|
-| `HERMES_GOVERNANCE_YAML` | `agent.json` default; override in shell or test harness | Which tools are **IntentFrame-governed** at runtime. If already set in the parent environment, `start hermes` (adapter) and `gateway start hermes` preserve it via `setdefault` — they do not replace it with the sandbox-seeded path from `integrate`. |
+| `HERMES_GOVERNANCE_YAML` | `agent.json` default; override in shell or test harness | Which tools are **IntentFrame-governed** at runtime. All pack-loading commands apply via `setdefault` — explicit shell value wins over `agent.json`. |
+| `IF_DYNAMIC_BUNDLE_MANIFEST` | `agent.json` default | Path to runtime `generic_actions.manifest` (generic `HERMES_*` action IDs). Backend dynamic bundle reads this at boot; policy `reload`/`set`/`reset` validate against the same registry — CLI applies this env via `load_and_activate_pack` before validation. |
 | `IF_AGENT_ADAPTER_SOCKET` | `agent.json` | UDS path for plugin → adapter validate calls. |
+
+**Env precedence:** explicit `os.environ` → `agent.json` defaults (`setdefault`) → seeded runtime files at those paths. Dev/test harnesses may export overrides before any CLI command; they are never clobbered.
 
 `integrate hermes` prints `export …` lines from `format_env_exports()`: values already
 present in the shell (including `HERMES_GOVERNANCE_YAML`) win over `agent.json` defaults.

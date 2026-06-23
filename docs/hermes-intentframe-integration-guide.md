@@ -424,35 +424,57 @@ When editing `GOVERNED_BUILTIN_MODULES` or any plugin import:
 ## Adding a new governed Hermes tool
 
 Work through **all** layers. Wrapping alone is insufficient without mapper + policy.
+See [`integrations/hermes/governance/README.md`](../integrations/hermes/governance/README.md)
+for dev vs user ownership. There is no user-facing `sync` command.
 
 ### Step 1 — Governance contract
 
 Add entry to `integrations/hermes/governance/tools.yaml`:
+
+**Native mapper** (deterministic native-kit bundles):
 
 ```yaml
   my_tool:
     enabled: true
     action: WRITE_HOST_FILE   # or RUN_COMMAND, DELETE_HOST_FILE, …
     risk: local_write
-    mapper: my_tool           # must exist in mapper.py
+    mapper: write_file        # terminal | process | write_file | patch
     blocked_response: generic_json
 ```
 
-Runtime copy: `~/.intentframe/integrations/hermes/governance/tools.yaml`.
+**Generic mapper** (semantic-only via dynamic bundle, e.g. `cronjob`):
+
+```yaml
+  cronjob:
+    enabled: true
+    action: HERMES_CRONJOB
+    risk: local_process
+    mapper: generic
+    blocked_response: generic_json
+```
+
+Runtime copy: `~/.intentframe/integrations/hermes/governance/tools.yaml` (user toggles
+`enabled` via `governance enable|disable`; restart gateway + adapter).
 
 Valid mapper kinds (plugin loader):
 
-```14:14:integrations/hermes/plugin/intentframe-gate/governance_loader.py
-VALID_MAPPER_KINDS = frozenset({"terminal", "process", "write_file", "patch"})
+```python
+VALID_MAPPER_KINDS = frozenset({"terminal", "process", "write_file", "patch", "generic"})
 ```
 
-Extend this set when adding a new mapper kind.
+For `mapper: generic`, no new mapper function is needed — `map_generic` handles all
+generic tools. Regenerate committed `governance/generic_actions.manifest` and update dev
+artifacts (Step 3).
 
 ### Step 2 — Adapter mapper
 
-Add `map_my_tool()` in `integrations/hermes/adapter/src/hermes_adapter/mapper.py`
-and register in `MAPPERS`. Must produce IntentFrame validate payloads including
-`reason` (adapter validates reason locally too):
+**Skip for `mapper: generic`** — `map_generic` already maps tool args to the action ID
+with `hermes_tool` / `hermes_args` in IntentFrame data.
+
+For native mappers, add `map_my_tool()` in
+`integrations/hermes/adapter/src/hermes_adapter/mapper.py` and register in `MAPPERS`.
+Must produce IntentFrame validate payloads including `reason` (adapter validates reason
+locally too):
 
 ```34:44:integrations/hermes/adapter/src/hermes_adapter/mapper.py
 def validate_reason(reason: object) -> str:
@@ -464,17 +486,24 @@ def validate_reason(reason: object) -> str:
 Multi-intent tools (like `patch`) return a **list** of intents; adapter fails closed
 on first BLOCK.
 
-### Step 3 — Policy
+### Step 3 — Dev artifacts (hand-edited, golden-tested)
 
-Add rules to the shipped template `integrations/hermes/policy.yaml` (for upstream
-changes) or edit the **runtime** file at
-`~/.intentframe/integrations/hermes/policy.yaml` (for local/production tuning).
-After editing runtime policy, run `bin/intentframe-integrations policy reload hermes`.
-Ensure `agent.json` lists the action type:
+Replaces a planned `sync hermes` CLI: edit shipped repo files when adding a new action ID,
+then run the golden test. Full contract:
+[`governance/README.md` — Derived artifacts (sync replacement)](../integrations/hermes/governance/README.md#derived-artifacts-sync-replacement).
 
-```5:5:integrations/hermes/agent.json
-  "action_types": ["RUN_COMMAND", "WRITE_HOST_FILE", "DELETE_HOST_FILE"],
-```
+| File | What to add |
+|------|-------------|
+| `governance/generic_actions.manifest` | Generic action ID (comma-separated; full catalog superset) |
+| `agent.json` `action_types` | Every action ID the agent may emit |
+| `integrations/hermes/policy.yaml` | `allowed_actions` row (`safe: false` for generic) |
+| `executor.yaml` `supported_actions` | Same action IDs for validate-only executor |
+
+Golden test: `tests/intentframe_integrations/test_actions_manifest.py`.
+
+Users edit **runtime** policy at `~/.intentframe/integrations/hermes/policy.yaml` and
+reload with `bin/intentframe-integrations policy reload hermes`. Governance toggles
+do not change manifest or policy files.
 
 ### Step 4 — Plugin preload (if Hermes builtin)
 
@@ -490,13 +519,21 @@ one import is enough — preload dedupes modules.
 
 Delete coverage is via `patch` V4A `*** Delete File:` operations (maps to `DELETE_HOST_FILE`).
 
-### Step 5 — E2E probes
+### Step 5 — Probes (native gateway E2E + live semantic)
 
-Add probe functions to `tests/hermes_gateway/test_gateway_e2e.py` and register symbols
-in `tests/hermes_governance_fixtures.py` (`GATEWAY_E2E_PROBE_SYMBOLS`). Coverage test
-enforces parity:
+Every catalog tool must appear in the probe contract (`test_governed_tool_coverage.py`):
 
-**Harness determinism (required for reliable E2E):**
+| Mapper | Registry | Live adapter + plugin | Gateway LLM E2E |
+|--------|----------|----------------------|-----------------|
+| native (`terminal`, `process`, …) | `GATEWAY_E2E_PROBE_SYMBOLS` | deterministic ALLOW/BLOCK (+ patch semantic) | yes (`test_gateway_e2e.py`) |
+| `generic` | derived via `mapper: generic` | semantic smoke (ALLOW or BLOCK) | no |
+
+Add native probe functions to `tests/hermes_gateway/test_gateway_e2e.py` and register symbols
+in `tests/hermes_governance_fixtures.py` (`GATEWAY_E2E_PROBE_SYMBOLS`). Add generic live probes
+in `tests/hermes_adapter/test_live.py` and `tests/hermes_plugin/test_bridge_gate_live.py`.
+Coverage test enforces full-catalog parity across both tiers.
+
+**Harness determinism (required for reliable gateway E2E — native tools only):**
 
 | Probe type | Harness setup |
 |------------|---------------|
@@ -506,12 +543,12 @@ enforces parity:
 
 Details: [`tests/hermes_gateway/README.md`](../tests/hermes_gateway/README.md#probe-harness-determinism).
 
-```25:29:tests/hermes_gateway/test_governed_tool_coverage.py
-    def test_gateway_probe_registry_covers_catalog(self) -> None:
-        self.assertEqual(
-            frozenset(GATEWAY_E2E_PROBE_SYMBOLS),
-            template_catalog_tool_names(),
-        )
+```25:35:tests/hermes_gateway/test_governed_tool_coverage.py
+    def test_probe_tiers_partition_catalog(self) -> None:
+        gateway = gateway_e2e_probe_tool_names()
+        live_semantic = live_semantic_probe_tool_names()
+        catalog = template_catalog_tool_names()
+        self.assertEqual(gateway | live_semantic, catalog)
 ```
 
 ### Step 6 — Verify
@@ -566,6 +603,37 @@ tool in yaml stops preloading/wrapping it on next gateway restart.
 
 ---
 
+## Pack activation and env precedence
+
+All CLI commands that need an agent profile call `load_and_activate_pack()` in
+`intentframe_integrations/integration_pack.py`:
+
+1. Load `integrations/<agent>/agent.json`
+2. Apply `env` keys via `os.environ.setdefault` — **explicit shell exports win**
+3. For Hermes: seed runtime `governance/tools.yaml` and `generic_actions.manifest`
+   if missing (paths in env must point at real files)
+
+This applies to `start`, `integrate`, `doctor`, `gateway start`, `run`, and every
+`policy *` command. It keeps three layers aligned:
+
+| Priority | Source | Example |
+|----------|--------|---------|
+| 1 (wins) | Explicit `export` in shell / test harness | `HERMES_GOVERNANCE_YAML=/tmp/e2e.yaml` |
+| 2 | `agent.json` `env` defaults | `IF_DYNAMIC_BUNDLE_MANIFEST=~/.intentframe/.../generic_actions.manifest` |
+| 3 | Seeded runtime files | Copied from repo templates on first use |
+
+**Why policy commands need this:** `policy reload` validates policy locally via
+`validate_policy_with_bundles()` — it rebuilds the bundle registry from the CLI
+process env. Generic action IDs (e.g. `HERMES_CRONJOB`) register only when
+`IF_DYNAMIC_BUNDLE_MANIFEST` points at a manifest file. Without pack activation,
+validation fails even though the running backend registered those actions at boot.
+
+Regression tests: `tests/intentframe_integrations/test_policy_manage.py`,
+`tests/intentframe_integrations/test_integration_pack.py`. Live smoke:
+`tests/scripts/test-hermes-integration.sh` (`policy show` + `policy reload`).
+
+---
+
 ## Testing pyramid
 
 Run cheap tests first; full E2E last.
@@ -584,6 +652,10 @@ uv run --package intentframe-integrations-cli python tests/intentframe_integrati
 
 # Probe symbol coverage for all catalog tools
 uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_governed_tool_coverage.py
+
+# Pack activation + policy env parity (HERMES_CRONJOB / manifest defaults)
+uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_integration_pack.py
+uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_policy_manage.py
 ```
 
 Extend `test_builtin_preload.py` when adding `GOVERNED_BUILTIN_MODULES` entries.
@@ -615,19 +687,29 @@ HERMES_E2E_GOVERNED_TOOLS=terminal RUN_HERMES_GATEWAY_E2E=1 \
 
 Expect: `POST /v1/responses ALLOW (attempt 1/3)`, passes 1/2a/2b.
 
-### Layer 4 — Full gateway E2E (all governed catalog tools)
+### Layer 4 — Full gateway E2E (native-mapper catalog tools)
 
 ```bash
-# Default — all catalog tools governed
+# Default — all catalog tools governed; gateway LLM probes run for native mappers only
 RUN_HERMES_GATEWAY_E2E=1 ./tests/scripts/test-hermes-gateway-e2e.sh
 ```
 
 Runs ALLOW/BLOCK/semantic probes for `terminal`, `process`, `write_file`, `patch`
 (including V4A delete via `patch`) across greenfield, idempotent, and external-`HERMES_BIN` paths.
-Full run is green as of 2026-06-23 (all passes, probes typically attempt 1).
+Generic catalog tools (e.g. `cronjob`) are live-tested only — no gateway LLM probe.
 
 Probe matrix: [`tests/hermes_gateway/README.md`](../tests/hermes_gateway/README.md).
 Status snapshot: [`hermes-intentframe-state-report.md`](./hermes-intentframe-state-report.md).
+
+### Layer 5 — Live adapter + plugin integration (all catalog tools)
+
+```bash
+./tests/scripts/test-hermes-integration.sh
+```
+
+Requires `OPENAI_API_KEY`. Starts Hermes stack, runs `policy show` + `policy reload`
+(live registry smoke), then deterministic adapter + plugin gate probes for every
+catalog tool (native ALLOW/BLOCK + generic semantic smoke for e.g. `cronjob`).
 
 ---
 
@@ -644,6 +726,8 @@ Status snapshot: [`hermes-intentframe-state-report.md`](./hermes-intentframe-sta
 | Stale governance after edit | Process not restarted | restart adapter + gateway |
 | `patch replace ALLOW` fails Pass 2a (overwrite BLOCK) | Same marker/file reused across passes | Pass-unique marker + `seed_patch_replace_target` |
 | `patch replace BLOCK`: path under `/tmp/…` | LLM rewrote `/etc/…` | Explicit block prompt in `run_patch_replace_block_once` |
+| `policy reload`: `HERMES_*` has no registered ActionBundle | CLI env missing manifest | Ensure `agent.json` has `IF_DYNAMIC_BUNDLE_MANIFEST`; policy commands use `load_and_activate_pack`. Run `test_policy_manage.py`. |
+| `start hermes`: BundleConfigError (manifest missing) | Runtime file not seeded | `load_and_activate_pack` seeds on start; run `integrate hermes` once or check `~/.intentframe/integrations/hermes/governance/` |
 
 **Debug order:**
 

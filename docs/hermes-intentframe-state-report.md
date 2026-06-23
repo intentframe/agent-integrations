@@ -9,7 +9,7 @@
 
 | Area | Status |
 |------|--------|
-| Governed tool catalog | **4 tools**: `terminal`, `process`, `write_file`, `patch` |
+| Governed tool catalog | **5 tools**: `terminal`, `process`, `write_file`, `patch`, `cronjob` (generic) |
 | Standalone `delete_file` Hermes tool | **Removed** — delete via `patch` V4A `*** Delete File:` → `DELETE_HOST_FILE` |
 | Plugin gateway registration | **Fixed** — selective `builtin_preload` before registry snapshot |
 | Full gateway E2E (pass 1, 2a, 2b) | **Green** — all four governed tools, probes typically attempt 1 |
@@ -68,6 +68,7 @@ IntentFrame gate active; **`enabled: false`** means native Hermes handler withou
 | `process` | `RUN_COMMAND` | `process` | Maps `action: run` + `data` to shell command |
 | `write_file` | `WRITE_HOST_FILE` | `write_file` | Path + content |
 | `patch` | `WRITE_HOST_FILE`, `DELETE_HOST_FILE` | `patch` | Replace mode + V4A multi-intent |
+| `cronjob` | `HERMES_CRONJOB` | `generic` | Semantic-only via dynamic bundle; live smoke, no gateway LLM E2E |
 
 **Not governed by default:** `read_file`, `search_files`, browser tools, skills, etc.
 They may still appear on `GET /v1/toolsets` and run without IntentFrame validation.
@@ -125,7 +126,8 @@ adapter venv, and copies shipped governance + policy templates into
 **Policy changes:** edit `~/.intentframe/integrations/hermes/policy.yaml`, then
 `bin/intentframe-integrations policy reload hermes` (no gateway restart).
 Use `policy set`, `policy reset`, or `integrate hermes --reset-policy` to switch
-or restore defaults.
+or restore defaults. Policy commands apply `agent.json` env via `load_and_activate_pack`
+(manifest path for generic action IDs) before validating against registered bundles.
 
 ---
 
@@ -133,10 +135,10 @@ or restore defaults.
 
 | Layer | Entry | LLM / network |
 |-------|-------|---------------|
-| Unit | `tests/hermes_plugin/`, `tests/hermes_gateway/test_*.py`, adapter tests | No |
+| Unit | `tests/hermes_plugin/`, `tests/hermes_gateway/test_*.py`, adapter tests, `test_policy_manage.py`, `test_integration_pack.py` | No |
 | Toolsets + provider payload | `RUN_HERMES_GATEWAY_TOOLSETS=1 ./tests/scripts/test-hermes-gateway-toolsets.sh` | OpenAI `chat.completions` (one round-trip); asserts `tools=` + `reason` in request dump |
-| Live integration | `./tests/scripts/test-hermes-integration.sh` | Backend; no LLM probes |
-| Gateway E2E | `RUN_HERMES_GATEWAY_E2E=1 ./tests/scripts/test-hermes-gateway-e2e.sh` | OpenAI + full stack; tool-calling ALLOW/BLOCK probes |
+| Live integration | `./tests/scripts/test-hermes-integration.sh` | Backend; policy reload smoke + adapter/plugin probes (no LLM) |
+| Gateway E2E | `RUN_HERMES_GATEWAY_E2E=1 ./tests/scripts/test-hermes-gateway-e2e.sh` | OpenAI + full stack; native-mapper LLM probes only |
 
 ### Gateway E2E passes
 
@@ -146,8 +148,9 @@ or restore defaults.
 | **2a** | Idempotent install/integrate on same sandbox |
 | **2b** | External `HERMES_BIN` symlink, first-time integrate |
 
-With default temp governance yaml, each pass runs ALLOW/BLOCK/semantic probes for all
-four catalog tools.
+With default temp governance yaml, each pass runs ALLOW/BLOCK/semantic probes for native
+catalog tools (`terminal`, `process`, `write_file`, `patch`). Generic tools (e.g. `cronjob`)
+are live-tested via adapter/plugin semantic smoke only — no gateway LLM probe.
 
 ### E2E harness determinism (2026-06)
 
@@ -172,6 +175,8 @@ See [`tests/hermes_gateway/README.md`](../tests/hermes_gateway/README.md).
 | Remove invented `delete_file` catalog entry | Hermes 0.17 has no standalone delete tool; use `patch` V4A |
 | Patch replace seed + pass markers | Fix flaky ALLOW and Pass 2a overwrite BLOCK |
 | Hardened block probe prompts | Fix LLM rewriting `/etc/` to sandbox paths |
+| `load_and_activate_pack` + policy env parity | Policy validation sees same manifest env as backend boot |
+| `cronjob` generic tool + two-tier probe contract | Live semantic smoke; no gateway LLM E2E for generic mappers |
 
 ---
 

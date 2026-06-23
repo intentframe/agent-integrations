@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -14,7 +15,13 @@ CLI_SRC = REPO_ROOT / "intentframe-integrations-cli" / "src"
 if str(CLI_SRC) not in sys.path:
     sys.path.insert(0, str(CLI_SRC))
 
-from intentframe_integrations.integration_pack import load_integration_pack  # noqa: E402
+from intentframe_integrations.hermes_governance_contract import (  # noqa: E402
+    actions_manifest_runtime_path,
+)
+from intentframe_integrations.integration_pack import (  # noqa: E402
+    load_and_activate_pack,
+    load_integration_pack,
+)
 
 
 class TestIntegrationPack(unittest.TestCase):
@@ -51,6 +58,57 @@ class TestIntegrationPack(unittest.TestCase):
             assert pack.adapter is not None
             self.assertEqual(pack.adapter.python, "3.11")
             self.assertEqual(pack.adapter.module, "custom_adapter.main")
+
+
+class TestLoadAndActivatePack(unittest.TestCase):
+    """Regression: pack activation env parity (setdefault + manifest seeding)."""
+    def setUp(self) -> None:
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.home = Path(self.temp_dir.name) / "home"
+        self.home.mkdir()
+
+    def tearDown(self) -> None:
+        self.temp_dir.cleanup()
+
+    def test_load_and_activate_applies_agent_json_env_with_setdefault(self) -> None:
+        override = "/tmp/custom-manifest.manifest"
+        previous_home = os.environ.get("HOME")
+        previous_manifest = os.environ.get("IF_DYNAMIC_BUNDLE_MANIFEST")
+        try:
+            os.environ["HOME"] = str(self.home)
+            os.environ["IF_DYNAMIC_BUNDLE_MANIFEST"] = override
+            load_and_activate_pack("hermes")
+            self.assertEqual(os.environ["IF_DYNAMIC_BUNDLE_MANIFEST"], override)
+        finally:
+            if previous_manifest is None:
+                os.environ.pop("IF_DYNAMIC_BUNDLE_MANIFEST", None)
+            else:
+                os.environ["IF_DYNAMIC_BUNDLE_MANIFEST"] = previous_manifest
+            if previous_home is None:
+                os.environ.pop("HOME", None)
+            else:
+                os.environ["HOME"] = previous_home
+
+    def test_load_and_activate_seeds_manifest_when_missing(self) -> None:
+        previous_home = os.environ.get("HOME")
+        previous_manifest = os.environ.get("IF_DYNAMIC_BUNDLE_MANIFEST")
+        try:
+            os.environ["HOME"] = str(self.home)
+            os.environ.pop("IF_DYNAMIC_BUNDLE_MANIFEST", None)
+            load_and_activate_pack("hermes")
+            expected = actions_manifest_runtime_path("hermes")
+            self.assertTrue(expected.is_file())
+            self.assertIn("HERMES_CRONJOB", expected.read_text(encoding="utf-8"))
+            self.assertEqual(os.environ["IF_DYNAMIC_BUNDLE_MANIFEST"], str(expected))
+        finally:
+            if previous_manifest is None:
+                os.environ.pop("IF_DYNAMIC_BUNDLE_MANIFEST", None)
+            else:
+                os.environ["IF_DYNAMIC_BUNDLE_MANIFEST"] = previous_manifest
+            if previous_home is None:
+                os.environ.pop("HOME", None)
+            else:
+                os.environ["HOME"] = previous_home
 
 
 def main() -> int:

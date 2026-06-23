@@ -4,6 +4,12 @@ Generic **IntentFrame validate-only** platform: one runtime, one noop executor p
 
 Agent profiles live under `../integrations/` (e.g. `integrations/hermes/`) — each ships `agent.json` + `policy.yaml` only, no executor packs.
 
+**Dynamic bundle** (`bundles/dynamic.py`): agent-agnostic pass-through bundle. Reads
+`IF_DYNAMIC_BUNDLE_MANIFEST` (comma-separated action IDs). If unset, registers nothing.
+Hermes sets this env in `agent.json` pointing at runtime `generic_actions.manifest`.
+The integrations CLI applies the same env via `load_and_activate_pack()` before
+backend start and before policy validation — see `intentframe-integrations-cli/README.md`.
+
 ## Quick start
 
 From the **repo root** (uv workspace):

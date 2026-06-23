@@ -12,10 +12,14 @@ from unittest.mock import patch
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CLI_SRC = REPO_ROOT / "intentframe-integrations-cli" / "src"
+GOVERNANCE_TEMPLATE = REPO_ROOT / "integrations" / "hermes" / "governance" / "tools.yaml"
 if str(CLI_SRC) not in sys.path:
     sys.path.insert(0, str(CLI_SRC))
 
-from intentframe_integrations.integration_pack import load_integration_pack  # noqa: E402
+from intentframe_integrations.integration_pack import (  # noqa: E402
+    load_and_activate_pack,
+    load_integration_pack,
+)
 from intentframe_integrations.policy_contract import (  # noqa: E402
     ensure_runtime_policy_yaml,
     policy_yaml_runtime_path,
@@ -32,20 +36,87 @@ from intentframe_integrations.policy_manage import (  # noqa: E402
 
 
 class patch_home:
+    """Temp HOME + explicit manifest/governance env (full bundle registry for policy tests)."""
     def __init__(self, home: Path) -> None:
         self.home = home
         self._previous: str | None = None
+        self._gov_previous: str | None = None
+        self._manifest_previous: str | None = None
 
     def __enter__(self) -> None:
         self._previous = os.environ.get("HOME")
+        self._gov_previous = os.environ.get("HERMES_GOVERNANCE_YAML")
+        self._manifest_previous = os.environ.get("IF_DYNAMIC_BUNDLE_MANIFEST")
         os.environ["HOME"] = str(self.home)
+        os.environ["HERMES_GOVERNANCE_YAML"] = str(GOVERNANCE_TEMPLATE)
+        manifest_dir = (
+            self.home / ".intentframe" / "integrations" / "hermes" / "governance"
+        )
+        manifest_dir.mkdir(parents=True, exist_ok=True)
+        manifest_path = manifest_dir / "generic_actions.manifest"
+        manifest_path.write_text("HERMES_CRONJOB", encoding="utf-8")
+        os.environ["IF_DYNAMIC_BUNDLE_MANIFEST"] = str(manifest_path)
+        self._reset_bundle_loader_state()
         return self
 
     def __exit__(self, *args: object) -> None:
+        self._reset_bundle_loader_state()
+        if self._manifest_previous is None:
+            os.environ.pop("IF_DYNAMIC_BUNDLE_MANIFEST", None)
+        else:
+            os.environ["IF_DYNAMIC_BUNDLE_MANIFEST"] = self._manifest_previous
+        if self._gov_previous is None:
+            os.environ.pop("HERMES_GOVERNANCE_YAML", None)
+        else:
+            os.environ["HERMES_GOVERNANCE_YAML"] = self._gov_previous
         if self._previous is None:
             os.environ.pop("HOME", None)
         else:
             os.environ["HOME"] = self._previous
+
+    @staticmethod
+    def _reset_bundle_loader_state() -> None:
+        import intentframe_bundle_sdk.loader as bundle_loader
+        import intentframe_bundle_sdk.registry as registry
+
+        bundle_loader._LOADED_PACKAGES = None
+        registry._ACTION_BY_ID.clear()
+        registry._ACTION_INSTANCES.clear()
+        registry._DOMAIN_BY_ID.clear()
+        registry._ACTION_TO_DOMAINS.clear()
+        registry._ROUTED_DOMAIN_IDS = frozenset()
+
+
+class agent_json_env_only:
+    """Simulate harnesses that set HOME only — no explicit manifest/governance exports.
+
+    Mirrors ``test-hermes-integration.sh`` (``HERMES_GOVERNANCE_YAML`` only) and
+    asserts ``load_and_activate_pack`` fills ``IF_DYNAMIC_BUNDLE_MANIFEST`` from
+    ``agent.json`` so generic actions (e.g. ``HERMES_CRONJOB``) validate.
+    """
+
+    _ENV_KEYS = ("HOME", "IF_DYNAMIC_BUNDLE_MANIFEST", "HERMES_GOVERNANCE_YAML")
+
+    def __init__(self, home: Path) -> None:
+        self.home = home
+        self._saved: dict[str, str | None] = {}
+
+    def __enter__(self) -> None:
+        for key in self._ENV_KEYS:
+            self._saved[key] = os.environ.get(key)
+        os.environ["HOME"] = str(self.home)
+        os.environ.pop("IF_DYNAMIC_BUNDLE_MANIFEST", None)
+        os.environ.pop("HERMES_GOVERNANCE_YAML", None)
+        patch_home._reset_bundle_loader_state()
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        patch_home._reset_bundle_loader_state()
+        for key, value in self._saved.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
 
 
 class TestPolicyManage(unittest.TestCase):
@@ -86,6 +157,54 @@ class TestPolicyManage(unittest.TestCase):
                 policy_set("hermes", missing)
             self.assertEqual(runtime.read_text(encoding="utf-8"), original)
         seed_mock.assert_not_called()
+
+    @patch("if_security_backend.runtime.policy.seed_policy")
+    def test_reload_applies_agent_json_env_without_explicit_manifest(self, seed_mock: object) -> None:
+        """Policy validation must see agent.json env defaults, not only explicit exports."""
+        with agent_json_env_only(self.home):
+            pack = load_integration_pack(REPO_ROOT / "integrations/hermes/agent.json")
+            runtime = ensure_runtime_policy_yaml(pack)
+            path = policy_reload("hermes")
+            self.assertEqual(path, runtime)
+            seed_mock.assert_called_once()
+            manifest = os.environ.get("IF_DYNAMIC_BUNDLE_MANIFEST")
+            self.assertIsNotNone(manifest)
+            assert manifest is not None
+            self.assertTrue(Path(manifest).is_file())
+
+    def test_validate_policy_registers_hermes_cronjob_without_explicit_env(self) -> None:
+        """Regression: policy reload failed when HERMES_CRONJOB had no registered bundle."""
+        with agent_json_env_only(self.home):
+            pack = load_and_activate_pack("hermes")
+            runtime = ensure_runtime_policy_yaml(pack)
+            validate_policy_file(pack, runtime)
+
+    @patch("if_security_backend.runtime.policy.seed_policy")
+    def test_set_applies_agent_json_env_without_explicit_manifest(self, seed_mock: object) -> None:
+        custom = Path(self.temp_dir.name) / "custom.yaml"
+        custom.write_text(
+            shipped_policy_template_path(self.pack).read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+        with agent_json_env_only(self.home):
+            path = policy_set("hermes", custom)
+            self.assertEqual(path, policy_yaml_runtime_path("hermes"))
+            seed_mock.assert_called_once()
+
+    @patch("if_security_backend.runtime.policy.seed_policy")
+    def test_reset_applies_agent_json_env_without_explicit_manifest(self, seed_mock: object) -> None:
+        with agent_json_env_only(self.home):
+            pack = load_integration_pack(REPO_ROOT / "integrations/hermes/agent.json")
+            runtime = ensure_runtime_policy_yaml(pack)
+            runtime.write_text("user-edit: true\n", encoding="utf-8")
+            path = policy_reset("hermes")
+            shipped = shipped_policy_template_path(pack)
+            self.assertEqual(path.read_text(encoding="utf-8"), shipped.read_text(encoding="utf-8"))
+            seed_mock.assert_called_once()
+
+    @staticmethod
+    def _reset_bundle_loader_state() -> None:
+        patch_home._reset_bundle_loader_state()
 
     @patch("if_security_backend.runtime.policy.seed_policy")
     def test_reload_calls_seed(self, seed_mock: object) -> None:
@@ -165,6 +284,17 @@ class TestPolicyCli(unittest.TestCase):
         from intentframe_integrations.cli import main
 
         with patch_home(self.home):
+            pack = load_integration_pack(REPO_ROOT / "integrations/hermes/agent.json")
+            ensure_runtime_policy_yaml(pack)
+            ec = main(["policy", "reload", "hermes"])
+        self.assertEqual(ec, 0)
+        seed_mock.assert_called_once()
+
+    @patch("if_security_backend.runtime.policy.seed_policy")
+    def test_cli_policy_reload_without_explicit_manifest(self, seed_mock: object) -> None:
+        from intentframe_integrations.cli import main
+
+        with agent_json_env_only(self.home):
             pack = load_integration_pack(REPO_ROOT / "integrations/hermes/agent.json")
             ensure_runtime_policy_yaml(pack)
             ec = main(["policy", "reload", "hermes"])

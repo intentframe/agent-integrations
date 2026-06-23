@@ -7,6 +7,8 @@ Hermes does **not** ship an IntentFrame executor pack or runtime. This folder pr
 | `agent.json` | Agent profile, adapter socket, exported `env` for Hermes plugin |
 | `policy.yaml` | Shipped policy **template** (copied to runtime on first integrate/start) |
 | `governance/tools.yaml` | Default governed-tool **template** (seeded to runtime on first integrate) |
+| `governance/generic_actions.manifest` | Static generic action IDs (copied to runtime on first integrate) |
+| `governance/README.md` | Dev vs user ownership for governance artifacts |
 | `shared/` | `hermes-governance` package — contract loader for adapter |
 | `adapter/` | Hermes adapter sidecar (bridge client, tool mapping, HTTP/UDS server) |
 | `plugin/intentframe-gate/` | Hermes plugin — selective schema override + adapter gate |
@@ -60,6 +62,7 @@ Configured in runtime `~/.intentframe/integrations/hermes/governance/tools.yaml`
 | `terminal`, `process` | `RUN_COMMAND` | Native Hermes handler, no IF gate |
 | `write_file`, `patch` (update/add) | `WRITE_HOST_FILE` | same |
 | `patch` (V4A delete) | `DELETE_HOST_FILE` | same |
+| `cronjob` | `HERMES_CRONJOB` | same (semantic-only via dynamic bundle) |
 
 ```bash
 bin/intentframe-integrations governance list hermes
@@ -67,7 +70,12 @@ bin/intentframe-integrations governance disable hermes write_file
 bin/intentframe-integrations governance enable hermes write_file
 ```
 
-Reads (`read_file`, `search_files`, …) stay **ungoverned** unless explicitly added to the catalog.
+**Restart Hermes gateway + adapter** after enable/disable (governance is cached at
+process start). IntentFrame backend does **not** need restart for governance toggles.
+
+Governance and policy are **independent gates** — they do not need to stay in sync.
+Disabling a tool stops Hermes from sending intents; manifest and policy rows for that
+action ID can remain harmlessly. See [`governance/README.md`](governance/README.md).
 
 ## Policy (runtime)
 
@@ -106,20 +114,43 @@ bin/intentframe-integrations stop
 
 `integrate hermes` symlinks the plugin to `$HERMES_HOME/plugins/intentframe-gate`, merges
 `plugins.enabled` in `$HERMES_HOME/config.yaml`, syncs the adapter venv at
-`~/.intentframe/integrations/hermes/.venv`, seeds runtime governance config at
-`~/.intentframe/integrations/hermes/governance/tools.yaml` and runtime policy at
-`~/.intentframe/integrations/hermes/policy.yaml` if missing.
+`~/.intentframe/integrations/hermes/.venv`, and on first use copies runtime artifacts
+from repo templates (never overwrites existing user files):
+
+- `~/.intentframe/integrations/hermes/governance/tools.yaml`
+- `~/.intentframe/integrations/hermes/governance/generic_actions.manifest`
+- `~/.intentframe/integrations/hermes/policy.yaml`
+
+### Config ownership
+
+| What | Who edits | Restart after change |
+|------|-----------|----------------------|
+| Runtime `governance/tools.yaml` `enabled` | User (`governance enable\|disable`) | Hermes gateway + adapter |
+| Runtime `policy.yaml` | User (`policy set\|reload\|reset`) | None (live registry) |
+| Repo templates (`tools.yaml`, `generic_actions.manifest`, `policy.yaml`, `agent.json`, `executor.yaml`) | Dev only | Backend restart if manifest/action IDs change |
+
+There is no user-facing `sync` command. Runtime CLI never rewrites repo templates.
 
 ### Governance env contract
 
-`agent.json` declares a default `HERMES_GOVERNANCE_YAML` (runtime sandbox path above).
-The CLI propagates governance config to child processes as follows:
+`agent.json` declares defaults for `HERMES_GOVERNANCE_YAML`, `IF_DYNAMIC_BUNDLE_MANIFEST`,
+and `IF_AGENT_ADAPTER_SOCKET`. All pack-loading CLI commands use
+`load_and_activate_pack()` (`integration_pack.py`): apply env via `setdefault`, then
+seed Hermes runtime governance artifacts if missing.
 
 | Step | Behavior |
 |------|----------|
-| `integrate hermes` | Prints `export HERMES_GOVERNANCE_YAML=…` using the **effective** value (`os.environ` overrides `agent.json`). |
-| `start hermes` (adapter) | `_adapter_env()` copies the parent environment and `setdefault`s `pack.agent.env` keys — an existing `HERMES_GOVERNANCE_YAML` in the shell is preserved. |
+| `integrate hermes` | Prints `export …` using the **effective** value (`os.environ` overrides `agent.json`). Copies governance yaml, actions manifest, and policy template to runtime on first use. |
+| `start hermes` | `load_and_activate_pack` → seeds manifest/governance if missing → starts backend (dynamic bundle reads manifest) + adapter. |
+| `policy show\|reload\|set\|reset hermes` | Same pack activation before local policy validation — registers generic action IDs (e.g. `HERMES_CRONJOB`) from manifest. No backend restart. |
 | `gateway start hermes` | `build_gateway_env()` uses the same `setdefault` pattern; logs `Hermes governance config: …` on startup. |
+| `start hermes` (adapter child) | `_adapter_env()` copies parent env and `setdefault`s `pack.agent.env` keys. |
+
+| Env | Points to | Read by |
+|-----|-----------|---------|
+| `HERMES_GOVERNANCE_YAML` | Runtime `governance/tools.yaml` | Plugin gate, adapter |
+| `IF_DYNAMIC_BUNDLE_MANIFEST` | Runtime `governance/generic_actions.manifest` | Dynamic bundle at backend boot (registers all catalog generic action IDs) |
+| `IF_AGENT_ADAPTER_SOCKET` | Adapter UDS | Plugin → adapter validate calls |
 
 To use a custom governed-tool set without editing runtime yaml, export
 `HERMES_GOVERNANCE_YAML` **before** `start hermes` / `gateway start hermes`. Gateway E2E
@@ -160,16 +191,30 @@ Export env from `agent.json` (or set in the shell before `start` / `gateway star
 
 - `IF_AGENT_ADAPTER_SOCKET=~/.intentframe/integrations/hermes/adapter.sock`
 - `HERMES_GOVERNANCE_YAML=~/.intentframe/integrations/hermes/governance/tools.yaml` (optional override path for governed-tool set)
+- `IF_DYNAMIC_BUNDLE_MANIFEST=~/.intentframe/integrations/hermes/governance/generic_actions.manifest` (static generic action IDs; set by us in agent.json)
 
 ## Adding a governed tool
 
-1. Add an entry to `governance/tools.yaml`.
-2. Add a mapper in `adapter/src/hermes_adapter/mapper.py` (or reuse a mapper kind).
-3. Add the IntentFrame action to `agent.json` `action_types` if new.
-4. Add policy constraints in `policy.yaml`.
-5. Add mapper unit test + optional E2E probe.
+See [`governance/README.md`](governance/README.md) for dev vs user ownership.
 
-No plugin code changes are required when the mapper kind already exists.
+**Native mapper** (terminal, process, write_file, patch):
+
+1. Add an entry to `governance/tools.yaml`.
+2. Add or reuse a mapper in `adapter/src/hermes_adapter/mapper.py`.
+3. Update dev artifacts: `agent.json` `action_types`, shipped `policy.yaml`, `executor.yaml` `supported_actions`.
+4. Add mapper unit test + gateway LLM E2E probe + live adapter/plugin probes.
+
+**Generic mapper** (semantic-only, e.g. `cronjob` → `HERMES_CRONJOB`):
+
+1. Add entry with `mapper: generic` and a distinct `HERMES_*` action ID in `tools.yaml`.
+2. Regenerate committed `governance/generic_actions.manifest` (full catalog superset).
+3. Update dev artifacts as above; add `safe: false` row in shipped `policy.yaml`.
+4. Golden test: `tests/intentframe_integrations/test_actions_manifest.py`.
+5. Add live adapter + plugin semantic smoke probe (`action: list` or other low-risk args).
+6. No plugin code changes — `map_generic` handles all generic tools. No gateway LLM E2E probe.
+
+No user-facing sync step — see [`governance/README.md`](governance/README.md#derived-artifacts-sync-replacement).
+Users toggle governance via CLI; policy via policy CLI.
 
 If the tool can emit **multiple IntentFrames per call** (like V4A `patch`), follow
 the `map_patch` pattern in `mapper.py`: scoped per-op `content` for writes (not
@@ -193,7 +238,7 @@ each intent honestly. See [`docs/delete-host-file-validation.md`](../../docs/del
     passes path policy; Guardian decides). Not a guaranteed execute.
 11. Ask LLM to `patch` with V4A `*** Delete File: /etc/…` → blocked by host-path policy (deterministic)
 
-## Live integration tests (all governed tools)
+## Live integration tests (all catalog tools)
 
 Deterministic adapter + plugin gate probes (no LLM) against a running Hermes stack:
 
@@ -201,8 +246,15 @@ Deterministic adapter + plugin gate probes (no LLM) against a running Hermes sta
 ./tests/scripts/test-hermes-integration.sh
 ```
 
-Covers all four Hermes governed tools (`terminal`, `process`, `write_file`, `patch`)
-including V4A `patch` multi-intent write+delete. Requires `OPENAI_API_KEY` (backend startup).
+Covers all catalog tools: native tools (`terminal`, `process`, `write_file`, `patch`)
+including V4A `patch` multi-intent write+delete, plus generic tools (e.g. `cronjob`)
+via semantic smoke. Also runs `policy show` + `policy reload` (live registry smoke —
+validates generic action IDs via `agent.json` manifest defaults without exporting
+`IF_DYNAMIC_BUNDLE_MANIFEST`). Requires `OPENAI_API_KEY` (backend startup).
+
+Unit regression for policy env parity (no live stack):
+`tests/intentframe_integrations/test_policy_manage.py` and
+`tests/intentframe_integrations/test_integration_pack.py`.
 
 ## Gateway E2E test (opt-in)
 
@@ -214,8 +266,9 @@ RUN_HERMES_GATEWAY_E2E=1 \
   python tests/hermes_gateway/test_gateway_e2e.py
 ```
 
-Requires `OPENAI_API_KEY`. Covers ALLOW/BLOCK for all four Hermes governed tools (`terminal`, `process`,
+Requires `OPENAI_API_KEY`. Covers ALLOW/BLOCK for native-mapper catalog tools (`terminal`, `process`,
 `write_file`, `patch`), including V4A mixed write+delete multi-intent `patch` probes.
+Generic tools are not exercised via gateway LLM E2E.
 
 Full run (passes 1, 2a, 2b) is green as of 2026-06-23. The harness seeds `patch replace`
 targets, uses pass-unique markers, and explicit block prompts — see

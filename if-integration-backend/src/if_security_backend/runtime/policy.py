@@ -10,9 +10,8 @@ from policy_registry.client import PolicyRegistryClient
 from policy_registry.seeds import load_policy_seed
 
 from if_security_backend.agent_config import default_test_policy_path, load_agent_pack
+from if_security_backend.runtime.bundles import load_core_bundle_packages
 from if_security_backend.runtime.paths import run_dir
-
-DEFAULT_BUNDLE = "intentframe_native_kit.intentframe_native_bundles"
 
 
 def resolve_user_id(explicit: str | None = None) -> str:
@@ -67,7 +66,7 @@ def seed_policy(
     )
 
     if validate_bundles:
-        validate_policy_with_bundles(policy, [DEFAULT_BUNDLE])
+        validate_policy_with_bundles(policy, load_core_bundle_packages())
 
     socket = str(run_dir() / "policy-registry.sock")
     with PolicyRegistryClient(socket_path=socket) as client:

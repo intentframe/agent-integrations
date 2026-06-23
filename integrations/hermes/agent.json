@@ -2,7 +2,12 @@
   "agent_id": "hermes",
   "user_id": "dev_user",
   "agent_type": "hermes",
-  "action_types": ["RUN_COMMAND", "WRITE_HOST_FILE", "DELETE_HOST_FILE"],
+  "action_types": [
+    "DELETE_HOST_FILE",
+    "HERMES_CRONJOB",
+    "RUN_COMMAND",
+    "WRITE_HOST_FILE"
+  ],
   "bridge_secret": "change-me-hermes-dev-only",
   "policy_file": "policy.yaml",
   "adapter": {
@@ -14,6 +19,7 @@
   },
   "env": {
     "IF_AGENT_ADAPTER_SOCKET": "~/.intentframe/integrations/hermes/adapter.sock",
-    "HERMES_GOVERNANCE_YAML": "~/.intentframe/integrations/hermes/governance/tools.yaml"
+    "HERMES_GOVERNANCE_YAML": "~/.intentframe/integrations/hermes/governance/tools.yaml",
+    "IF_DYNAMIC_BUNDLE_MANIFEST": "~/.intentframe/integrations/hermes/governance/generic_actions.manifest"
   }
 }

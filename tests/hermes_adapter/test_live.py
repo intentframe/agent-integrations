@@ -18,6 +18,7 @@ for path in (HERE, TESTS_DIR):
 
 from intentframe_validation_helpers import assert_adapter_semantic_validate  # noqa: E402
 from live_fixtures import (  # noqa: E402
+    CRONJOB_SEMANTIC_ARGS,
     PATCH_ALLOW_REPLACE_ARGS,
     PATCH_BLOCK_REPLACE_ARGS,
     PATCH_V4A_BLOCK_ARGS,
@@ -112,6 +113,10 @@ class TestLiveHermesAdapter(unittest.TestCase):
         body = self._validate_tool("patch", PATCH_V4A_BLOCK_ARGS)
         self.assertFalse(body["allowed"])
         self.assertIn("agent_response", body)
+
+    def test_cronjob_semantic(self) -> None:
+        body = self._validate_tool("cronjob", CRONJOB_SEMANTIC_ARGS)
+        assert_adapter_semantic_validate(body)
 
 
 def main() -> int:

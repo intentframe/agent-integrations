@@ -139,6 +139,7 @@ step "Hermes governance unit tests"
 
 step "Backend validate adapter unit tests"
 (cd "$REPO_ROOT" && uv run --package if-integration-backend python if-integration-backend/tests/test_validate_adapter.py)
+(cd "$REPO_ROOT" && uv run --package if-integration-backend python if-integration-backend/tests/test_dynamic_bundle.py)
 
 step "E2e bridge_test agent sync (tests/agents vs bundled default)"
 (cd "$REPO_ROOT" && uv run --package if-integration-backend python tests/agents/test_bridge_test_agent_sync.py)
@@ -160,6 +161,7 @@ step "Integrations CLI unit tests"
 (cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_policy_manage.py)
 (cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_governance_runtime_contract.py)
 (cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_scoped_governance_yaml.py)
+(cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_actions_manifest.py)
 
 step "Hermes gateway unit tests"
 (cd "$REPO_ROOT" && uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_isolation.py)
