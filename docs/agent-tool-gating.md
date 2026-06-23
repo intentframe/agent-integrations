@@ -8,6 +8,8 @@ This doc captures the design reasoning behind the Hermes integration and
 generalizes it to other agents (Python and TypeScript SDKs). It is the
 conceptual companion to the Hermes integration docs in
 [`integrations/hermes/README.md`](../integrations/hermes/README.md),
+[`hermes-intentframe-integration-guide.md`](./hermes-intentframe-integration-guide.md)
+(end-to-end integration and tool changes),
 [`hermes-plugin-registration-order.md`](./hermes-plugin-registration-order.md)
 (gateway preload + snapshot), and builds on IntentFrame's adoption guidance in
 [`do-i-have-to-rewrite-tools.md`](../external-reference-only-libs/intentframe/docs/executor/do-i-have-to-rewrite-tools.md).
@@ -541,6 +543,7 @@ incrementally with policy review each time.
 - IntentFrame adoption guidance:
   [`do-i-have-to-rewrite-tools.md`](../external-reference-only-libs/intentframe/docs/executor/do-i-have-to-rewrite-tools.md)
 - Hermes integration: [`integrations/hermes/README.md`](../integrations/hermes/README.md)
+- **Hermes + IntentFrame integration guide:** [`hermes-intentframe-integration-guide.md`](./hermes-intentframe-integration-guide.md)
 - Gateway load order (preload + snapshot): [`hermes-plugin-registration-order.md`](./hermes-plugin-registration-order.md)
 - Current plugin: [`hermes/plugin/intentframe-gate/`](../integrations/hermes/plugin/intentframe-gate/)
 - Mapper bottleneck:

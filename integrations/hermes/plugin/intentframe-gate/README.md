@@ -15,6 +15,7 @@ A tool is **governed** when it appears in `governance/tools.yaml` with
 exposes the tool on `/v1/toolsets`.
 
 Full terminology: [`docs/agent-tool-gating.md`](../../../docs/agent-tool-gating.md#terminology-what-governed-means).
+Integration guide: [`docs/hermes-intentframe-integration-guide.md`](../../../docs/hermes-intentframe-integration-guide.md).
 Gateway startup / preload: [`docs/hermes-plugin-registration-order.md`](../../../docs/hermes-plugin-registration-order.md).
 
 ## Governed tools (v1)

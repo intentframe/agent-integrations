@@ -25,6 +25,7 @@ RUN_HERMES_GATEWAY_E2E=1 ./tests/scripts/test-hermes-gateway-e2e.sh
 
 **Governed tools** = IntentFrame plugin gate active (see
 [`docs/agent-tool-gating.md`](../../docs/agent-tool-gating.md#terminology-what-governed-means)).
+Integration guide: [`docs/hermes-intentframe-integration-guide.md`](../../docs/hermes-intentframe-integration-guide.md).
 Plugin registration / preload: [`docs/hermes-plugin-registration-order.md`](../../docs/hermes-plugin-registration-order.md).
 This E2E harness does **not** toggle Hermes `/v1/toolsets`.
 
@@ -179,6 +180,8 @@ Hermes gateway before trusting stale PID files.
 
 ## Related docs
 
+- [`docs/hermes-intentframe-integration-guide.md`](../../docs/hermes-intentframe-integration-guide.md) — integrate, add tools, testing pyramid
+- [`docs/hermes-plugin-registration-order.md`](../../docs/hermes-plugin-registration-order.md) — gateway preload + load order
 - `integrations/hermes/README.md` — integration architecture and manual checklist
 - `intentframe-integrations-cli/README.md` — CLI command reference
 

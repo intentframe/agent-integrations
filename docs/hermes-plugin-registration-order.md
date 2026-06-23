@@ -3,7 +3,8 @@
 > Why the v1 multi-tool gate regressed on gateway E2E, and why governed builtins need
 > **selective module preload** before the generic snapshot wrap at plugin load time.
 
-Related: [`agent-tool-gating.md`](./agent-tool-gating.md),
+Related: [`hermes-intentframe-integration-guide.md`](./hermes-intentframe-integration-guide.md),
+[`agent-tool-gating.md`](./agent-tool-gating.md),
 [`NATIVE_KIT_INTEGRATION.md`](./NATIVE_KIT_INTEGRATION.md),
 [`integrations/hermes/plugin/intentframe-gate/`](../integrations/hermes/plugin/intentframe-gate/),
 [`integrations/hermes/plugin/intentframe-gate/README.md`](../integrations/hermes/plugin/intentframe-gate/README.md).
@@ -20,6 +21,90 @@ Related: [`agent-tool-gating.md`](./agent-tool-gating.md),
 | Fix | **`preload_governed_builtins(governed)`** then generic snapshot loop with `ctx.register_tool(..., override=True)` for each governed name. See [`builtin_preload.py`](../integrations/hermes/plugin/intentframe-gate/builtin_preload.py). |
 | Not the cause | Wrong yaml, reason wording, or LLM flakiness (same model + Hermes passed on old plugin). **`/v1/toolsets` showing `terminal` is not proof the LLM received it.** |
 | Avoid | Full `discover_builtin_tools()` in the plugin — side effects like `read_terminal` break the toolsets contract. |
+
+Full integration / add-tool checklist:
+[`hermes-intentframe-integration-guide.md`](./hermes-intentframe-integration-guide.md).
+
+---
+
+## Imports are the mechanism (old vs new)
+
+The regression looked like a large architectural failure, but the **working fix differed
+from the broken generic gate mainly in which Python modules were imported at plugin
+load time** — not in gate logic, adapter wiring, or governance yaml.
+
+### Hermes builtins register at import time
+
+Importing `tools.terminal_tool` executes module-level registration:
+
+```2711:2719:external-reference-only-libs/hermes-agent/tools/terminal_tool.py
+registry.register(
+    name="terminal",
+    toolset="terminal",
+    schema=TERMINAL_SCHEMA,
+    handler=_handle_terminal,
+    check_fn=check_terminal_requirements,
+    emoji="💻",
+    max_result_size_chars=100_000,
+)
+```
+
+Hermes' own discovery is “AST-scan `tools/*.py`, then `importlib.import_module`”:
+
+```57:70:external-reference-only-libs/hermes-agent/tools/registry.py
+def discover_builtin_tools(tools_dir: Optional[Path] = None) -> List[str]:
+    """Import built-in self-registering tool modules and return their module names."""
+    ...
+            importlib.import_module(mod_name)
+```
+
+### Three plugin versions — same gate, different imports
+
+| Version | What runs at `register()` | Registry at snapshot |
+|---------|---------------------------|----------------------|
+| **`intentframe-terminal` (old)** | Import `terminal_tool` (via schema builder) + explicit `ctx.register_tool` | `terminal` present |
+| **`intentframe-gate` (broken)** | Hook + snapshot only — **no preload** | **empty** → `wrapped = []` |
+| **`intentframe-gate` (fixed)** | `preload_governed_builtins(governed)` + generic snapshot | governed names present |
+
+The fixed plugin restores the old **early-import effect** generically:
+
+```12:29:integrations/hermes/plugin/intentframe-gate/builtin_preload.py
+GOVERNED_BUILTIN_MODULES: dict[str, str] = {
+    "terminal": "tools.terminal_tool",
+    "process": "tools.process_registry",
+    "write_file": "tools.file_tools",
+    "patch": "tools.file_tools",
+}
+...
+            importlib.import_module(module_name)
+```
+
+Then the same wrap loop runs for every governed name — no terminal-specific
+`_register_terminal_override()`:
+
+```20:35:integrations/hermes/plugin/intentframe-gate/__init__.py
+    governed = governed_tool_names()
+    preload_governed_builtins(governed)
+
+    for entry in registry._snapshot_entries():
+        if entry.name not in governed:
+            continue
+        ctx.register_tool(
+            ...
+            override=True,
+        )
+```
+
+### Why this matters for code review
+
+Treat changes to `GOVERNED_BUILTIN_MODULES` and any plugin `import` like **API
+surface changes**:
+
+- Removing an import line can remove a tool from the OpenAI payload entirely.
+- Adding `discover_builtin_tools()` can register unrelated tools (`read_terminal`).
+- Unit test: [`tests/hermes_plugin/test_builtin_preload.py`](../tests/hermes_plugin/test_builtin_preload.py).
+
+See also: [Imports are registration triggers](hermes-intentframe-integration-guide.md#imports-are-registration-triggers-not-just-dependencies) in the integration guide.
 
 ---
 
@@ -369,6 +454,7 @@ attempt 1/3; that isolates the regression to plugin registration, not the LLM.
 
 ## References
 
+- **Integration guide (add/change tools):** [`hermes-intentframe-integration-guide.md`](./hermes-intentframe-integration-guide.md)
 - Plugin README: [`integrations/hermes/plugin/intentframe-gate/README.md`](../integrations/hermes/plugin/intentframe-gate/README.md)
 - Gating overview: [`docs/agent-tool-gating.md`](./agent-tool-gating.md)
 - E2E harness: [`tests/hermes_gateway/`](../tests/hermes_gateway/),

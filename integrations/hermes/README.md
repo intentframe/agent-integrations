@@ -12,6 +12,8 @@ Hermes does **not** ship an IntentFrame executor pack or runtime. This folder pr
 | `plugin/intentframe-gate/` | Hermes plugin — selective schema override + adapter gate |
 
 Docs: [`docs/agent-tool-gating.md`](../../docs/agent-tool-gating.md),
+[`docs/hermes-intentframe-integration-guide.md`](../../docs/hermes-intentframe-integration-guide.md)
+(integrate, add/change tools, testing),
 [`docs/hermes-plugin-registration-order.md`](../../docs/hermes-plugin-registration-order.md)
 (gateway preload + snapshot),
 [`docs/NATIVE_KIT_INTEGRATION.md`](../../docs/NATIVE_KIT_INTEGRATION.md)
