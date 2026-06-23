@@ -198,7 +198,7 @@ See [`governance/README.md`](governance/README.md) for dev vs user ownership.
 1. Add an entry to `governance/tools.yaml`.
 2. Add or reuse a mapper in `adapter/src/hermes_adapter/mapper.py`.
 3. Update dev artifacts: `agent.json` `action_types`, shipped `policy.yaml`, `executor.yaml` `supported_actions`.
-4. Add mapper unit test + E2E probe (native tools only).
+4. Add mapper unit test + gateway LLM E2E probe + live adapter/plugin probes.
 
 **Generic mapper** (semantic-only, e.g. `cronjob` → `HERMES_CRONJOB`):
 
@@ -206,7 +206,8 @@ See [`governance/README.md`](governance/README.md) for dev vs user ownership.
 2. Regenerate committed `governance/generic_actions.manifest` (full catalog superset).
 3. Update dev artifacts as above; add `safe: false` row in shipped `policy.yaml`.
 4. Golden test: `tests/intentframe_integrations/test_actions_manifest.py`.
-5. No plugin code changes — `map_generic` handles all generic tools.
+5. Add live adapter + plugin semantic smoke probe (`action: list` or other low-risk args).
+6. No plugin code changes — `map_generic` handles all generic tools. No gateway LLM E2E probe.
 
 No user-facing sync step. Users toggle governance via CLI; policy via policy CLI.
 
@@ -232,7 +233,7 @@ each intent honestly. See [`docs/delete-host-file-validation.md`](../../docs/del
     passes path policy; Guardian decides). Not a guaranteed execute.
 11. Ask LLM to `patch` with V4A `*** Delete File: /etc/…` → blocked by host-path policy (deterministic)
 
-## Live integration tests (all governed tools)
+## Live integration tests (all catalog tools)
 
 Deterministic adapter + plugin gate probes (no LLM) against a running Hermes stack:
 
@@ -240,8 +241,9 @@ Deterministic adapter + plugin gate probes (no LLM) against a running Hermes sta
 ./tests/scripts/test-hermes-integration.sh
 ```
 
-Covers all four Hermes governed tools (`terminal`, `process`, `write_file`, `patch`)
-including V4A `patch` multi-intent write+delete. Requires `OPENAI_API_KEY` (backend startup).
+Covers all catalog tools: native tools (`terminal`, `process`, `write_file`, `patch`)
+including V4A `patch` multi-intent write+delete, plus generic tools (e.g. `cronjob`)
+via semantic smoke. Requires `OPENAI_API_KEY` (backend startup).
 
 ## Gateway E2E test (opt-in)
 
@@ -253,8 +255,9 @@ RUN_HERMES_GATEWAY_E2E=1 \
   python tests/hermes_gateway/test_gateway_e2e.py
 ```
 
-Requires `OPENAI_API_KEY`. Covers ALLOW/BLOCK for all four Hermes governed tools (`terminal`, `process`,
+Requires `OPENAI_API_KEY`. Covers ALLOW/BLOCK for native-mapper catalog tools (`terminal`, `process`,
 `write_file`, `patch`), including V4A mixed write+delete multi-intent `patch` probes.
+Generic tools are not exercised via gateway LLM E2E.
 
 Full run (passes 1, 2a, 2b) is green as of 2026-06-23. The harness seeds `patch replace`
 targets, uses pass-unique markers, and explicit block prompts — see

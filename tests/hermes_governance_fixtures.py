@@ -45,6 +45,9 @@ LIVE_PLUGIN_EXTRA_FIXTURES = frozenset(
     {"PATCH_V4A_MIXED_HOME_DELETE_ARGS", "PATCH_V4A_BLOCK_ARGS"}
 )
 
+# Generic-mapper catalog tools: live adapter/plugin semantic smoke only (no gateway LLM E2E).
+# Derived from ``mapper: generic`` in the default template — do not hardcode tool names here.
+
 _governance_env_depth = 0
 _governance_env_saved: str | None = None
 
@@ -93,6 +96,28 @@ def template_catalog_tool_names() -> frozenset[str]:
     from hermes_governance.loader import load_tool_catalog
 
     return frozenset(load_tool_catalog(str(DEFAULT_GOVERNANCE_TEMPLATE)).keys())
+
+
+@lru_cache(maxsize=1)
+def template_generic_mapper_tool_names() -> frozenset[str]:
+    """Catalog tools using ``mapper: generic`` (live semantic probes, no gateway LLM E2E)."""
+    ensure_shared_loader_importable()
+    from hermes_governance.loader import load_tool_catalog
+
+    catalog = load_tool_catalog(str(DEFAULT_GOVERNANCE_TEMPLATE))
+    return frozenset(name for name, spec in catalog.items() if spec.mapper == "generic")
+
+
+@lru_cache(maxsize=1)
+def live_semantic_probe_tool_names() -> frozenset[str]:
+    """Alias for generic-mapper tools covered by live adapter/plugin semantic smoke."""
+    return template_generic_mapper_tool_names()
+
+
+@lru_cache(maxsize=1)
+def gateway_e2e_probe_tool_names() -> frozenset[str]:
+    """Native-mapper catalog tools with deterministic gateway LLM E2E probes."""
+    return frozenset(GATEWAY_E2E_PROBE_SYMBOLS)
 
 
 @lru_cache(maxsize=1)

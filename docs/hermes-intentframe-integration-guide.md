@@ -517,13 +517,21 @@ one import is enough — preload dedupes modules.
 
 Delete coverage is via `patch` V4A `*** Delete File:` operations (maps to `DELETE_HOST_FILE`).
 
-### Step 5 — E2E probes
+### Step 5 — Probes (native gateway E2E + live semantic)
 
-Add probe functions to `tests/hermes_gateway/test_gateway_e2e.py` and register symbols
-in `tests/hermes_governance_fixtures.py` (`GATEWAY_E2E_PROBE_SYMBOLS`). Coverage test
-enforces parity:
+Every catalog tool must appear in the probe contract (`test_governed_tool_coverage.py`):
 
-**Harness determinism (required for reliable E2E):**
+| Mapper | Registry | Live adapter + plugin | Gateway LLM E2E |
+|--------|----------|----------------------|-----------------|
+| native (`terminal`, `process`, …) | `GATEWAY_E2E_PROBE_SYMBOLS` | deterministic ALLOW/BLOCK (+ patch semantic) | yes (`test_gateway_e2e.py`) |
+| `generic` | derived via `mapper: generic` | semantic smoke (ALLOW or BLOCK) | no |
+
+Add native probe functions to `tests/hermes_gateway/test_gateway_e2e.py` and register symbols
+in `tests/hermes_governance_fixtures.py` (`GATEWAY_E2E_PROBE_SYMBOLS`). Add generic live probes
+in `tests/hermes_adapter/test_live.py` and `tests/hermes_plugin/test_bridge_gate_live.py`.
+Coverage test enforces full-catalog parity across both tiers.
+
+**Harness determinism (required for reliable gateway E2E — native tools only):**
 
 | Probe type | Harness setup |
 |------------|---------------|
@@ -533,12 +541,12 @@ enforces parity:
 
 Details: [`tests/hermes_gateway/README.md`](../tests/hermes_gateway/README.md#probe-harness-determinism).
 
-```25:29:tests/hermes_gateway/test_governed_tool_coverage.py
-    def test_gateway_probe_registry_covers_catalog(self) -> None:
-        self.assertEqual(
-            frozenset(GATEWAY_E2E_PROBE_SYMBOLS),
-            template_catalog_tool_names(),
-        )
+```25:35:tests/hermes_gateway/test_governed_tool_coverage.py
+    def test_probe_tiers_partition_catalog(self) -> None:
+        gateway = gateway_e2e_probe_tool_names()
+        live_semantic = live_semantic_probe_tool_names()
+        catalog = template_catalog_tool_names()
+        self.assertEqual(gateway | live_semantic, catalog)
 ```
 
 ### Step 6 — Verify
@@ -642,16 +650,16 @@ HERMES_E2E_GOVERNED_TOOLS=terminal RUN_HERMES_GATEWAY_E2E=1 \
 
 Expect: `POST /v1/responses ALLOW (attempt 1/3)`, passes 1/2a/2b.
 
-### Layer 4 — Full gateway E2E (all governed catalog tools)
+### Layer 4 — Full gateway E2E (native-mapper catalog tools)
 
 ```bash
-# Default — all catalog tools governed
+# Default — all catalog tools governed; gateway LLM probes run for native mappers only
 RUN_HERMES_GATEWAY_E2E=1 ./tests/scripts/test-hermes-gateway-e2e.sh
 ```
 
 Runs ALLOW/BLOCK/semantic probes for `terminal`, `process`, `write_file`, `patch`
 (including V4A delete via `patch`) across greenfield, idempotent, and external-`HERMES_BIN` paths.
-Full run is green as of 2026-06-23 (all passes, probes typically attempt 1).
+Generic catalog tools (e.g. `cronjob`) are live-tested only — no gateway LLM probe.
 
 Probe matrix: [`tests/hermes_gateway/README.md`](../tests/hermes_gateway/README.md).
 Status snapshot: [`hermes-intentframe-state-report.md`](./hermes-intentframe-state-report.md).

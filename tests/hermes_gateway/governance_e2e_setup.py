@@ -23,6 +23,7 @@ from intentframe_integrations.hermes_governance_contract import (  # noqa: E402
 from hermes_governance_fixtures import (  # noqa: E402
     GATEWAY_E2E_PROBE_SYMBOLS,
     clear_shared_governance_cache,
+    live_semantic_probe_tool_names,
     template_catalog_tool_names,
 )
 from hermes_governance.loader import load_governed_tools, load_tool_catalog  # noqa: E402
@@ -135,13 +136,16 @@ def format_governance_snapshot(snapshot: GovernanceSnapshot) -> str:
 
 
 def format_gateway_probe_plan(governed: frozenset[str]) -> str:
+    live_semantic = live_semantic_probe_tool_names()
     lines = ["LLM probe plan (IntentFrame-governed → RUN, not governed → SKIP):"]
     for tool in sorted(template_catalog_tool_names()):
         probes = sorted(GATEWAY_E2E_PROBE_SYMBOLS.get(tool, ()))
-        if tool in governed:
-            lines.append(f"  {tool}: RUN  probes={probes}")
-        else:
+        if tool not in governed:
             lines.append(f"  {tool}: SKIP probes={probes}")
+        elif tool in live_semantic:
+            lines.append(f"  {tool}: LIVE_SEMANTIC_ONLY (no gateway LLM probe)")
+        else:
+            lines.append(f"  {tool}: RUN  probes={probes}")
     return "\n".join(lines)
 
 

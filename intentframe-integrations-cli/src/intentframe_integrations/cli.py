@@ -28,6 +28,11 @@ from intentframe_integrations.hermes_install import (
     install_hermes_agent,
     resolve_hermes_bin,
 )
+from intentframe_integrations.hermes_governance_contract import (
+    HERMES_AGENT_ID,
+    ensure_runtime_actions_manifest,
+    ensure_runtime_governance_yaml,
+)
 from intentframe_integrations.hermes_integrate import (
     doctor_hermes,
     format_env_exports,
@@ -63,6 +68,23 @@ def _apply_agent_env(pack: IntegrationPack) -> None:
     os.environ.setdefault("INTENTFRAME_AGENT_ID", pack.agent.agent_id)
     for key, value in pack.agent.env.items():
         os.environ.setdefault(key, os.path.expanduser(value))
+
+
+def _seed_hermes_runtime_governance(pack: IntegrationPack) -> None:
+    """Seed Hermes runtime governance artifacts before backend boot.
+
+    Ensures tools.yaml and generic_actions.manifest exist at their runtime paths
+    so IF_DYNAMIC_BUNDLE_MANIFEST and HERMES_GOVERNANCE_YAML are never set to
+    missing files when the backend starts. Safe to call before ``integrate hermes``
+    has run; if the committed templates are missing the error surfaces at integrate time.
+    """
+    if pack.agent.agent_id != HERMES_AGENT_ID:
+        return
+    try:
+        ensure_runtime_governance_yaml(HERMES_AGENT_ID)
+        ensure_runtime_actions_manifest(HERMES_AGENT_ID)
+    except FileNotFoundError:
+        pass
 
 
 def _load_pack(agent: str) -> IntegrationPack:
@@ -182,6 +204,7 @@ def _cmd_start(agent: str, *, seed: bool, skip_if_exists: bool) -> int:
 
     pack = _load_pack(agent)
     _apply_agent_env(pack)
+    _seed_hermes_runtime_governance(pack)
 
     ec = _start_pack(pack, seed=seed, skip_if_exists=skip_if_exists)
     if ec:
@@ -215,6 +238,7 @@ def _cmd_start_config(
     if cfg.is_file():
         pack = load_integration_pack(cfg)
         _apply_agent_env(pack)
+        _seed_hermes_runtime_governance(pack)
         ec = _start_pack(pack, seed=seed, skip_if_exists=skip_if_exists)
         if ec:
             return ec

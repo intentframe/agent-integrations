@@ -77,9 +77,9 @@ RUN_HERMES_GATEWAY_E2E=1 ./scripts/e2e.sh
 | **2b** | External Hermes via `HERMES_BIN`, then `integrate` and gateway E2E |
 
 Each pass runs HTTP assertions against the gateway API for **IntentFrame-governed**
-tools only (see `runtime_governed_tool_names()` in `_run_api_allow_block`). With
-the default temp yaml that is all catalog tools; use `HERMES_E2E_GOVERNED_TOOLS`
-to scope LLM probes.
+native-mapper tools only. Generic-mapper catalog tools (e.g. `cronjob`) are covered
+by live adapter/plugin semantic smoke — no gateway LLM probe. With the default temp
+yaml all catalog tools are governed; use `HERMES_E2E_GOVERNED_TOOLS` to scope LLM probes.
 
 | Tool | Deterministic ALLOW probe | Deterministic BLOCK probe | Semantic (ALLOW or BLOCK) |
 |------|---------------------------|---------------------------|---------------------------|
@@ -88,6 +88,7 @@ to scope LLM probes.
 | `write_file` | path under `~/…` | path under `/etc/…` | — |
 | `patch` (replace) | replace under `~/…` (harness seeds file with `"a"` first) | replace under `/etc/…` | — |
 | `patch` (V4A mixed) | — | Update `~/…` + Delete `/etc/…` (fail-closed batch) | Update `~/…` + Delete `~/…` (per-intent AE/Guardian; batch fails if any op BLOCKs) |
+| `cronjob` (generic) | — | — | live only: `action: list` (no gateway LLM E2E) |
 
 Multi-intent `patch` calls map to multiple IntentFrame `/validate` requests inside the adapter;
 the plugin still sees one allow/block for the single Hermes tool call.

@@ -12,9 +12,10 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CLI_SRC = REPO_ROOT / "intentframe-integrations-cli" / "src"
 GATEWAY_DIR = REPO_ROOT / "tests" / "hermes_gateway"
+TESTS_DIR = REPO_ROOT / "tests"
 SHARED_SRC = REPO_ROOT / "integrations" / "hermes" / "shared" / "src"
 
-for path in (CLI_SRC, GATEWAY_DIR, SHARED_SRC):
+for path in (CLI_SRC, GATEWAY_DIR, TESTS_DIR, SHARED_SRC):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
@@ -33,6 +34,7 @@ from governance_e2e_setup import (  # noqa: E402
     parse_governed_tools_env,
     setup_e2e_governance_yaml,
 )
+from hermes_governance_fixtures import template_catalog_tool_names  # noqa: E402
 
 
 class TestWriteScopedGovernanceYaml(unittest.TestCase):
@@ -99,18 +101,20 @@ class TestGovernanceE2eSetup(unittest.TestCase):
         )
 
     def test_log_e2e_governance_reports_scoped_tools(self) -> None:
+        governed = frozenset({"terminal", "process"})
         os.environ["HERMES_E2E_GOVERNED_TOOLS"] = "terminal,process"
         setup_e2e_governance_yaml()
         messages: list[str] = []
 
         snapshot = log_e2e_governance(log=messages.append)
 
-        self.assertEqual(snapshot.governed, frozenset({"terminal", "process"}))
-        self.assertEqual(snapshot.ungoverned, frozenset({"write_file", "patch"}))
+        self.assertEqual(snapshot.governed, governed)
+        self.assertEqual(snapshot.ungoverned, template_catalog_tool_names() - governed)
         joined = "\n".join(messages)
         self.assertIn("HERMES_E2E_GOVERNED_TOOLS", joined)
         self.assertIn("terminal: RUN", joined)
         self.assertIn("write_file: SKIP", joined)
+        self.assertIn("cronjob: SKIP", joined)
 
     def test_assert_e2e_governance_snapshot_rejects_mismatch(self) -> None:
         path = write_scoped_governance_yaml(governed_tools=frozenset({"terminal"}))
@@ -137,6 +141,7 @@ class TestGovernanceE2eSetup(unittest.TestCase):
         text = format_gateway_probe_plan(frozenset({"terminal"}))
         self.assertIn("terminal: RUN", text)
         self.assertIn("process: SKIP", text)
+        self.assertIn("cronjob: SKIP", text)
 
     def test_assert_governance_env_contract(self) -> None:
         os.environ["HERMES_E2E_GOVERNED_TOOLS"] = "terminal"

@@ -25,7 +25,9 @@ intents; policy rows for that action ID can remain without harm.
    (golden test `tests/intentframe_integrations/test_actions_manifest.py` enforces parity).
 3. Update `agent.json` `action_types`, shipped `policy.yaml`, and `executor.yaml`
    `supported_actions` (hand-edited; same golden test checks coverage).
-4. Set `IF_DYNAMIC_BUNDLE_MANIFEST` in `agent.json` env (already points at runtime path).
+4. Add live adapter + plugin semantic smoke probe in `tests/hermes_adapter/test_live.py`
+   and `tests/hermes_plugin/test_bridge_gate_live.py` (no gateway LLM E2E).
+5. Set `IF_DYNAMIC_BUNDLE_MANIFEST` in `agent.json` env (already points at runtime path).
 
 There is **no** user-facing `sync` command. Runtime automation never rewrites repo
 templates or user governance/policy files.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Contract: gateway E2E probes cover every governed Hermes tool."""
+"""Contract: every catalog tool has native gateway E2E probes or live semantic probes."""
 
 from __future__ import annotations
 
@@ -17,18 +17,30 @@ if str(TESTS_DIR) not in sys.path:
 from hermes_governance_fixtures import (  # noqa: E402
     GATEWAY_E2E_PROBE_SYMBOLS,
     LIVE_PLUGIN_EXTRA_FIXTURES,
+    gateway_e2e_probe_tool_names,
+    live_semantic_probe_tool_names,
     template_catalog_tool_names,
+    template_generic_mapper_tool_names,
 )
 
 
 class TestGovernedToolCoverage(unittest.TestCase):
-    def test_gateway_probe_registry_covers_catalog(self) -> None:
+    def test_probe_tiers_partition_catalog(self) -> None:
+        gateway = gateway_e2e_probe_tool_names()
+        live_semantic = live_semantic_probe_tool_names()
+        catalog = template_catalog_tool_names()
+        self.assertEqual(gateway | live_semantic, catalog)
+        self.assertFalse(gateway & live_semantic)
+        self.assertEqual(live_semantic, template_generic_mapper_tool_names())
+
+    def test_gateway_probe_registry_covers_native_catalog(self) -> None:
         self.assertEqual(
             frozenset(GATEWAY_E2E_PROBE_SYMBOLS),
-            template_catalog_tool_names(),
+            gateway_e2e_probe_tool_names(),
         )
+        self.assertFalse(gateway_e2e_probe_tool_names() & live_semantic_probe_tool_names())
 
-    def test_gateway_e2e_invokes_all_governed_tools(self) -> None:
+    def test_gateway_e2e_invokes_all_native_probed_tools(self) -> None:
         source = (GATEWAY_DIR / "test_gateway_e2e.py").read_text(encoding="utf-8")
         self.assertIn("load_e2e_governance_snapshot", source)
         self.assertIn("snapshot.governed", source)
@@ -41,12 +53,12 @@ class TestGovernedToolCoverage(unittest.TestCase):
                     msg=f"missing E2E probe {symbol!r} for {tool!r}",
                 )
 
-    def test_live_adapter_covers_all_governed_tools(self) -> None:
+    def test_live_adapter_covers_all_catalog_tools(self) -> None:
         source = (TESTS_DIR / "hermes_adapter" / "test_live.py").read_text(encoding="utf-8")
         for tool in template_catalog_tool_names():
             self.assertIn(f'"{tool}"', source, msg=f"missing live adapter probe for {tool}")
 
-    def test_live_plugin_gate_covers_all_governed_tools(self) -> None:
+    def test_live_plugin_gate_covers_all_catalog_tools(self) -> None:
         source = (TESTS_DIR / "hermes_plugin" / "test_bridge_gate_live.py").read_text(
             encoding="utf-8"
         )
