@@ -89,7 +89,7 @@ At `register()`:
 
 1. **`install_registry_hook()`** — wrap tools registered later (e.g. MCP refresh).
 2. **`preload_governed_builtins(governed)`** — selective import from
-   `GOVERNED_BUILTIN_MODULES` in [`builtin_preload.py`](../integrations/hermes/plugin/intentframe-gate/builtin_preload.py):
+   ``builtin_module`` per tool in [`builtin_preload.py`](../integrations/hermes/plugin/intentframe-gate/builtin_preload.py) (from repo ``tools.yaml``):
    - `terminal` → `tools.terminal_tool`
    - `process` → `tools.process_registry`
    - `write_file`, `patch` → `tools.file_tools`

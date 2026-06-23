@@ -20,12 +20,17 @@ from api_client import (  # noqa: E402
 )
 from provider_request_contract import (  # noqa: E402
     assert_gateway_openai_roundtrip,
+    assert_gateway_response_contains_marker,
+    assert_provider_request_contains_marker,
     assert_provider_tools_surface,
     format_gateway_roundtrip_snapshot,
     format_provider_tools_snapshot,
     load_newest_request_dump,
     load_request_dump,
     request_dump_paths,
+    toolsets_llm_instructions,
+    toolsets_llm_prompt,
+    toolsets_run_marker,
 )
 from cli_runner import CliError, format_diagnostics, run_cli, step, stop_everything  # noqa: E402
 from isolation import (  # noqa: E402
@@ -47,7 +52,7 @@ from toolsets_contract import format_toolsets_snapshot, parse_toolsets_response 
 _TESTS_DIR = HERE.parent
 if str(_TESTS_DIR) not in sys.path:
     sys.path.insert(0, str(_TESTS_DIR))
-from hermes_governance_fixtures import gateway_e2e_probe_tool_names  # noqa: E402
+from hermes_governance_fixtures import template_governed_tool_names  # noqa: E402
 
 API_HOST = "127.0.0.1"
 INSTALL_TIMEOUT = 600.0
@@ -73,9 +78,12 @@ def _run_schema_probe(env: IsolatedEnv) -> None:
         raise AssertionError(f"Probe script missing: {PROBE_SCRIPT}")
 
     step("Probe Hermes registry schemas (reason injection + gate markers)")
+    probe_env = os.environ.copy()
+    # Mirror gateway process: cronjob check_fn requires HERMES_GATEWAY_SESSION.
+    probe_env["HERMES_GATEWAY_SESSION"] = "1"
     result = subprocess.run(
         [str(python), str(PROBE_SCRIPT)],
-        env=os.environ.copy(),
+        env=probe_env,
         capture_output=True,
         text=True,
         timeout=120.0,
@@ -98,6 +106,9 @@ def main() -> int:
 
     try:
         env = create_isolated_env()
+        run_marker = toolsets_run_marker(env.run_id)
+        step(f"Run marker (OpenAI log correlation): {run_marker}")
+        print(f"\n==> Toolsets live run marker: {run_marker}", file=sys.stderr)
         step(f"Activating sandbox HOME={env.home} HERMES_HOME={env.hermes_home}")
         activate(env)
         step(f"Seeding Hermes OpenAI provider (model={_e2e_openai_model()})")
@@ -147,16 +158,17 @@ def main() -> int:
         _run_schema_probe(env)
 
         existing_dumps = frozenset(request_dump_paths(env.hermes_home))
-        step("POST /v1/responses (capture provider tools= for OpenAI)")
+        step(f"POST /v1/responses (capture provider tools= for OpenAI, marker={run_marker})")
         responses_body = post_responses(
             host=API_HOST,
             port=env.api_port,
             api_key=env.api_key,
-            prompt="Reply with the single word OK. Do not call any tools.",
-            instructions="Automated integration test. Do not use tools.",
+            prompt=toolsets_llm_prompt(run_marker),
+            instructions=toolsets_llm_instructions(run_marker),
         )
         assert_gateway_openai_roundtrip(responses_body)
-        governed = gateway_e2e_probe_tool_names()
+        gateway_output_text = assert_gateway_response_contains_marker(responses_body, run_marker)
+        governed = template_governed_tool_names()
         dump_path, provider_body = load_newest_request_dump(
             env.hermes_home,
             existing=existing_dumps,
@@ -164,6 +176,7 @@ def main() -> int:
         dump_raw = load_request_dump(dump_path)
         request_meta = dump_raw.get("request")
         request_meta_dict = request_meta if isinstance(request_meta, dict) else {}
+        assert_provider_request_contains_marker(provider_body, run_marker)
         assert_provider_tools_surface(
             provider_body,
             governed,
@@ -178,6 +191,8 @@ def main() -> int:
                 responses_body,
                 provider_url=provider_url,
                 expected_model=_e2e_openai_model(),
+                run_marker=run_marker,
+                gateway_output_text=gateway_output_text,
             ),
             file=sys.stderr,
         )
@@ -187,13 +202,17 @@ def main() -> int:
                 provider_body,
                 governed,
                 dump_path=dump_path,
+                run_marker=run_marker,
             ),
             file=sys.stderr,
         )
 
         assert_real_state_untouched(env)
         exit_code = 0
-        print("\n==> Hermes gateway toolsets live test passed", file=sys.stderr)
+        print(
+            f"\n==> Hermes gateway toolsets live test passed (run_marker={run_marker})",
+            file=sys.stderr,
+        )
     except (CliError, AssertionError, TimeoutError, RuntimeError, subprocess.TimeoutExpired) as exc:
         print(f"\nERROR: {exc}", file=sys.stderr)
         if env is not None:

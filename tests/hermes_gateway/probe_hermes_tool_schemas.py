@@ -2,11 +2,12 @@
 """Probe Hermes registry schemas after intentframe-gate (reason injection).
 
 Run inside the managed Hermes venv with HERMES_HOME set. Used by gateway
-toolsets live test to verify **native-mapper** governed tools use Hermes names
-and require ``reason`` in their JSON schema.
+toolsets live test to verify **all** IntentFrame-governed tools (native and
+generic mappers) use Hermes names, require ``reason`` in their JSON schema,
+and have gated handlers.
 
-Generic-mapper tools (e.g. ``cronjob``) are governed at runtime but excluded
-here — same two-tier contract as gateway E2E (live semantic smoke only).
+Requires ``HERMES_GATEWAY_SESSION=1`` in the probe environment (set by the
+toolsets live harness) so ``cronjob`` passes Hermes ``check_fn`` filtering.
 """
 
 from __future__ import annotations
@@ -25,7 +26,6 @@ if str(PLUGIN_SRC) not in sys.path:
     sys.path.insert(0, str(PLUGIN_SRC))
 
 from governance_loader import governed_tool_names  # type: ignore  # noqa: E402
-from hermes_governance_fixtures import gateway_e2e_probe_tool_names  # noqa: E402
 
 
 def main() -> int:
@@ -52,9 +52,7 @@ def main() -> int:
     )
     definitions = get_tool_definitions(enabled_toolsets=enabled_toolsets, quiet_mode=True)
 
-    governed = governed_tool_names()
-    probe_targets = gateway_e2e_probe_tool_names() & governed
-    skipped_generic = sorted(governed - probe_targets)
+    probe_targets = governed_tool_names()
     by_name: dict[str, dict] = {}
     for item in definitions:
         fn = item.get("function")
@@ -69,7 +67,6 @@ def main() -> int:
         "enabled_toolset_count": len(enabled_toolsets),
         "definition_count": len(definitions),
         "governed_tools": {},
-        "skipped_generic_governed": skipped_generic,
         "distractors": {},
     }
 

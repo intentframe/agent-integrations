@@ -41,6 +41,41 @@ class TestGovernanceLoader(unittest.TestCase):
             self.assertEqual(frozenset(catalog), template_catalog_tool_names())
             self.assertEqual(frozenset(tools), template_governed_tool_names())
 
+    def test_builtin_module_on_catalog_tools(self) -> None:
+        from hermes_governance.loader import load_tool_catalog
+
+        with governance_env():
+            catalog = load_tool_catalog()
+            self.assertEqual(catalog["terminal"].builtin_module, "tools.terminal_tool")
+            self.assertEqual(catalog["process"].builtin_module, "tools.process_registry")
+            self.assertEqual(catalog["write_file"].builtin_module, "tools.file_tools")
+            self.assertEqual(catalog["patch"].builtin_module, "tools.file_tools")
+            self.assertEqual(catalog["cronjob"].builtin_module, "tools.cronjob_tools")
+
+    def test_invalid_builtin_module_prefix_raises(self) -> None:
+        from hermes_governance.loader import load_tool_catalog
+
+        yaml_text = """
+tools:
+  terminal:
+    enabled: true
+    action: RUN_COMMAND
+    risk: local_process
+    mapper: terminal
+    builtin_module: os.path
+"""
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as handle:
+            handle.write(yaml_text)
+            path = handle.name
+
+        try:
+            load_tool_catalog.cache_clear()
+            with self.assertRaises(ValueError):
+                load_tool_catalog(path)
+        finally:
+            load_tool_catalog.cache_clear()
+            Path(path).unlink(missing_ok=True)
+
     def test_generic_mapper_action_ids(self) -> None:
         from hermes_governance.loader import generic_mapper_action_ids
 

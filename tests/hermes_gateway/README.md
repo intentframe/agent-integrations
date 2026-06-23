@@ -242,7 +242,9 @@ POST /v1/responses   →  real chat.completions round-trip + request dump
 assertions           →  token usage > 0, governed tools + reason in tools=
 ```
 
-Hermes gateway starts with `HERMES_DUMP_REQUESTS=1`. One cheap `POST /v1/responses`
+Hermes gateway starts with `HERMES_DUMP_REQUESTS=1`. The schema probe subprocess
+sets `HERMES_GATEWAY_SESSION=1` so ``cronjob`` passes Hermes ``check_fn`` (same
+as the running gateway). One cheap `POST /v1/responses`
 prompts the model to reply `OK` without calling tools (minimizes IntentFrame policy
 noise; still sends the full `tools=` list upstream).
 
@@ -251,8 +253,8 @@ noise; still sends the full `tools=` list upstream).
 | Surface | What it proves |
 |---------|----------------|
 | `GET /v1/toolsets` | Hermes **config** tool names for api_server (e.g. ~31) |
-| `probe_hermes_tool_schemas.py` | **Registry** schemas for native-mapper governed tools (`reason` + gate); generic tools skipped |
-| Request dump + round-trip assert | **OpenAI `chat.completions` payload** — native governed tools with required `reason` in `tools=` |
+| `probe_hermes_tool_schemas.py` | **Registry** schemas for all governed tools (`reason` + gate), including generic mappers |
+| Request dump + round-trip assert | **OpenAI `chat.completions` payload** — all governed tools with required `reason` in `tools=` |
 
 The registry count and toolsets count differ by design — not every listed toolset
 name becomes a registry definition on the LLM path. See
@@ -263,7 +265,7 @@ name becomes a registry definition on the LLM path. See
 | Helper | Checks |
 |--------|--------|
 | `assert_gateway_openai_roundtrip()` | Gateway `status: completed` and `usage.total_tokens > 0` |
-| `assert_provider_tools_surface()` | Native-mapper governed tools in dump `request.body.tools` with required `reason` |
+| `assert_provider_tools_surface()` | All governed catalog tools in dump `request.body.tools` with required `reason` |
 
 The request dump is written at **preflight** (before the HTTP call to OpenAI). Token
 usage from the gateway response proves the call **completed** — the dump alone only
@@ -273,16 +275,19 @@ Contract helpers: `tests/hermes_gateway/provider_request_contract.py`
 
 ### Stderr on success
 
-1. **OpenAI round-trip proof** — input/output/total tokens, provider URL/model
-2. **Provider tools= snapshot** — dump path, sorted tool list, `[governed, reason_required=true]` markers
+1. **OpenAI round-trip proof** — run marker, input/output/total tokens, provider URL/model
+2. **Provider tools= snapshot** — run marker, dump path, sorted tool list, `[governed, reason_required=true]` markers
 
 ### Finding the call in OpenAI Platform
 
-Shows as **Chat Completion** (`gpt-4o-mini`), not Responses API. Typical signature:
+Each run prints a unique marker: ``intentframe-toolsets-<run_id>``. Search Platform
+Logs / Usage for that token in the user prompt or assistant reply to match this run.
 
-- User prompt: `Reply with the single word OK. Do not call any tools.`
-- System includes: `Automated integration test. Do not use tools.`
-- ~11k input tokens, **17 tools** in the Tools list, output `OK`
+Typical signature:
+
+- User prompt contains: ``Reply with exactly this single token ... intentframe-toolsets-...``
+- System includes: ``Automated IntentFrame toolsets integration test run_id=...``
+- ~11k input tokens, **17+ tools** in the Tools list, output is the marker token
 - No tool invocations (unlike full E2E entries that say “Call the terminal tool…”)
 
 Platform Logs list tool **names** but not JSON schema details (`reason` in `required`).

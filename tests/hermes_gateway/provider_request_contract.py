@@ -65,6 +65,86 @@ def load_newest_request_dump_body(
     return body
 
 
+TOOLSETS_RUN_MARKER_PREFIX = "intentframe-toolsets"
+
+
+def toolsets_run_marker(run_id: str) -> str:
+    """Unique token for one toolsets live test run (OpenAI logs + request dumps)."""
+    return f"{TOOLSETS_RUN_MARKER_PREFIX}-{run_id}"
+
+
+def toolsets_llm_prompt(marker: str) -> str:
+    return (
+        f"Reply with exactly this single token and nothing else: {marker}. "
+        "Do not call any tools."
+    )
+
+
+def toolsets_llm_instructions(marker: str) -> str:
+    return (
+        f"Automated IntentFrame toolsets integration test run_id={marker}. "
+        "Do not use tools. Your entire reply must be exactly the marker token."
+    )
+
+
+def extract_gateway_text_output(gateway_body: dict[str, Any]) -> str:
+    """Concatenate assistant text from Hermes ``POST /v1/responses`` output items."""
+    parts: list[str] = []
+    output = gateway_body.get("output")
+    if not isinstance(output, list):
+        return ""
+    for item in output:
+        if not isinstance(item, dict):
+            continue
+        content = item.get("content")
+        if isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict):
+                    text = block.get("text")
+                    if isinstance(text, str):
+                        parts.append(text)
+        text = item.get("text")
+        if isinstance(text, str):
+            parts.append(text)
+    return " ".join(parts).strip()
+
+
+def assert_gateway_response_contains_marker(gateway_body: dict[str, Any], marker: str) -> str:
+    """Assert the LLM round-trip echoed the run marker in gateway output."""
+    text = extract_gateway_text_output(gateway_body)
+    if marker not in text:
+        raise AssertionError(
+            f"Gateway response missing run marker {marker!r}.\n"
+            f"  extracted_text={text!r}\n"
+            f"  body: {json.dumps(gateway_body)[:2000]}"
+        )
+    return text
+
+
+def extract_provider_user_message(body: dict[str, Any]) -> str | None:
+    """Best-effort user message from a chat.completions request dump body."""
+    messages = body.get("messages")
+    if not isinstance(messages, list):
+        return None
+    for msg in reversed(messages):
+        if not isinstance(msg, dict) or msg.get("role") != "user":
+            continue
+        content = msg.get("content")
+        if isinstance(content, str):
+            return content
+    return None
+
+
+def assert_provider_request_contains_marker(body: dict[str, Any], marker: str) -> None:
+    """Assert the OpenAI upstream payload included the run marker in the user message."""
+    user = extract_provider_user_message(body)
+    if user is None or marker not in user:
+        raise AssertionError(
+            f"Provider request dump missing run marker {marker!r}.\n"
+            f"  user_message={user!r}"
+        )
+
+
 def tool_reason_required(fn: dict[str, Any]) -> bool:
     """Return True when ``reason`` is a required parameter in a function schema."""
     params = fn.get("parameters")
@@ -191,6 +271,8 @@ def format_gateway_roundtrip_snapshot(
     *,
     provider_url: str | None = None,
     expected_model: str | None = None,
+    run_marker: str | None = None,
+    gateway_output_text: str | None = None,
 ) -> str:
     """Human-readable proof that Hermes completed an OpenAI chat.completions call."""
     usage = extract_gateway_usage(gateway_body)
@@ -198,11 +280,19 @@ def format_gateway_roundtrip_snapshot(
     output_items = output if isinstance(output, list) else []
     lines = [
         "OpenAI round-trip completed (via Hermes gateway):",
-        f"  gateway_status={gateway_body.get('status')!r}",
-        f"  provider_url={provider_url!r}",
     ]
+    if run_marker is not None:
+        lines.append(f"  run_marker={run_marker!r}")
+    lines.extend(
+        [
+            f"  gateway_status={gateway_body.get('status')!r}",
+            f"  provider_url={provider_url!r}",
+        ]
+    )
     if expected_model is not None:
         lines.append(f"  provider_model={expected_model!r}")
+    if gateway_output_text is not None:
+        lines.append(f"  gateway_output_text={gateway_output_text!r}")
     lines.extend(
         [
             f"  input_tokens={usage.get('input_tokens', 0)}",
@@ -224,6 +314,7 @@ def format_provider_tools_snapshot(
     governed: frozenset[str],
     *,
     dump_path: Path | None = None,
+    run_marker: str | None = None,
 ) -> str:
     """Human-readable summary of ``tools=`` sent to the OpenAI provider."""
     by_name = parse_provider_tools(body)
@@ -232,6 +323,8 @@ def format_provider_tools_snapshot(
         f"model={model!r}",
         f"tool_count={len(by_name)}",
     ]
+    if run_marker is not None:
+        lines.append(f"run_marker={run_marker!r}")
     if dump_path is not None:
         lines.append(f"request_dump={dump_path}")
     lines.append("")

@@ -271,18 +271,22 @@ unless explicitly added to the contract — govern by **tool name**, not toolset
 
 ### 1. Selective preload
 
-```12:29:integrations/hermes/plugin/intentframe-gate/builtin_preload.py
-GOVERNED_BUILTIN_MODULES: dict[str, str] = {
-    "terminal": "tools.terminal_tool",
-    "process": "tools.process_registry",
-    "write_file": "tools.file_tools",
-    "patch": "tools.file_tools",
-}
+Each catalog tool may declare ``builtin_module`` in the dev-owned repo
+``integrations/hermes/governance/tools.yaml`` (copied to runtime on integrate).
+The plugin imports those modules for **enabled** governed tools only:
 
-def preload_governed_builtins(governed: frozenset[str]) -> None:
-    ...
-            importlib.import_module(module_name)
+```yaml
+terminal:
+  enabled: true
+  builtin_module: tools.terminal_tool
+cronjob:
+  enabled: true
+  builtin_module: tools.cronjob_tools
 ```
+
+[`builtin_preload.py`](../integrations/hermes/plugin/intentframe-gate/builtin_preload.py)
+validates ``builtin_module`` must start with ``tools.`` and imports unique modules before
+the registry snapshot.
 
 **Why not call `discover_builtin_tools()` in the plugin?**
 
@@ -403,7 +407,7 @@ the modules first.
 
 ### Scrutinize import changes like API changes
 
-When editing `GOVERNED_BUILTIN_MODULES` or any plugin import:
+When editing ``builtin_module`` in the repo catalog template or any plugin import:
 
 | Change | Risk |
 |--------|------|
@@ -507,15 +511,18 @@ do not change manifest or policy files.
 
 ### Step 4 — Plugin preload (if Hermes builtin)
 
-If the tool is a Hermes built-in registered at import time, add to
-`GOVERNED_BUILTIN_MODULES`:
+If the tool is a Hermes built-in registered at import time, set in repo
+``integrations/hermes/governance/tools.yaml``:
 
-```python
-"my_tool": "tools.my_tool_module",
+```yaml
+my_tool:
+  enabled: true
+  builtin_module: tools.my_tool_module
 ```
 
 If several catalog names share one module (like `write_file` + `patch` → `file_tools`),
-one import is enough — preload dedupes modules.
+one import is enough — preload dedupes modules. ``builtin_module`` must start with
+``tools.`` (validated at load time).
 
 Delete coverage is via `patch` V4A `*** Delete File:` operations (maps to `DELETE_HOST_FILE`).
 
@@ -658,7 +665,7 @@ uv run --package intentframe-integrations-cli python tests/intentframe_integrati
 uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_policy_manage.py
 ```
 
-Extend `test_builtin_preload.py` when adding `GOVERNED_BUILTIN_MODULES` entries.
+Extend `test_builtin_preload.py` when adding ``builtin_module`` entries to the catalog template.
 
 ### Layer 2 — Toolsets + OpenAI provider payload (networked LLM)
 

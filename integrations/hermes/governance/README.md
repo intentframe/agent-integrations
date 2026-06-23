@@ -2,7 +2,7 @@
 
 | File | Owner | Purpose |
 |------|-------|---------|
-| `tools.yaml` (repo) | **Dev** | Tool catalog: names, mappers, action IDs, default `enabled` |
+| `tools.yaml` (repo) | **Dev** | Tool catalog: names, mappers, action IDs, default `enabled`, `builtin_module` |
 | `tools.yaml` (runtime) | **User** | Same catalog; user toggles `enabled` via `governance enable\|disable` |
 | `generic_actions.manifest` (repo) | **Dev** | Static list of all `mapper: generic` action IDs (full catalog superset) |
 | `generic_actions.manifest` (runtime) | **Copied once** | Seeded on `integrate hermes`; never overwritten by automation |
@@ -42,7 +42,8 @@ uv run --package intentframe-integrations-cli python tests/intentframe_integrati
 
 ## Dev workflow (adding a generic tool)
 
-1. Add entry to `tools.yaml` with `mapper: generic` and a `HERMES_*` action ID.
+1. Add entry to `tools.yaml` with `mapper: generic`, a `HERMES_*` action ID, and
+   `builtin_module: tools.<module>` when Hermes registers the tool at import time.
 2. Regenerate committed `generic_actions.manifest` to include the new action ID
    (golden test `tests/intentframe_integrations/test_actions_manifest.py` enforces parity).
 3. Update `agent.json` `action_types`, shipped `policy.yaml`, and `executor.yaml`

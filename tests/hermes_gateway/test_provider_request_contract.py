@@ -15,7 +15,10 @@ if str(HERE) not in sys.path:
 
 from provider_request_contract import (  # noqa: E402
     assert_gateway_openai_roundtrip,
+    assert_gateway_response_contains_marker,
+    assert_provider_request_contains_marker,
     assert_provider_tools_surface,
+    extract_gateway_text_output,
     format_gateway_roundtrip_snapshot,
     format_provider_tools_snapshot,
     load_newest_request_dump,
@@ -23,6 +26,9 @@ from provider_request_contract import (  # noqa: E402
     load_request_dump_body,
     parse_provider_tools,
     tool_reason_required,
+    toolsets_llm_instructions,
+    toolsets_llm_prompt,
+    toolsets_run_marker,
 )
 
 
@@ -123,15 +129,38 @@ class ProviderRequestContractTests(unittest.TestCase):
         body = {
             "status": "completed",
             "usage": {"input_tokens": 11655, "output_tokens": 2, "total_tokens": 11657},
-            "output": [{"type": "message", "content": [{"text": "OK"}]}],
+            "output": [{"type": "message", "content": [{"text": "intentframe-toolsets-abc"}]}],
         }
+        marker = toolsets_run_marker("abc")
         text = format_gateway_roundtrip_snapshot(
             body,
             provider_url="https://api.openai.com/v1/chat/completions",
             expected_model="gpt-4o-mini",
+            run_marker=marker,
+            gateway_output_text=marker,
         )
+        self.assertIn("run_marker='intentframe-toolsets-abc'", text)
         self.assertIn("total_tokens=11657", text)
         self.assertIn("provider_url='https://api.openai.com/v1/chat/completions'", text)
+
+    def test_toolsets_run_marker_helpers(self) -> None:
+        marker = toolsets_run_marker("deadbeef")
+        self.assertEqual(marker, "intentframe-toolsets-deadbeef")
+        self.assertIn(marker, toolsets_llm_prompt(marker))
+        self.assertIn(marker, toolsets_llm_instructions(marker))
+
+    def test_assert_gateway_response_contains_marker(self) -> None:
+        marker = toolsets_run_marker("abc")
+        body = {
+            "output": [{"type": "message", "content": [{"text": marker}]}],
+        }
+        self.assertEqual(assert_gateway_response_contains_marker(body, marker), marker)
+        self.assertEqual(extract_gateway_text_output(body), marker)
+
+    def test_assert_provider_request_contains_marker(self) -> None:
+        marker = toolsets_run_marker("abc")
+        body = {"messages": [{"role": "user", "content": toolsets_llm_prompt(marker)}]}
+        assert_provider_request_contains_marker(body, marker)
 
     def test_format_provider_tools_snapshot(self) -> None:
         body = {

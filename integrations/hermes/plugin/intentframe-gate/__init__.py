@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from .builtin_preload import preload_governed_builtins
 from .gate import wrap_handler
-from .governance_loader import governed_tool_names
+from .governance_loader import load_governed_tools
 from .registry_hook import install_registry_hook
 from .schema import inject_reason
 
@@ -17,8 +17,9 @@ def register(ctx) -> None:
 
     install_registry_hook()
 
-    governed = governed_tool_names()
-    preload_governed_builtins(governed)
+    governed_tools = load_governed_tools()
+    governed = frozenset(governed_tools)
+    preload_governed_builtins(governed_tools)
 
     for entry in registry._snapshot_entries():
         if entry.name not in governed:

@@ -4,24 +4,23 @@ from __future__ import annotations
 
 import importlib
 import logging
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .governance_loader import ToolSpec
 
 logger = logging.getLogger(__name__)
 
-# Hermes 0.17 modules that register governed tool names at import time.
-# Several catalog names may share one module (write_file + patch → file_tools).
-GOVERNED_BUILTIN_MODULES: dict[str, str] = {
-    "terminal": "tools.terminal_tool",
-    "process": "tools.process_registry",
-    "write_file": "tools.file_tools",
-    "patch": "tools.file_tools",
-}
 
+def preload_governed_builtins(governed_tools: dict[str, "ToolSpec"]) -> None:
+    """Ensure governed Hermes builtins are registered before snapshot wrap.
 
-def preload_governed_builtins(governed: frozenset[str]) -> None:
-    """Ensure governed Hermes builtins are registered before snapshot wrap."""
+    Imports ``builtin_module`` from each enabled governed tool spec (yaml, dev-owned).
+    Disabled catalog entries are not in *governed_tools* and are never preloaded.
+    """
     seen_modules: set[str] = set()
-    for tool_name in sorted(governed):
-        module_name = GOVERNED_BUILTIN_MODULES.get(tool_name)
+    for tool_name in sorted(governed_tools):
+        module_name = governed_tools[tool_name].builtin_module
         if not module_name or module_name in seen_modules:
             continue
         seen_modules.add(module_name)

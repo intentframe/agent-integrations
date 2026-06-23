@@ -275,7 +275,7 @@ Wiring (schema/handler layers plus registration order):
 
 The plugin loads the same contract as the adapter (`hermes-governance` / bundled
 YAML). Adding a tool is mostly **config + mapper + policy**, plus an entry in
-`GOVERNED_BUILTIN_MODULES` when Hermes registers the tool at module import time.
+``builtin_module`` in the repo catalog template when Hermes registers the tool at module import time.
 
 **History (before v1):** the first proof gated only `terminal` via
 `intentframe-terminal`, which imported `tools.terminal_tool` at plugin load (early

@@ -80,9 +80,20 @@ class TestPluginGovernance(PluginGovernanceEnvMixin, unittest.TestCase):
         ensure_shared_loader_importable()
         from hermes_governance.loader import load_governed_tools as shared_load_governed
 
-        plugin_names = frozenset(governance_mod.load_governed_tools().keys())
-        shared_names = frozenset(shared_load_governed().keys())
-        self.assertEqual(plugin_names, shared_names)
+        plugin_tools = governance_mod.load_governed_tools()
+        shared_tools = shared_load_governed()
+        self.assertEqual(frozenset(plugin_tools), frozenset(shared_tools))
+        for name in plugin_tools:
+            self.assertEqual(
+                plugin_tools[name].builtin_module,
+                shared_tools[name].builtin_module,
+                msg=f"builtin_module mismatch for {name!r}",
+            )
+            self.assertEqual(
+                plugin_tools[name].enabled,
+                shared_tools[name].enabled,
+                msg=f"enabled mismatch for {name!r}",
+            )
 
 
 class TestGateToolCall(PluginGovernanceEnvMixin, unittest.TestCase):
