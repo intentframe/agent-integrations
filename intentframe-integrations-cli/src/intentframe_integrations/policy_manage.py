@@ -38,6 +38,13 @@ def _load_pack(agent: str) -> IntegrationPack:
     return load_integration_pack(agent_config_path(agent))
 
 
+def _resolve_policy_path(yaml_path: Path) -> Path:
+    path = yaml_path.expanduser().resolve()
+    if not path.is_file():
+        raise PolicyError(f"Policy file not found: {path}")
+    return path
+
+
 def _validate_policy_agent_id(yaml_path: Path, expected_agent_id: str) -> None:
     try:
         raw = yaml.safe_load(yaml_path.read_text(encoding="utf-8")) or {}
@@ -56,6 +63,26 @@ def _validate_policy_agent_id(yaml_path: Path, expected_agent_id: str) -> None:
         )
 
 
+def validate_policy_file(pack: IntegrationPack, yaml_path: Path) -> None:
+    """Validate policy yaml structure and bundle semantics without registry writes."""
+    path = _resolve_policy_path(yaml_path)
+    _validate_policy_agent_id(path, pack.agent.agent_id)
+
+    from intentframe_bundle_sdk.loader import validate_policy_with_bundles
+    from if_security_backend.runtime.policy import DEFAULT_BUNDLE
+    from policy_registry.seeds import load_policy_seed
+
+    try:
+        policy = load_policy_seed(
+            path,
+            user_id=pack.agent.user_id,
+            agent_id=pack.agent.agent_id,
+        )
+        validate_policy_with_bundles(policy, [DEFAULT_BUNDLE])
+    except Exception as exc:
+        raise PolicyError(str(exc)) from exc
+
+
 def seed_agent_policy_from_file(
     pack: IntegrationPack,
     yaml_path: Path,
@@ -63,11 +90,8 @@ def seed_agent_policy_from_file(
     skip_if_exists: bool = False,
 ) -> None:
     """Validate policy yaml and upsert into policy-registry."""
-    path = yaml_path.expanduser().resolve()
-    if not path.is_file():
-        raise PolicyError(f"Policy file not found: {path}")
-
-    _validate_policy_agent_id(path, pack.agent.agent_id)
+    path = _resolve_policy_path(yaml_path)
+    validate_policy_file(pack, path)
 
     from if_security_backend.runtime.policy import seed_policy
 
@@ -80,6 +104,12 @@ def seed_agent_policy_from_file(
         )
     except Exception as exc:
         raise PolicyError(str(exc)) from exc
+
+
+def _policy_file_error(exc: BaseException) -> PolicyError:
+    if isinstance(exc, PolicyError):
+        return exc
+    return PolicyError(str(exc))
 
 
 def _registry_status(pack: IntegrationPack) -> tuple[bool, int | None, str]:
@@ -105,7 +135,10 @@ def _registry_status(pack: IntegrationPack) -> tuple[bool, int | None, str]:
 def policy_show(agent: str) -> PolicyShowReport:
     pack = _load_pack(agent)
     runtime = policy_yaml_runtime_path(pack.agent.agent_id)
-    shipped = shipped_policy_template_path(pack)
+    try:
+        shipped = shipped_policy_template_path(pack)
+    except FileNotFoundError as exc:
+        raise PolicyError(str(exc)) from exc
     loaded, action_count, message = _registry_status(pack)
     return PolicyShowReport(
         agent_id=pack.agent.agent_id,
@@ -134,15 +167,20 @@ def format_policy_show(report: PolicyShowReport) -> str:
 def policy_reload(agent: str) -> Path:
     """Re-read runtime policy file and upsert into policy-registry."""
     pack = _load_pack(agent)
-    path = ensure_runtime_policy_yaml(pack)
+    try:
+        path = ensure_runtime_policy_yaml(pack)
+    except FileNotFoundError as exc:
+        raise _policy_file_error(exc) from exc
     seed_agent_policy_from_file(pack, path)
     return path
 
 
 def policy_set(agent: str, src: Path) -> Path:
-    """Copy external policy into runtime location and load into registry."""
+    """Validate external policy, copy to runtime, and load into registry."""
     pack = _load_pack(agent)
-    path = install_policy_from_path(pack, src)
+    source = src.expanduser().resolve()
+    validate_policy_file(pack, source)
+    path = install_policy_from_path(pack, source)
     seed_agent_policy_from_file(pack, path)
     return path
 
@@ -150,6 +188,9 @@ def policy_set(agent: str, src: Path) -> Path:
 def policy_reset(agent: str) -> Path:
     """Restore shipped default to runtime location and load into registry."""
     pack = _load_pack(agent)
-    path = reset_runtime_policy_yaml(pack)
+    try:
+        path = reset_runtime_policy_yaml(pack)
+    except FileNotFoundError as exc:
+        raise _policy_file_error(exc) from exc
     seed_agent_policy_from_file(pack, path)
     return path

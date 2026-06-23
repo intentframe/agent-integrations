@@ -335,7 +335,7 @@ def _cmd_policy_show(agent: str) -> int:
 def _cmd_policy_reload(agent: str) -> int:
     try:
         path = policy_reload(agent)
-    except PolicyError as exc:
+    except (PolicyError, FileNotFoundError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
     print(f"Policy reloaded from {path}")
@@ -357,7 +357,7 @@ def _cmd_policy_set(agent: str, policy_path: Path) -> int:
 def _cmd_policy_reset(agent: str) -> int:
     try:
         path = policy_reset(agent)
-    except PolicyError as exc:
+    except (PolicyError, FileNotFoundError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
     print(f"Policy reset to shipped default at {path} and loaded into registry")

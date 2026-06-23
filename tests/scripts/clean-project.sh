@@ -108,10 +108,11 @@ remove_path "${TS_CLIENT_DIR}/dist"
 if (( KEEP_RUNTIME )); then
   step "Keeping ~/.intentframe runtime state (--keep-runtime)"
 else
-  step "Remove IntentFrame runtime state"
+  step "Remove IntentFrame runtime state (backend, policy-registry, integrations runtime config)"
   remove_path "$INTENTFRAME_STATE"
   remove_path "$INTENTFRAME_RUN"
   remove_path "$INTENTFRAME_INTEGRATIONS"
+  echo "    removed ~/.intentframe/integrations (runtime policy, governance, adapter venvs)"
 fi
 
 step "Done"

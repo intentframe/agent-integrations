@@ -27,7 +27,7 @@ from intentframe_integrations.policy_manage import (  # noqa: E402
     policy_reset,
     policy_set,
     policy_show,
-    seed_agent_policy_from_file,
+    validate_policy_file,
 )
 
 
@@ -62,7 +62,30 @@ class TestPolicyManage(unittest.TestCase):
         bad = Path(self.temp_dir.name) / "bad-policy.yaml"
         bad.write_text("agent_id: not_hermes\nallowed_actions: {}\n", encoding="utf-8")
         with self.assertRaises(PolicyError):
-            seed_agent_policy_from_file(self.pack, bad)
+            validate_policy_file(self.pack, bad)
+
+    @patch("if_security_backend.runtime.policy.seed_policy")
+    def test_set_bad_policy_preserves_runtime(self, seed_mock: object) -> None:
+        bad = Path(self.temp_dir.name) / "bad-policy.yaml"
+        bad.write_text("agent_id: not_hermes\nallowed_actions: {}\n", encoding="utf-8")
+        with patch_home(self.home):
+            runtime = ensure_runtime_policy_yaml(self.pack)
+            original = runtime.read_text(encoding="utf-8")
+            with self.assertRaises(PolicyError):
+                policy_set("hermes", bad)
+            self.assertEqual(runtime.read_text(encoding="utf-8"), original)
+        seed_mock.assert_not_called()
+
+    @patch("if_security_backend.runtime.policy.seed_policy")
+    def test_set_missing_source_preserves_runtime(self, seed_mock: object) -> None:
+        missing = Path(self.temp_dir.name) / "missing-policy.yaml"
+        with patch_home(self.home):
+            runtime = ensure_runtime_policy_yaml(self.pack)
+            original = runtime.read_text(encoding="utf-8")
+            with self.assertRaises(PolicyError):
+                policy_set("hermes", missing)
+            self.assertEqual(runtime.read_text(encoding="utf-8"), original)
+        seed_mock.assert_not_called()
 
     @patch("if_security_backend.runtime.policy.seed_policy")
     def test_reload_calls_seed(self, seed_mock: object) -> None:
@@ -101,6 +124,31 @@ class TestPolicyManage(unittest.TestCase):
             report = policy_show("hermes")
             self.assertEqual(report.runtime_path, policy_yaml_runtime_path("hermes"))
             self.assertTrue(report.runtime_exists)
+
+    @patch(
+        "intentframe_integrations.policy_manage.shipped_policy_template_path",
+        side_effect=FileNotFoundError("Shipped policy template missing"),
+    )
+    def test_show_missing_shipped_template_raises_policy_error(self, _mock: object) -> None:
+        with patch_home(self.home):
+            with self.assertRaises(PolicyError):
+                policy_show("hermes")
+
+    @patch(
+        "intentframe_integrations.policy_manage.ensure_runtime_policy_yaml",
+        side_effect=FileNotFoundError("Shipped policy template missing"),
+    )
+    def test_reload_missing_template_raises_policy_error(self, _mock: object) -> None:
+        with self.assertRaises(PolicyError):
+            policy_reload("hermes")
+
+    @patch(
+        "intentframe_integrations.policy_manage.reset_runtime_policy_yaml",
+        side_effect=FileNotFoundError("Shipped policy template missing"),
+    )
+    def test_reset_missing_template_raises_policy_error(self, _mock: object) -> None:
+        with self.assertRaises(PolicyError):
+            policy_reset("hermes")
 
 
 class TestPolicyCli(unittest.TestCase):
@@ -147,6 +195,26 @@ class TestPolicyCli(unittest.TestCase):
         argv = backend_mock.call_args[0][0]
         self.assertIn("--policy", argv)
         self.assertIn(str(runtime), argv)
+
+    @patch(
+        "intentframe_integrations.cli.policy_reload",
+        side_effect=PolicyError("Shipped policy template missing"),
+    )
+    def test_cli_policy_reload_reports_error(self, _mock: object) -> None:
+        from intentframe_integrations.cli import main
+
+        ec = main(["policy", "reload", "hermes"])
+        self.assertEqual(ec, 1)
+
+    @patch(
+        "intentframe_integrations.cli.policy_set",
+        side_effect=PolicyError("Policy agent_id mismatch"),
+    )
+    def test_cli_policy_set_reports_error(self, _mock: object) -> None:
+        from intentframe_integrations.cli import main
+
+        ec = main(["policy", "set", "hermes", "/tmp/bad.yaml"])
+        self.assertEqual(ec, 1)
 
 
 def main() -> int:
