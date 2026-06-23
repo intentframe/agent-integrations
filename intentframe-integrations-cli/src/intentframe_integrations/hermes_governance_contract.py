@@ -1,4 +1,10 @@
-"""Default governance template path and runtime user config materialization."""
+"""Default governance template paths and runtime user config materialization.
+
+Repo templates (dev-maintained): governance/tools.yaml, governance/actions.manifest.
+Runtime copies (~/.intentframe/...): seeded on first integrate; never overwritten
+unless the user runs --reset-governance or deletes the file. User toggles tool
+governance via CLI; that only edits runtime tools.yaml enabled flags.
+"""
 
 from __future__ import annotations
 

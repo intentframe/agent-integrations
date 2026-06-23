@@ -317,8 +317,17 @@ closed**. Every governed name needs a matching mapper kind and policy.
 **Wrapping is easy; meaningful per-tool mapping + policy is the work.**
 
 Drift is prevented by a **shared contract**: `governance/tools.yaml` +
-`hermes-governance` loader; adapter exposes `supported_tools()` for doctor/sync
-checks.
+`hermes-governance` loader; adapter exposes `supported_tools()` for doctor checks.
+Dev-maintained `governance/actions.manifest` lists all generic-mapper action IDs
+(full catalog superset); golden test
+[`test_actions_manifest.py`](../tests/intentframe_integrations/test_actions_manifest.py)
+enforces parity. There is no user-facing `sync` command — runtime CLI never
+rewrites repo templates.
+
+**Governance and policy are independent gates.** Disabling a tool stops Hermes
+from sending intents; manifest and policy rows for that action ID can remain
+harmlessly. User toggles governance only in runtime `tools.yaml`; policy only via
+policy CLI.
 
 Each tool entry may set `enabled: true|false` (default `true`). In this yaml,
 **`enabled` means IntentFrame-governed**, not “Hermes tool enabled.” Only entries

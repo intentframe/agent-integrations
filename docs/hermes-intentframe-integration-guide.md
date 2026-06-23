@@ -424,35 +424,57 @@ When editing `GOVERNED_BUILTIN_MODULES` or any plugin import:
 ## Adding a new governed Hermes tool
 
 Work through **all** layers. Wrapping alone is insufficient without mapper + policy.
+See [`integrations/hermes/governance/README.md`](../integrations/hermes/governance/README.md)
+for dev vs user ownership. There is no user-facing `sync` command.
 
 ### Step 1 — Governance contract
 
 Add entry to `integrations/hermes/governance/tools.yaml`:
+
+**Native mapper** (deterministic native-kit bundles):
 
 ```yaml
   my_tool:
     enabled: true
     action: WRITE_HOST_FILE   # or RUN_COMMAND, DELETE_HOST_FILE, …
     risk: local_write
-    mapper: my_tool           # must exist in mapper.py
+    mapper: write_file        # terminal | process | write_file | patch
     blocked_response: generic_json
 ```
 
-Runtime copy: `~/.intentframe/integrations/hermes/governance/tools.yaml`.
+**Generic mapper** (semantic-only via dynamic bundle, e.g. `cronjob`):
+
+```yaml
+  cronjob:
+    enabled: true
+    action: HERMES_CRONJOB
+    risk: local_process
+    mapper: generic
+    blocked_response: generic_json
+```
+
+Runtime copy: `~/.intentframe/integrations/hermes/governance/tools.yaml` (user toggles
+`enabled` via `governance enable|disable`; restart gateway + adapter).
 
 Valid mapper kinds (plugin loader):
 
-```14:14:integrations/hermes/plugin/intentframe-gate/governance_loader.py
-VALID_MAPPER_KINDS = frozenset({"terminal", "process", "write_file", "patch"})
+```python
+VALID_MAPPER_KINDS = frozenset({"terminal", "process", "write_file", "patch", "generic"})
 ```
 
-Extend this set when adding a new mapper kind.
+For `mapper: generic`, no new mapper function is needed — `map_generic` handles all
+generic tools. Regenerate committed `governance/actions.manifest` and update dev
+artifacts (Step 3).
 
 ### Step 2 — Adapter mapper
 
-Add `map_my_tool()` in `integrations/hermes/adapter/src/hermes_adapter/mapper.py`
-and register in `MAPPERS`. Must produce IntentFrame validate payloads including
-`reason` (adapter validates reason locally too):
+**Skip for `mapper: generic`** — `map_generic` already maps tool args to the action ID
+with `hermes_tool` / `hermes_args` in IntentFrame data.
+
+For native mappers, add `map_my_tool()` in
+`integrations/hermes/adapter/src/hermes_adapter/mapper.py` and register in `MAPPERS`.
+Must produce IntentFrame validate payloads including `reason` (adapter validates reason
+locally too):
 
 ```34:44:integrations/hermes/adapter/src/hermes_adapter/mapper.py
 def validate_reason(reason: object) -> str:
@@ -464,17 +486,22 @@ def validate_reason(reason: object) -> str:
 Multi-intent tools (like `patch`) return a **list** of intents; adapter fails closed
 on first BLOCK.
 
-### Step 3 — Policy
+### Step 3 — Dev artifacts (hand-edited, golden-tested)
 
-Add rules to the shipped template `integrations/hermes/policy.yaml` (for upstream
-changes) or edit the **runtime** file at
-`~/.intentframe/integrations/hermes/policy.yaml` (for local/production tuning).
-After editing runtime policy, run `bin/intentframe-integrations policy reload hermes`.
-Ensure `agent.json` lists the action type:
+Update shipped repo files when adding a new action ID:
 
-```5:5:integrations/hermes/agent.json
-  "action_types": ["RUN_COMMAND", "WRITE_HOST_FILE", "DELETE_HOST_FILE"],
-```
+| File | What to add |
+|------|-------------|
+| `governance/actions.manifest` | Generic action ID (comma-separated; full catalog superset) |
+| `agent.json` `action_types` | Every action ID the agent may emit |
+| `integrations/hermes/policy.yaml` | `allowed_actions` row (`safe: false` for generic) |
+| `executor.yaml` `supported_actions` | Same action IDs for validate-only executor |
+
+Golden test: `tests/intentframe_integrations/test_actions_manifest.py`.
+
+Users edit **runtime** policy at `~/.intentframe/integrations/hermes/policy.yaml` and
+reload with `bin/intentframe-integrations policy reload hermes`. Governance toggles
+do not change manifest or policy files.
 
 ### Step 4 — Plugin preload (if Hermes builtin)
 

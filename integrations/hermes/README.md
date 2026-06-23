@@ -187,16 +187,28 @@ Export env from `agent.json` (or set in the shell before `start` / `gateway star
 
 - `IF_AGENT_ADAPTER_SOCKET=~/.intentframe/integrations/hermes/adapter.sock`
 - `HERMES_GOVERNANCE_YAML=~/.intentframe/integrations/hermes/governance/tools.yaml` (optional override path for governed-tool set)
+- `IF_DYNAMIC_BUNDLE_MANIFEST=~/.intentframe/integrations/hermes/governance/actions.manifest` (static generic action IDs; set by us in agent.json)
 
 ## Adding a governed tool
 
-1. Add an entry to `governance/tools.yaml`.
-2. Add a mapper in `adapter/src/hermes_adapter/mapper.py` (or reuse a mapper kind).
-3. Add the IntentFrame action to `agent.json` `action_types` if new.
-4. Add policy constraints in `policy.yaml`.
-5. Add mapper unit test + optional E2E probe.
+See [`governance/README.md`](governance/README.md) for dev vs user ownership.
 
-No plugin code changes are required when the mapper kind already exists.
+**Native mapper** (terminal, process, write_file, patch):
+
+1. Add an entry to `governance/tools.yaml`.
+2. Add or reuse a mapper in `adapter/src/hermes_adapter/mapper.py`.
+3. Update dev artifacts: `agent.json` `action_types`, shipped `policy.yaml`, `executor.yaml` `supported_actions`.
+4. Add mapper unit test + E2E probe (native tools only).
+
+**Generic mapper** (semantic-only, e.g. `cronjob` → `HERMES_CRONJOB`):
+
+1. Add entry with `mapper: generic` and a distinct `HERMES_*` action ID in `tools.yaml`.
+2. Regenerate committed `governance/actions.manifest` (full catalog superset).
+3. Update dev artifacts as above; add `safe: false` row in shipped `policy.yaml`.
+4. Golden test: `tests/intentframe_integrations/test_actions_manifest.py`.
+5. No plugin code changes — `map_generic` handles all generic tools.
+
+No user-facing sync step. Users toggle governance via CLI; policy via policy CLI.
 
 If the tool can emit **multiple IntentFrames per call** (like V4A `patch`), follow
 the `map_patch` pattern in `mapper.py`: scoped per-op `content` for writes (not

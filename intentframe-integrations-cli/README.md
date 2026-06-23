@@ -29,6 +29,8 @@ intentframe-integrations policy reset hermes
 
 `governance enable|disable` toggles **IntentFrame governance** for a catalog tool
 (yaml `enabled: true/false`). It does not enable or disable Hermes native tools.
+After toggling, **restart Hermes gateway + adapter** (governance is loaded at process
+start). IntentFrame backend does not need restart.
 See [`docs/agent-tool-gating.md`](../docs/agent-tool-gating.md#terminology-what-governed-means).
 
 **Policy** lives at `~/.intentframe/integrations/<agent>/policy.yaml` (copied from the
@@ -36,6 +38,14 @@ shipped template on first `integrate` or `start`). Edit that file, then
 `policy reload <agent>`. Use `policy set` to install an external yaml, or
 `policy reset` to restore the shipped default. Changes apply immediately — no
 gateway restart needed.
+
+**Runtime artifacts** (copied on first `integrate`, never auto-overwritten):
+
+- `governance/tools.yaml` — user toggles via `governance enable|disable`
+- `governance/actions.manifest` — static dev-shipped superset of generic action IDs
+- `policy.yaml` — user edits via policy CLI
+
+There is no `sync` command. Repo templates are dev-maintained only.
 
 Run from repo root via `bin/intentframe-integrations` or:
 
@@ -77,7 +87,8 @@ Hermes binary resolution order:
 
 1. `install hermes` — Hermes Agent CLI (managed venv, pinned version)
 2. `start hermes` — backend bridge + adapter sidecar (`~/.intentframe/integrations/hermes/`)
-3. `integrate hermes` — plugin symlink + adapter venv sync + config merge
+3. `integrate hermes` — plugin symlink + adapter venv sync + copy runtime governance,
+   actions manifest, and policy templates (first use only)
 4. `gateway start hermes` — launch Hermes gateway (optionally with API server)
 5. `stop` — stop gateway started by orchestrator, adapters, and backend runtime
 
@@ -93,6 +104,7 @@ adapter sync, and gateway lifecycle.
 | Variable | Set by | Effect |
 |----------|--------|--------|
 | `HERMES_GOVERNANCE_YAML` | `agent.json` default; override in shell or test harness | Which tools are **IntentFrame-governed** at runtime. If already set in the parent environment, `start hermes` (adapter) and `gateway start hermes` preserve it via `setdefault` — they do not replace it with the sandbox-seeded path from `integrate`. |
+| `IF_DYNAMIC_BUNDLE_MANIFEST` | `agent.json` default | Path to static `actions.manifest` (generic `HERMES_*` action IDs). Backend dynamic bundle reads this at boot; unset env → dynamic bundle is a no-op. |
 | `IF_AGENT_ADAPTER_SOCKET` | `agent.json` | UDS path for plugin → adapter validate calls. |
 
 `integrate hermes` prints `export …` lines from `format_env_exports()`: values already
