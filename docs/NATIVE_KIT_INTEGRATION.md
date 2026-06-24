@@ -68,7 +68,6 @@ Configured in [`governance/tools.yaml`](../integrations/hermes/governance/tools.
 | Hermes tool | IntentFrame action(s) | Mapper kind | Notes |
 |-------------|----------------------|-------------|-------|
 | `terminal` | `RUN_COMMAND` | `terminal` | Full `command_shield` + capability analysis |
-| `process` | `RUN_COMMAND` | `process` | Synthetic `process:…` command string |
 | `write_file` | `WRITE_HOST_FILE` | `write_file` | Path + content |
 | `patch` | `WRITE_HOST_FILE`, `DELETE_HOST_FILE` | `patch` | Multi-intent from V4A diff |
 | `cronjob` | `HERMES_CRONJOB` | `generic` | Semantic-only via dynamic bundle (AE + Guardian) |
@@ -220,8 +219,6 @@ map into `IntentFrame.data` on the backend.
 **Hermes mappers:**
 
 - `terminal` — passes real shell command → full terminal pipeline
-- `process` — builds `process:{action} session_id=…` → structurally valid but **weaker**
-  semantic analysis than a real shell command
 
 ### `WRITE_HOST_FILE` / `DELETE_HOST_FILE` — `HostFilesActionBundle`
 
@@ -423,8 +420,8 @@ Hermes handler so native tools unchanged.
 
 ### Mapper quality = security quality
 
-Weak synthetic commands (`process:…`) bypass rich `command_shield` analysis. Prefer
-mapping to intents that exercise the bundle’s real evidence pipeline.
+Mapping to intents that exercise the bundle’s real evidence pipeline improves policy
+effectiveness (e.g. real shell strings for `RUN_COMMAND`).
 
 ### Passive reads in bundles
 
@@ -454,7 +451,7 @@ Hermes hybrid. Do not conflate “bundle registers on macOS” with “needs mac
 
 | Gap | Impact | Mitigation |
 |-----|--------|------------|
-| `process` mapper uses synthetic command | Thinner terminal analysis | Map to richer command representation if Hermes exposes it |
+| Ungoverned Hermes `process` tool | Background job manager runs without IF gate | Govern via `terminal` for shell execution; leave `process` ungoverned until a faithful mapper exists |
 | `patch` validates diff hunks, not merged file | Weaker write content gates | Prefer `write_file` for sensitive paths; tighten path policy |
 | E2E mostly terminal BLOCK | Host-file regressions possible | Add probes for `/etc` write, `~` delete |
 | ValidateOnlyAdapter action list | New actions fail silently at executor | Extend `executor.yaml` with each new action |

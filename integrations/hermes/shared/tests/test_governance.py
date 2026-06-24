@@ -47,7 +47,6 @@ class TestGovernanceLoader(unittest.TestCase):
         with governance_env():
             catalog = load_tool_catalog()
             self.assertEqual(catalog["terminal"].builtin_module, "tools.terminal_tool")
-            self.assertEqual(catalog["process"].builtin_module, "tools.process_registry")
             self.assertEqual(catalog["write_file"].builtin_module, "tools.file_tools")
             self.assertEqual(catalog["patch"].builtin_module, "tools.file_tools")
             self.assertEqual(catalog["cronjob"].builtin_module, "tools.cronjob_tools")

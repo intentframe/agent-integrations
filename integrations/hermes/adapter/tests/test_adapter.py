@@ -70,32 +70,6 @@ class TestMapper(unittest.TestCase):
             {"background": True, "timeout": 600},
         )
 
-    def test_map_process(self) -> None:
-        from hermes_adapter.mapper import map_process
-
-        intents = map_process(
-            {"action": "kill", "session_id": "abc", "reason": "Stop runaway"}
-        )
-        self.assertEqual(intents[0]["action"], "RUN_COMMAND")
-        self.assertIn("process:kill", intents[0]["command"])
-        self.assertNotIn("hermes_args", intents[0])
-
-    def test_map_process_hermes_args_remainder(self) -> None:
-        from hermes_adapter.mapper import map_process
-
-        intents = map_process(
-            {
-                "action": "wait",
-                "session_id": "proc_abc",
-                "timeout": 120,
-                "reason": "Wait for job",
-            }
-        )
-        intent = intents[0]
-        self.assertNotIn("action", intent.get("hermes_args", {}))
-        self.assertNotIn("session_id", intent.get("hermes_args", {}))
-        self.assertEqual(intent["hermes_args"], {"timeout": 120})
-
     def test_map_write_file(self) -> None:
         from hermes_adapter.mapper import map_write_file
 

@@ -48,7 +48,7 @@ the validate-only gate). It does **not** enable/disable Hermes native tools on
 | Variable | Effect |
 |----------|--------|
 | *(unset)* | Temp yaml with **all** catalog tools IntentFrame-governed |
-| `HERMES_E2E_GOVERNED_TOOLS=terminal,process` | Temp yaml with only those tools governed; LLM probes run for that subset |
+| `HERMES_E2E_GOVERNED_TOOLS=terminal,write_file` | Temp yaml with only those tools governed; LLM probes run for that subset |
 | `HERMES_GOVERNANCE_YAML=/path/to/tools.yaml` | Use your yaml as-is; skip auto-generation |
 
 Examples:
@@ -57,8 +57,8 @@ Examples:
 # All governed tools (default)
 RUN_HERMES_GATEWAY_E2E=1 ./tests/scripts/test-hermes-gateway-e2e.sh
 
-# Only terminal + process LLM probes (IntentFrame-governed subset)
-HERMES_E2E_GOVERNED_TOOLS=terminal,process \
+# Only terminal + write_file LLM probes (IntentFrame-governed subset)
+HERMES_E2E_GOVERNED_TOOLS=terminal,write_file \
   RUN_HERMES_GATEWAY_E2E=1 ./tests/scripts/test-hermes-gateway-e2e.sh
 ```
 
@@ -84,7 +84,6 @@ yaml all catalog tools are governed; use `HERMES_E2E_GOVERNED_TOOLS` to scope LL
 | Tool | Deterministic ALLOW probe | Deterministic BLOCK probe | Semantic (ALLOW or BLOCK) |
 |------|---------------------------|---------------------------|---------------------------|
 | `terminal` | `printf '<marker>'` | `sudo echo …` | — |
-| `process` | `action: list` | `action: run`, `data` contains `sudo` | — |
 | `write_file` | path under `~/…` | path under `/etc/…` | — |
 | `patch` (replace) | replace under `~/…` (harness seeds file with `"a"` first) | replace under `/etc/…` | — |
 | `patch` (V4A mixed) | — | Update `~/…` + Delete `/etc/…` (fail-closed batch) | Update `~/…` + Delete `~/…` (per-intent AE/Guardian; batch fails if any op BLOCKs) |
@@ -102,7 +101,7 @@ IntentFrame** chain, not open-ended agent behavior. Harness setup (not policy we
 |-----------|-------|-----|
 | **`seed_patch_replace_target()`** | `tests/hermes_tool_probes.py`; called from `run_patch_replace_allow_with_retries` | `patch replace` requires an existing file with `old_string`; harness writes `"a"` before each attempt |
 | **Pass-unique markers** | `_pass_marker_slug()` in `test_gateway_e2e.py` → suffix `-p1`, `-p2a`, `-p2b` | Pass 2a reuses Pass 1 sandbox; unique markers avoid overwrite BLOCK on stale files |
-| **Explicit block prompts** | `run_write_file_block_once`, `run_process_block_once`, `run_patch_replace_block_once`, `run_patch_v4a_mixed_block_once` in `api_client.py` | Keep `/etc/…`, `sudo`, and V4A delete paths verbatim; one tool call; no rewrite to `~/` or `/tmp` |
+| **Explicit block prompts** | `run_write_file_block_once`, `run_patch_replace_block_once`, `run_patch_v4a_mixed_block_once` in `api_client.py` | Keep `/etc/…`, `sudo`, and V4A delete paths verbatim; one tool call; no rewrite to `~/` or `/tmp` |
 
 Block assertions still require blocked tool output and the expected path/command shape.
 Allow assertions still fail on blocked output.
@@ -151,7 +150,7 @@ When `/v1/responses` reaches the plugin and adapter:
 1. Adapter handshake on first validate
 2. One or more intent evaluations per governed tool call (multi-intent `patch` emits several)
 
-With the default all-governed yaml, a full pass runs many probes (terminal, process,
+With the default all-governed yaml, a full pass runs many probes (terminal,
 write_file, patch replace + block + V4A semantic + V4A block), so expect **multiple**
 intent blocks in `intentframe-server.log` — not a fixed count of four.
 

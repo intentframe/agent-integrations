@@ -46,23 +46,22 @@ def _tool(name: str, *, reason_required: bool = True) -> dict[str, object]:
 
 class ProviderRequestContractTests(unittest.TestCase):
     def test_parse_provider_tools(self) -> None:
-        body = {"tools": [_tool("terminal"), _tool("process")]}
+        body = {"tools": [_tool("terminal"), _tool("write_file")]}
         by_name = parse_provider_tools(body)
-        self.assertEqual(set(by_name), {"terminal", "process"})
+        self.assertEqual(set(by_name), {"terminal", "write_file"})
 
     def test_assert_provider_tools_surface_passes(self) -> None:
         body = {
             "model": "gpt-4o-mini",
             "tools": [
                 _tool("terminal"),
-                _tool("process"),
                 _tool("write_file"),
                 _tool("patch"),
             ],
         }
         assert_provider_tools_surface(
             body,
-            frozenset({"terminal", "process", "write_file", "patch"}),
+            frozenset({"terminal", "write_file", "patch"}),
             expected_model="gpt-4o-mini",
         )
 

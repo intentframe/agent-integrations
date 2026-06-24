@@ -51,11 +51,11 @@ class TestWriteScopedGovernanceYaml(unittest.TestCase):
             shutil.rmtree(path.parent, ignore_errors=True)
 
     def test_only_listed_tools_governed(self) -> None:
-        path = write_scoped_governance_yaml(governed_tools=frozenset({"terminal", "process"}))
+        path = write_scoped_governance_yaml(governed_tools=frozenset({"terminal", "patch"}))
         try:
             catalog = load_tool_catalog(str(path))
             governed = load_governed_tools(str(path))
-            self.assertEqual(set(governed), {"terminal", "process"})
+            self.assertEqual(set(governed), {"terminal", "patch"})
             self.assertFalse(catalog["write_file"].enabled)
         finally:
             shutil.rmtree(path.parent, ignore_errors=True)
@@ -86,7 +86,7 @@ class TestGovernanceE2eSetup(unittest.TestCase):
         self.assertEqual(set(governed), {"terminal"})
 
     def test_respects_existing_hermes_governance_yaml(self) -> None:
-        path = write_scoped_governance_yaml(governed_tools=frozenset({"process"}))
+        path = write_scoped_governance_yaml(governed_tools=frozenset({"patch"}))
         try:
             os.environ["HERMES_GOVERNANCE_YAML"] = str(path)
             result = setup_e2e_governance_yaml()
@@ -96,13 +96,13 @@ class TestGovernanceE2eSetup(unittest.TestCase):
 
     def test_parse_governed_tools_env(self) -> None:
         self.assertEqual(
-            parse_governed_tools_env(" terminal , process "),
-            frozenset({"terminal", "process"}),
+            parse_governed_tools_env(" terminal , write_file "),
+            frozenset({"terminal", "write_file"}),
         )
 
     def test_log_e2e_governance_reports_scoped_tools(self) -> None:
-        governed = frozenset({"terminal", "process"})
-        os.environ["HERMES_E2E_GOVERNED_TOOLS"] = "terminal,process"
+        governed = frozenset({"terminal", "write_file"})
+        os.environ["HERMES_E2E_GOVERNED_TOOLS"] = "terminal,write_file"
         setup_e2e_governance_yaml()
         messages: list[str] = []
 
@@ -113,14 +113,14 @@ class TestGovernanceE2eSetup(unittest.TestCase):
         joined = "\n".join(messages)
         self.assertIn("HERMES_E2E_GOVERNED_TOOLS", joined)
         self.assertIn("terminal: RUN", joined)
-        self.assertIn("write_file: SKIP", joined)
+        self.assertIn("patch: SKIP", joined)
         self.assertIn("cronjob: SKIP", joined)
 
     def test_assert_e2e_governance_snapshot_rejects_mismatch(self) -> None:
         path = write_scoped_governance_yaml(governed_tools=frozenset({"terminal"}))
         try:
             os.environ["HERMES_GOVERNANCE_YAML"] = str(path)
-            os.environ["HERMES_E2E_GOVERNED_TOOLS"] = "process"
+            os.environ["HERMES_E2E_GOVERNED_TOOLS"] = "write_file"
             snapshot = load_e2e_governance_snapshot()
             with self.assertRaises(AssertionError):
                 assert_e2e_governance_snapshot(snapshot)
@@ -133,14 +133,14 @@ class TestGovernanceE2eSetup(unittest.TestCase):
             os.environ["HERMES_GOVERNANCE_YAML"] = str(path)
             text = format_governance_snapshot(load_e2e_governance_snapshot())
             self.assertIn("not governed", text)
-            self.assertIn("process", text)
+            self.assertIn("write_file", text)
         finally:
             shutil.rmtree(path.parent, ignore_errors=True)
 
     def test_format_gateway_probe_plan(self) -> None:
         text = format_gateway_probe_plan(frozenset({"terminal"}))
         self.assertIn("terminal: RUN", text)
-        self.assertIn("process: SKIP", text)
+        self.assertIn("write_file: SKIP", text)
         self.assertIn("cronjob: SKIP", text)
 
     def test_assert_governance_env_contract(self) -> None:

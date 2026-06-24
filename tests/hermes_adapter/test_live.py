@@ -23,8 +23,6 @@ from live_fixtures import (  # noqa: E402
     PATCH_BLOCK_REPLACE_ARGS,
     PATCH_V4A_BLOCK_ARGS,
     PATCH_V4A_MIXED_HOME_DELETE_ARGS,
-    PROCESS_ALLOW_ARGS,
-    PROCESS_BLOCK_ARGS,
     WRITE_ALLOW_ARGS,
     WRITE_BLOCK_ARGS,
 )
@@ -77,15 +75,6 @@ class TestLiveHermesAdapter(unittest.TestCase):
         self.assertIsInstance(agent_response, dict)
         self.assertEqual(agent_response.get("exit_code"), -1)
         self.assertEqual(agent_response.get("status"), "blocked")
-
-    def test_allow_process(self) -> None:
-        body = self._validate_tool("process", PROCESS_ALLOW_ARGS)
-        self.assertTrue(body["allowed"])
-
-    def test_block_process(self) -> None:
-        body = self._validate_tool("process", PROCESS_BLOCK_ARGS)
-        self.assertFalse(body["allowed"])
-        self.assertIn("agent_response", body)
 
     def test_allow_write_file(self) -> None:
         body = self._validate_tool("write_file", WRITE_ALLOW_ARGS)

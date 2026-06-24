@@ -18,8 +18,6 @@ from api_client import (  # noqa: E402
     assert_patch_replace_block,
     assert_patch_v4a_mixed_block,
     assert_patch_v4a_mixed_home_delete_semantic,
-    assert_process_allow,
-    assert_process_block,
 )
 
 
@@ -49,22 +47,6 @@ class TestApiClientAssertions(unittest.TestCase):
         )
         with self.assertRaises(AssertionError):
             assert_block_response(body)
-
-    def test_assert_process_allow(self) -> None:
-        body = _response(
-            tool="process",
-            arguments={"action": "list", "reason": "ok"},
-            output='{"status": "ok"}',
-        )
-        assert_process_allow(body)
-
-    def test_assert_process_block(self) -> None:
-        body = _response(
-            tool="process",
-            arguments={"action": "run", "data": "sudo rm -rf /", "reason": "bad"},
-            output='{"status": "blocked", "error": "policy"}',
-        )
-        assert_process_block(body)
 
     def test_assert_patch_replace_allow(self) -> None:
         body = _response(

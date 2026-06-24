@@ -22,8 +22,6 @@ from live_fixtures import (  # noqa: E402
     PATCH_BLOCK_REPLACE_ARGS,
     PATCH_V4A_BLOCK_ARGS,
     PATCH_V4A_MIXED_HOME_DELETE_ARGS,
-    PROCESS_ALLOW_ARGS,
-    PROCESS_BLOCK_ARGS,
     WRITE_ALLOW_ARGS,
     WRITE_BLOCK_ARGS,
 )
@@ -87,14 +85,6 @@ class TestLiveBridgeGate(unittest.TestCase):
         self.assertEqual(body["exit_code"], -1)
         self.assertEqual(body["status"], "blocked")
         delegate.assert_not_called()
-
-    def test_allow_process(self) -> None:
-        delegate = MagicMock(return_value='{"status": "ok"}')
-        self._assert_allowed("process", PROCESS_ALLOW_ARGS, delegate=delegate)
-
-    def test_block_process(self) -> None:
-        delegate = MagicMock()
-        self._assert_blocked("process", PROCESS_BLOCK_ARGS, delegate=delegate)
 
     def test_allow_write_file(self) -> None:
         delegate = MagicMock(return_value='{"status": "ok"}')

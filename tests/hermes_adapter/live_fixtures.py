@@ -15,16 +15,12 @@ from hermes_tool_probes import (  # noqa: E402
     patch_replace_block_args,
     patch_v4a_block_args,
     patch_v4a_mixed_home_delete_args,
-    process_allow_args,
-    process_block_args,
     write_allow_args,
     write_block_args,
 )
 
 _LIVE_MARKER = "live"
 
-PROCESS_ALLOW_ARGS = process_allow_args()
-PROCESS_BLOCK_ARGS = process_block_args()
 WRITE_ALLOW_ARGS = write_allow_args(marker=_LIVE_MARKER)
 WRITE_BLOCK_ARGS = write_block_args()
 PATCH_ALLOW_REPLACE_ARGS = patch_replace_allow_args(marker=_LIVE_MARKER)

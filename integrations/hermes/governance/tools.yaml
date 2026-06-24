@@ -27,14 +27,6 @@ tools:
     blocked_response: terminal_json
     builtin_module: tools.terminal_tool
 
-  process:
-    enabled: true
-    action: RUN_COMMAND
-    risk: local_process
-    mapper: process
-    blocked_response: generic_json
-    builtin_module: tools.process_registry
-
   write_file:
     enabled: true
     action: WRITE_HOST_FILE

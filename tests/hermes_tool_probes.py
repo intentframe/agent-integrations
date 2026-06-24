@@ -5,14 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 
 
-def process_allow_args(*, reason: str = "Live process allow test") -> dict[str, str]:
-    return {"action": "list", "reason": reason}
-
-
-def process_block_args(*, reason: str = "E2E process run probe") -> dict[str, str]:
-    return {"action": "run", "data": "sudo rm -rf /", "reason": reason}
-
-
 def write_allow_args(*, marker: str, reason: str | None = None) -> dict[str, str]:
     return {
         "path": f"~/intentframe-e2e-{marker}.txt",

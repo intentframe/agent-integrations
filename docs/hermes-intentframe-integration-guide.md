@@ -231,14 +231,11 @@ Three independent knobs:
 
 Governance template (v1 catalog — four Hermes tools):
 
-```6:34:integrations/hermes/governance/tools.yaml
+```6:26:integrations/hermes/governance/tools.yaml
 tools:
   terminal:
     enabled: true
     action: RUN_COMMAND
-    ...
-  process:
-    enabled: true
     ...
   write_file:
     enabled: true
@@ -444,7 +441,7 @@ Add entry to `integrations/hermes/governance/tools.yaml`:
     enabled: true
     action: WRITE_HOST_FILE   # or RUN_COMMAND, DELETE_HOST_FILE, …
     risk: local_write
-    mapper: write_file        # terminal | process | write_file | patch
+    mapper: write_file        # terminal | write_file | patch
     blocked_response: generic_json
 ```
 
@@ -465,7 +462,7 @@ Runtime copy: `~/.intentframe/integrations/hermes/governance/tools.yaml` (user t
 Valid mapper kinds (plugin loader):
 
 ```python
-VALID_MAPPER_KINDS = frozenset({"terminal", "process", "write_file", "patch", "generic"})
+VALID_MAPPER_KINDS = frozenset({"terminal", "write_file", "patch", "generic"})
 ```
 
 For `mapper: generic`, no new mapper function is needed — `map_generic` handles all
@@ -534,7 +531,7 @@ Every catalog tool must appear in the probe contract (`test_governed_tool_covera
 
 | Mapper | Registry | Live adapter + plugin | Gateway LLM E2E |
 |--------|----------|----------------------|-----------------|
-| native (`terminal`, `process`, …) | `GATEWAY_E2E_PROBE_SYMBOLS` | deterministic ALLOW/BLOCK (+ patch semantic) | yes (`test_gateway_e2e.py`) |
+| native (`terminal`, …) | `GATEWAY_E2E_PROBE_SYMBOLS` | deterministic ALLOW/BLOCK (+ patch semantic) | yes (`test_gateway_e2e.py`) |
 | `generic` | derived via `mapper: generic` | semantic smoke (ALLOW or BLOCK) | no |
 
 Add native probe functions to `tests/hermes_gateway/test_gateway_e2e.py` and register symbols
@@ -703,7 +700,7 @@ Expect: `POST /v1/responses ALLOW (attempt 1/3)`, passes 1/2a/2b.
 RUN_HERMES_GATEWAY_E2E=1 ./tests/scripts/test-hermes-gateway-e2e.sh
 ```
 
-Runs ALLOW/BLOCK/semantic probes for `terminal`, `process`, `write_file`, `patch`
+Runs ALLOW/BLOCK/semantic probes for `terminal`, `write_file`, `patch`
 (including V4A delete via `patch`) across greenfield, idempotent, and external-`HERMES_BIN` paths.
 Generic catalog tools (e.g. `cronjob`) are live-tested only — no gateway LLM probe.
 

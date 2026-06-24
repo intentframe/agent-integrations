@@ -118,24 +118,6 @@ def map_terminal(args: dict[str, Any]) -> list[IntentDict]:
     return [_attach_hermes_args(intent, args, frozenset({"command"}))]
 
 
-def map_process(args: dict[str, Any]) -> list[IntentDict]:
-    action = _require_str(args, "action")
-    reason = validate_reason(args.get("reason"))
-    session_id = args.get("session_id")
-    session_part = f" session_id={session_id}" if session_id is not None else ""
-    data = args.get("data")
-    data_part = f" data={data!r}" if data is not None else ""
-    command = f"process:{action}{session_part}{data_part}"
-    intent = {
-        "action": "RUN_COMMAND",
-        "command": command,
-        "reason": reason,
-        "target": command[:200],
-    }
-    absorbed = frozenset({"action", "session_id", "data"})
-    return [_attach_hermes_args(intent, args, absorbed)]
-
-
 def map_write_file(args: dict[str, Any]) -> list[IntentDict]:
     path = _require_str(args, "path")
     content = args.get("content")
@@ -306,7 +288,6 @@ def map_generic(tool: str, args: dict[str, Any], *, action: str) -> list[IntentD
 
 MAPPERS: dict[str, MapperFn | GenericMapperFn] = {
     "terminal": map_terminal,
-    "process": map_process,
     "write_file": map_write_file,
     "patch": map_patch,
 }

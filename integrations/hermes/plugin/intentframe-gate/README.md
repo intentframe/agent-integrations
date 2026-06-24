@@ -23,7 +23,7 @@ Gateway startup / preload: [`docs/hermes-plugin-registration-order.md`](../../..
 Configured in `integrations/hermes/governance/tools.yaml` (runtime copy under
 `~/.intentframe/integrations/hermes/governance/tools.yaml`):
 
-- `terminal`, `process` → `RUN_COMMAND`
+- `terminal` → `RUN_COMMAND`
 - `write_file`, `patch` (update/add) → `WRITE_HOST_FILE`
 - `patch` (V4A delete) → `DELETE_HOST_FILE`
 

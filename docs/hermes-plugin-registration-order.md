@@ -421,7 +421,7 @@ repo catalog template (see [`test_builtin_preload.py`](../tests/hermes_plugin/te
 
 | Tool | Gateway E2E | Registration note |
 |------|-------------|-------------------|
-| `terminal`, `process`, `write_file`, `patch`, `cronjob` | Probed when in scoped yaml | ``builtin_module`` in repo ``tools.yaml`` — preload + snapshot |
+| `terminal`, `write_file`, `patch`, `cronjob` | Probed when in scoped yaml | ``builtin_module`` in repo ``tools.yaml`` — preload + snapshot |
 
 Delete coverage uses `patch` V4A `*** Delete File:` ops (maps to `DELETE_HOST_FILE`).
 
