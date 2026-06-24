@@ -60,6 +60,11 @@ also applies `check_cronjob_requirements()` — requires `HERMES_GATEWAY_SESSION
 (or interactive/exec env). The toolsets schema probe sets session env to mirror the
 gateway; see `tests/hermes_gateway/README.md` (Recent fixes).
 
+**Outbound messaging:** Hermes does not expose `send_message` to the LLM by default;
+proactive Slack/email/WhatsApp/SMS usually goes through governed **`terminal`**
+(`hermes send …`) or **`cronjob`** (`deliver=`). See
+[`docs/hermes-outbound-messaging-and-cronjob-governance.md`](../../../docs/hermes-outbound-messaging-and-cronjob-governance.md).
+
 ## Dev workflow (adding a generic tool)
 
 1. Add entry to `tools.yaml` with `mapper: generic`, a `HERMES_*` action ID, and

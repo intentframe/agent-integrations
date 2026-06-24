@@ -21,7 +21,9 @@ Docs: [`docs/agent-tool-gating.md`](../../docs/agent-tool-gating.md),
 [`docs/hermes-plugin-registration-order.md`](../../docs/hermes-plugin-registration-order.md)
 (gateway preload + snapshot),
 [`docs/NATIVE_KIT_INTEGRATION.md`](../../docs/NATIVE_KIT_INTEGRATION.md)
-(native-kit bundle, adding governed tools).
+(native-kit bundle, adding governed tools),
+[`docs/hermes-outbound-messaging-and-cronjob-governance.md`](../../docs/hermes-outbound-messaging-and-cronjob-governance.md)
+(proactive send, cron `deliver`, cronjob governance FAQ).
 
 ## Quick start
 

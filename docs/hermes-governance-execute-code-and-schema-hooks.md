@@ -5,6 +5,7 @@
 >
 > Related: [`hermes-plugin-registration-order.md`](./hermes-plugin-registration-order.md),
 > [`hermes-intentframe-integration-guide.md`](./hermes-intentframe-integration-guide.md),
+> [`hermes-outbound-messaging-and-cronjob-governance.md`](./hermes-outbound-messaging-and-cronjob-governance.md),
 > [`integrations/hermes/plugin/intentframe-gate/README.md`](../integrations/hermes/plugin/intentframe-gate/README.md).
 
 ---

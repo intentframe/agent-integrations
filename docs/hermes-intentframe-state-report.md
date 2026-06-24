@@ -206,5 +206,6 @@ See [`tests/hermes_gateway/README.md`](../tests/hermes_gateway/README.md).
 | Gating terminology | [`agent-tool-gating.md`](./agent-tool-gating.md) |
 | Native-kit alignment | [`NATIVE_KIT_INTEGRATION.md`](./NATIVE_KIT_INTEGRATION.md) |
 | DELETE_HOST_FILE validation | [`delete-host-file-validation.md`](./delete-host-file-validation.md) |
+| Outbound messaging + cronjob | [`hermes-outbound-messaging-and-cronjob-governance.md`](./hermes-outbound-messaging-and-cronjob-governance.md) |
 | Hermes README | [`integrations/hermes/README.md`](../integrations/hermes/README.md) |
 | E2E harness | [`tests/hermes_gateway/README.md`](../tests/hermes_gateway/README.md) |

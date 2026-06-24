@@ -9,6 +9,7 @@ Related:
 - [`hermes-intentframe-state-report.md`](./hermes-intentframe-state-report.md) — current integration snapshot (catalog, tests, limitations)
 - [`hermes-plugin-registration-order.md`](./hermes-plugin-registration-order.md) — load-order bug, preload fix, evidence
 - [`hermes-governance-execute-code-and-schema-hooks.md`](./hermes-governance-execute-code-and-schema-hooks.md) — `execute_code` governance, schema hooks, `read_terminal` lessons (June 2026)
+- [`hermes-outbound-messaging-and-cronjob-governance.md`](./hermes-outbound-messaging-and-cronjob-governance.md) — proactive outbound send (`hermes send`, cron `deliver`), cronjob governance, AE/Guardian visibility, v1 deferrals
 - [`agent-tool-gating.md`](./agent-tool-gating.md) — portable gating pattern
 - [`NATIVE_KIT_INTEGRATION.md`](./NATIVE_KIT_INTEGRATION.md) — native-kit bundles, policy alignment
 - [`integrations/hermes/README.md`](../integrations/hermes/README.md) — CLI quick start
