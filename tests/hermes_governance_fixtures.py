@@ -27,7 +27,9 @@ PLUGIN_GOVERNANCE_COPY = (
 
 GATEWAY_E2E_PROBE_SYMBOLS: dict[str, frozenset[str]] = {
     "terminal": frozenset({"run_allow_with_retries", "run_block_once"}),
-    "process": frozenset({"run_process_allow_with_retries", "run_process_block_once"}),
+    "execute_code": frozenset(
+        {"run_execute_code_allow_with_retries", "run_execute_code_block_once"}
+    ),
     "write_file": frozenset(
         {"run_write_file_allow_with_retries", "run_write_file_block_once"}
     ),

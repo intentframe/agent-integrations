@@ -16,12 +16,11 @@ if str(_TESTS_DIR) not in sys.path:
     sys.path.insert(0, str(_TESTS_DIR))
 
 from hermes_tool_probes import (  # noqa: E402
+    execute_code_block_args,
     patch_replace_allow_args,
     patch_replace_block_args,
     patch_v4a_block_args,
     patch_v4a_mixed_home_delete_args,
-    process_allow_args,
-    process_block_args,
     seed_patch_replace_target,
     write_block_args,
 )
@@ -329,6 +328,104 @@ def run_block_once(*, host: str, port: int, api_key: str) -> TerminalCall:
     return assert_block_response(body)
 
 
+def assert_execute_code_allow(body: dict[str, Any], *, marker: str) -> ToolCall:
+    calls = extract_tool_calls(body, tool_name="execute_code")
+    if not calls:
+        raise AssertionError(
+            f"No execute_code function_call in response: {json.dumps(body)[:2000]}"
+        )
+
+    call = calls[-1]
+    code = str(call.arguments.get("code", ""))
+    if marker not in code and marker not in call.output:
+        raise AssertionError(
+            f"Allow test missing marker {marker!r} in code={code!r} output={call.output!r}"
+        )
+    if _looks_blocked(call.output):
+        raise AssertionError(f"Expected allow but got blocked output: {call.output!r}")
+    return call
+
+
+def assert_execute_code_block(body: dict[str, Any]) -> ToolCall:
+    calls = extract_tool_calls(body, tool_name="execute_code")
+    if not calls:
+        raise AssertionError(
+            f"No execute_code function_call in block response: {json.dumps(body)[:2000]}"
+        )
+
+    call = calls[-1]
+    code = str(call.arguments.get("code", "")).lower()
+    if "sudo" not in code:
+        raise AssertionError(f"Block test code unexpected: {code!r}")
+    if not _looks_blocked(call.output):
+        raise AssertionError(f"Expected blocked tool output, got: {call.output!r}")
+    return call
+
+
+def run_execute_code_allow_with_retries(
+    *,
+    host: str,
+    port: int,
+    api_key: str,
+    marker: str,
+    attempts: int = 3,
+) -> ToolCall:
+    from cli_runner import step
+
+    code = f"print({marker!r})"
+    instructions = (
+        "You are running an automated integration test. "
+        "You MUST call the execute_code tool exactly once and no other tools."
+    )
+    last_error: Exception | None = None
+    for attempt in range(1, attempts + 1):
+        step(f"POST /v1/responses execute_code ALLOW (attempt {attempt}/{attempts})")
+        prompt = (
+            f"Call the execute_code tool exactly once with code: {code} "
+            f"and reason: 'IntentFrame E2E execute_code allow {attempt}'. "
+            "Do not explain; just run the tool."
+        )
+        try:
+            body = post_responses(
+                host=host,
+                port=port,
+                api_key=api_key,
+                prompt=prompt,
+                instructions=instructions,
+            )
+            return assert_execute_code_allow(body, marker=marker)
+        except (AssertionError, RuntimeError) as exc:
+            last_error = exc
+    raise AssertionError(
+        f"execute_code allow test failed after {attempts} attempts: {last_error}"
+    ) from last_error
+
+
+def run_execute_code_block_once(*, host: str, port: int, api_key: str) -> ToolCall:
+    from cli_runner import step
+
+    step("POST /v1/responses execute_code BLOCK (policy should deny sudo in code)")
+    args = execute_code_block_args(reason="IntentFrame E2E execute_code block test")
+    code = args["code"]
+    prompt = (
+        "Call the execute_code tool exactly once with this exact code and no other tools:\n"
+        f"{code}\n"
+        f"Use reason: '{args['reason']}'."
+    )
+    instructions = (
+        "You are running an automated integration test. "
+        "You MUST call the execute_code tool exactly once and no other tools."
+    )
+    body = post_responses(
+        host=host,
+        port=port,
+        api_key=api_key,
+        prompt=prompt,
+        instructions=instructions,
+    )
+    return assert_execute_code_block(body)
+
+
 def assert_write_file_allow(body: dict[str, Any], *, marker: str) -> ToolCall:
     calls = extract_tool_calls(body, tool_name="write_file")
     if not calls:
@@ -447,95 +544,6 @@ def _format_tool_prompt(tool_name: str, args: dict[str, str], *, attempt: int | 
         lines.append(f"(attempt {attempt})")
     lines.append("Do not explain; just run the tool.")
     return "\n".join(lines)
-
-
-def assert_process_allow(body: dict[str, Any]) -> ToolCall:
-    calls = extract_tool_calls(body, tool_name="process")
-    if not calls:
-        raise AssertionError(f"No process function_call in response: {json.dumps(body)[:2000]}")
-
-    call = calls[-1]
-    action = str(call.arguments.get("action", "")).lower()
-    if action != "list":
-        raise AssertionError(f"Expected process action 'list', got: {call.arguments!r}")
-    if _looks_blocked(call.output):
-        raise AssertionError(f"Expected allow but got blocked output: {call.output!r}")
-    return call
-
-
-def assert_process_block(body: dict[str, Any]) -> ToolCall:
-    calls = extract_tool_calls(body, tool_name="process")
-    if not calls:
-        raise AssertionError(f"No process function_call in block response: {json.dumps(body)[:2000]}")
-
-    call = calls[-1]
-    action = str(call.arguments.get("action", "")).lower()
-    data = str(call.arguments.get("data", "")).lower()
-    if action != "run" or "sudo" not in data:
-        raise AssertionError(f"Block test process args unexpected: {call.arguments!r}")
-    if not _looks_blocked(call.output):
-        raise AssertionError(f"Expected blocked tool output, got: {call.output!r}")
-    return call
-
-
-def run_process_allow_with_retries(
-    *,
-    host: str,
-    port: int,
-    api_key: str,
-    attempts: int = 3,
-) -> ToolCall:
-    from cli_runner import step
-
-    instructions = _single_tool_instructions("process")
-    last_error: Exception | None = None
-    for attempt in range(1, attempts + 1):
-        step(f"POST /v1/responses process ALLOW (attempt {attempt}/{attempts})")
-        args = process_allow_args(reason=f"IntentFrame E2E process allow {attempt}")
-        prompt = _format_tool_prompt("process", args, attempt=attempt)
-        try:
-            body = post_responses(
-                host=host,
-                port=port,
-                api_key=api_key,
-                prompt=prompt,
-                instructions=instructions,
-            )
-            return assert_process_allow(body)
-        except (AssertionError, RuntimeError) as exc:
-            last_error = exc
-    raise AssertionError(f"process allow test failed after {attempts} attempts: {last_error}") from last_error
-
-
-def run_process_block_once(*, host: str, port: int, api_key: str) -> ToolCall:
-    from cli_runner import step
-
-    step("POST /v1/responses process BLOCK (sudo in mapped RUN_COMMAND)")
-    args = process_block_args(reason="IntentFrame E2E process block test")
-    data = args["data"]
-    instructions = (
-        "You are running an automated integration test. "
-        "You MUST call the process tool exactly once and no other tools. "
-        f"The data argument MUST remain exactly {data!r}. "
-        "Do NOT remove or substitute the sudo command. "
-        "Do NOT make a second process call if the first is blocked."
-    )
-    prompt = (
-        "Call the process tool exactly once with these arguments (copy data verbatim):\n"
-        f"- action: {args['action']!r}\n"
-        f"- data: {data}\n"
-        f"- reason: {args['reason']!r}\n"
-        f"\nThe data MUST stay {data!r}. Do not change it.\n"
-        "Do not explain; just run the tool once."
-    )
-    body = post_responses(
-        host=host,
-        port=port,
-        api_key=api_key,
-        prompt=prompt,
-        instructions=instructions,
-    )
-    return assert_process_block(body)
 
 
 def _patch_text(call: ToolCall) -> str:

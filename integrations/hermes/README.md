@@ -59,7 +59,7 @@ Configured in runtime `~/.intentframe/integrations/hermes/governance/tools.yaml`
 
 | Hermes tool | IntentFrame action | `enabled: false` effect |
 |-------------|-------------------|-------------------------|
-| `terminal`, `process` | `RUN_COMMAND` | Native Hermes handler, no IF gate |
+| `terminal` | `RUN_COMMAND` | Native Hermes handler, no IF gate |
 | `write_file`, `patch` (update/add) | `WRITE_HOST_FILE` | same |
 | `patch` (V4A delete) | `DELETE_HOST_FILE` | same |
 | `cronjob` | `HERMES_CRONJOB` | same (semantic-only via dynamic bundle) |
@@ -197,7 +197,7 @@ Export env from `agent.json` (or set in the shell before `start` / `gateway star
 
 See [`governance/README.md`](governance/README.md) for dev vs user ownership.
 
-**Native mapper** (terminal, process, write_file, patch):
+**Native mapper** (terminal, write_file, patch):
 
 1. Add an entry to `governance/tools.yaml`.
 2. Add or reuse a mapper in `adapter/src/hermes_adapter/mapper.py`.
@@ -246,7 +246,7 @@ Deterministic adapter + plugin gate probes (no LLM) against a running Hermes sta
 ./tests/scripts/test-hermes-integration.sh
 ```
 
-Covers all catalog tools: native tools (`terminal`, `process`, `write_file`, `patch`)
+Covers all catalog tools: native tools (`terminal`, `write_file`, `patch`)
 including V4A `patch` multi-intent write+delete, plus generic tools (e.g. `cronjob`)
 via semantic smoke. Also runs `policy show` + `policy reload` (live registry smoke —
 validates generic action IDs via `agent.json` manifest defaults without exporting
@@ -266,7 +266,7 @@ RUN_HERMES_GATEWAY_E2E=1 \
   python tests/hermes_gateway/test_gateway_e2e.py
 ```
 
-Requires `OPENAI_API_KEY`. Covers ALLOW/BLOCK for native-mapper catalog tools (`terminal`, `process`,
+Requires `OPENAI_API_KEY`. Covers ALLOW/BLOCK for native-mapper catalog tools (`terminal`,
 `write_file`, `patch`), including V4A mixed write+delete multi-intent `patch` probes.
 Generic tools are not exercised via gateway LLM E2E.
 

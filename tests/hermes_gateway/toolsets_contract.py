@@ -1,7 +1,14 @@
 """Contract for GET /v1/toolsets after intentframe-gate integration.
 
-Validates the Hermes api_server tool *name* surface the LLM can choose from.
-Names only — full JSON schemas are probed separately via ``probe_hermes_tool_schemas.py``.
+Validates the Hermes api_server tool *name* surface at gateway startup (before lazy
+``model_tools`` import). Names only — full JSON schemas are probed separately via
+``probe_hermes_tool_schemas.py``; OpenAI ``tools=`` payload via
+``provider_request_contract.py``.
+
+Strict shape (e.g. ``terminal: {terminal, process}`` without ``read_terminal``) is a
+canary for accidental full ``discover_builtin_tools()`` during plugin load. Ungoverned
+tools like ``vision_analyze`` are *expected* on this surface; ``read_terminal`` is not.
+See ``docs/hermes-governance-execute-code-and-schema-hooks.md``.
 """
 
 from __future__ import annotations
@@ -23,7 +30,7 @@ API_SERVER_COMPOSITE_TOOLSET = "hermes-api-server"
 
 # Ungoverned tools that explain LLM tool-selection noise in gateway E2E.
 UNGATED_DISTRACTOR_TOOLS = frozenset(
-    {"vision_analyze", "execute_code", "skill_manage"}
+    {"vision_analyze", "skill_manage"}
 )
 
 # Individual toolsets that must be enabled when api_server uses the default composite.

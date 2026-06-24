@@ -46,23 +46,22 @@ def _tool(name: str, *, reason_required: bool = True) -> dict[str, object]:
 
 class ProviderRequestContractTests(unittest.TestCase):
     def test_parse_provider_tools(self) -> None:
-        body = {"tools": [_tool("terminal"), _tool("process")]}
+        body = {"tools": [_tool("terminal"), _tool("write_file")]}
         by_name = parse_provider_tools(body)
-        self.assertEqual(set(by_name), {"terminal", "process"})
+        self.assertEqual(set(by_name), {"terminal", "write_file"})
 
     def test_assert_provider_tools_surface_passes(self) -> None:
         body = {
             "model": "gpt-4o-mini",
             "tools": [
                 _tool("terminal"),
-                _tool("process"),
                 _tool("write_file"),
                 _tool("patch"),
             ],
         }
         assert_provider_tools_surface(
             body,
-            frozenset({"terminal", "process", "write_file", "patch"}),
+            frozenset({"terminal", "write_file", "patch"}),
             expected_model="gpt-4o-mini",
         )
 
@@ -167,10 +166,10 @@ class ProviderRequestContractTests(unittest.TestCase):
             "model": "gpt-4o-mini",
             "tools": [
                 _tool("terminal"),
-                _tool("execute_code", reason_required=False),
+                _tool("execute_code"),
             ],
         }
-        governed = frozenset({"terminal"})
+        governed = frozenset({"terminal", "execute_code"})
         text = format_provider_tools_snapshot(
             body,
             governed,
@@ -179,9 +178,8 @@ class ProviderRequestContractTests(unittest.TestCase):
         self.assertIn("model='gpt-4o-mini'", text)
         self.assertIn("request_dump=/tmp/dump.json", text)
         self.assertIn("terminal [governed, reason_required=True]", text)
-        self.assertIn("execute_code", text)
-        self.assertNotIn("execute_code [governed", text)
-        self.assertIn("['terminal']", text)
+        self.assertIn("execute_code [governed, reason_required=True]", text)
+        self.assertIn("['execute_code', 'terminal']", text)
 
     def test_tool_reason_required(self) -> None:
         fn = _tool("terminal")["function"]

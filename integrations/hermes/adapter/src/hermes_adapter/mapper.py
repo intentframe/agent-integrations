@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import shlex
 from dataclasses import dataclass
 from typing import Any, Callable, Literal
 
@@ -52,6 +53,30 @@ def _require_str(args: dict[str, Any], key: str) -> str:
     return value.strip()
 
 
+def hermes_args_remainder(
+    args: dict[str, Any],
+    mapped_keys: frozenset[str],
+) -> dict[str, Any]:
+    """Hermes args not already promoted or absorbed by the dedicated mapper."""
+    skip = mapped_keys | {"reason"}
+    return {
+        key: value
+        for key, value in args.items()
+        if key not in skip and value is not None
+    }
+
+
+def _attach_hermes_args(
+    intent: IntentDict,
+    args: dict[str, Any],
+    mapped_keys: frozenset[str],
+) -> IntentDict:
+    remainder = hermes_args_remainder(args, mapped_keys)
+    if remainder:
+        intent["hermes_args"] = remainder
+    return intent
+
+
 def _host_file_intent(
     *,
     action: str,
@@ -82,35 +107,35 @@ def _host_file_intent(
     return intent
 
 
+# command_shield max_command_length is 10_000; leave room for ``python -c `` wrapper.
+_EXECUTE_CODE_MAX_BODY = 9500
+
+
+def map_execute_code(args: dict[str, Any]) -> list[IntentDict]:
+    """Map Hermes execute_code (Python) to RUN_COMMAND for command_shield analysis."""
+    code = _require_str(args, "code")
+    reason = validate_reason(args.get("reason"))
+    body = code[:_EXECUTE_CODE_MAX_BODY]
+    command = f"python -c {shlex.quote(body)}"
+    intent = {
+        "action": "RUN_COMMAND",
+        "command": command,
+        "reason": reason,
+        "target": f"execute_code ({len(code)} chars)"[:200],
+    }
+    return [_attach_hermes_args(intent, args, frozenset({"code"}))]
+
+
 def map_terminal(args: dict[str, Any]) -> list[IntentDict]:
     command = _require_str(args, "command")
     reason = validate_reason(args.get("reason"))
-    return [
-        {
-            "action": "RUN_COMMAND",
-            "command": command,
-            "reason": reason,
-            "target": command[:200],
-        }
-    ]
-
-
-def map_process(args: dict[str, Any]) -> list[IntentDict]:
-    action = _require_str(args, "action")
-    reason = validate_reason(args.get("reason"))
-    session_id = args.get("session_id")
-    session_part = f" session_id={session_id}" if session_id is not None else ""
-    data = args.get("data")
-    data_part = f" data={data!r}" if data is not None else ""
-    command = f"process:{action}{session_part}{data_part}"
-    return [
-        {
-            "action": "RUN_COMMAND",
-            "command": command,
-            "reason": reason,
-            "target": command[:200],
-        }
-    ]
+    intent = {
+        "action": "RUN_COMMAND",
+        "command": command,
+        "reason": reason,
+        "target": command[:200],
+    }
+    return [_attach_hermes_args(intent, args, frozenset({"command"}))]
 
 
 def map_write_file(args: dict[str, Any]) -> list[IntentDict]:
@@ -119,14 +144,13 @@ def map_write_file(args: dict[str, Any]) -> list[IntentDict]:
     if not isinstance(content, str):
         raise ValidationError("Missing or invalid content")
     reason = validate_reason(args.get("reason"))
-    return [
-        _host_file_intent(
-            action="WRITE_HOST_FILE",
-            path=path,
-            reason=reason,
-            content=content,
-        )
-    ]
+    intent = _host_file_intent(
+        action="WRITE_HOST_FILE",
+        path=path,
+        reason=reason,
+        content=content,
+    )
+    return [_attach_hermes_args(intent, args, frozenset({"path", "content"}))]
 
 
 def _parse_v4a_operations(patch_content: str) -> list[PatchOperation]:
@@ -220,9 +244,18 @@ def _patch_operations_manifest(operations: list[PatchOperation]) -> list[dict[st
     return [{"kind": op.kind, "path": op.path} for op in operations]
 
 
+def _patch_mapped_arg_keys(mode: str) -> frozenset[str]:
+    if mode == "patch":
+        return frozenset({"mode", "patch"})
+    return frozenset({"mode", "path", "old_string", "new_string"})
+
+
 def map_patch(args: dict[str, Any]) -> list[IntentDict]:
     reason = validate_reason(args.get("reason"))
     mode = args.get("mode", "replace")
+    if not isinstance(mode, str):
+        raise ValidationError("Missing or invalid mode")
+    mapped_arg_keys = _patch_mapped_arg_keys(mode)
     operations = _extract_patch_operations(args)
     total = len(operations)
     is_v4a = mode == "patch"
@@ -243,45 +276,39 @@ def map_patch(args: dict[str, Any]) -> list[IntentDict]:
             }
 
         if operation.kind == "delete":
-            intents.append(
-                _host_file_intent(
-                    action="DELETE_HOST_FILE",
-                    path=operation.path,
-                    reason=op_reason,
-                    irreversible=True,
-                    **patch_context,
-                )
+            intent = _host_file_intent(
+                action="DELETE_HOST_FILE",
+                path=operation.path,
+                reason=op_reason,
+                irreversible=True,
+                **patch_context,
             )
-            continue
-
-        intents.append(
-            _host_file_intent(
+        else:
+            intent = _host_file_intent(
                 action="WRITE_HOST_FILE",
                 path=operation.path,
                 reason=op_reason,
                 content=_patch_content_for_operation(args, operation),
                 **patch_context,
             )
-        )
+        intents.append(_attach_hermes_args(intent, args, mapped_arg_keys))
     return intents
 
 
 def map_generic(tool: str, args: dict[str, Any], *, action: str) -> list[IntentDict]:
     reason = validate_reason(args.get("reason"))
-    return [
-        {
-            "action": action,
-            "reason": reason,
-            "target": tool,
-            "hermes_tool": tool,
-            "hermes_args": {key: value for key, value in args.items() if key != "reason"},
-        }
-    ]
+    intent: IntentDict = {
+        "action": action,
+        "reason": reason,
+        "target": tool,
+        "hermes_tool": tool,
+    }
+    return [_attach_hermes_args(intent, args, frozenset())]
 
 
 MAPPERS: dict[str, MapperFn | GenericMapperFn] = {
     "terminal": map_terminal,
-    "process": map_process,
+    "execute_code": map_execute_code,
     "write_file": map_write_file,
     "patch": map_patch,
 }

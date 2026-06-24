@@ -8,6 +8,7 @@ Related:
 
 - [`hermes-intentframe-state-report.md`](./hermes-intentframe-state-report.md) — current integration snapshot (catalog, tests, limitations)
 - [`hermes-plugin-registration-order.md`](./hermes-plugin-registration-order.md) — load-order bug, preload fix, evidence
+- [`hermes-governance-execute-code-and-schema-hooks.md`](./hermes-governance-execute-code-and-schema-hooks.md) — `execute_code` governance, schema hooks, `read_terminal` lessons (June 2026)
 - [`agent-tool-gating.md`](./agent-tool-gating.md) — portable gating pattern
 - [`NATIVE_KIT_INTEGRATION.md`](./NATIVE_KIT_INTEGRATION.md) — native-kit bundles, policy alignment
 - [`integrations/hermes/README.md`](../integrations/hermes/README.md) — CLI quick start
@@ -231,14 +232,11 @@ Three independent knobs:
 
 Governance template (v1 catalog — four Hermes tools):
 
-```6:34:integrations/hermes/governance/tools.yaml
+```6:26:integrations/hermes/governance/tools.yaml
 tools:
   terminal:
     enabled: true
     action: RUN_COMMAND
-    ...
-  process:
-    enabled: true
     ...
   write_file:
     enabled: true
@@ -314,29 +312,35 @@ TOOLSET_TOOL_EXPECTATIONS: dict[str, frozenset[str]] = {
 Selective preload avoids that side effect while still populating the registry before
 snapshot.
 
-### 2. Schema layer — `inject_reason()`
+### 2. Schema layer — `inject_reason()` on composition paths
 
-```22:55:integrations/hermes/plugin/intentframe-gate/schema.py
+`inject_reason()` returns a deep copy with required ``reason`` (idempotent). It is applied on
+**schema composition paths**, not at registry snapshot time:
+
+- **`registry.get_definitions`** — most governed tools (`registry_hook.py`)
+- **`build_execute_code_schema`** — after Hermes dynamic rebuild (`tool_definitions_hook.py`)
+
+```22:22:integrations/hermes/plugin/intentframe-gate/schema.py
 def inject_reason(schema: dict[str, Any], *, tool_name: str) -> dict[str, Any]:
-    """Return a deep copy of *schema* with required ``reason`` (idempotent)."""
-    ...
-    if "reason" not in required:
-        required.append("reason")
 ```
 
 Terminal gets slightly different reason copy; all governed tools require `reason` in
 the JSON schema the model sees.
 
-### 3. Registry hook (MCP / late registration)
+**Do not** `import model_tools` during plugin `register()` — that runs
+`discover_builtin_tools()` and leaks `read_terminal`. See
+[`hermes-governance-execute-code-and-schema-hooks.md`](./hermes-governance-execute-code-and-schema-hooks.md).
 
-```40:43:integrations/hermes/plugin/intentframe-gate/registry_hook.py
+### 3. Registry hook (MCP / late registration + schema finalization)
+
+```46:48:integrations/hermes/plugin/intentframe-gate/registry_hook.py
         if name in governed and not getattr(handler, GATED_MARKER, False):
-            schema = inject_reason(schema, tool_name=name)
             handler = wrap_handler(name, handler, is_async=is_async)
 ```
 
-The hook **complements** preload + snapshot; it must not be the **only** path for
-Hermes builtins on gateway startup.
+Schema injection at `register()` time was removed — `execute_code` and other dynamic
+schemas are rebuilt later by Hermes. The hook **complements** preload + snapshot; it must
+not be the **only** path for Hermes builtins on gateway startup.
 
 ---
 
@@ -444,7 +448,7 @@ Add entry to `integrations/hermes/governance/tools.yaml`:
     enabled: true
     action: WRITE_HOST_FILE   # or RUN_COMMAND, DELETE_HOST_FILE, …
     risk: local_write
-    mapper: write_file        # terminal | process | write_file | patch
+    mapper: write_file        # terminal | write_file | patch
     blocked_response: generic_json
 ```
 
@@ -465,7 +469,7 @@ Runtime copy: `~/.intentframe/integrations/hermes/governance/tools.yaml` (user t
 Valid mapper kinds (plugin loader):
 
 ```python
-VALID_MAPPER_KINDS = frozenset({"terminal", "process", "write_file", "patch", "generic"})
+VALID_MAPPER_KINDS = frozenset({"terminal", "write_file", "patch", "generic"})
 ```
 
 For `mapper: generic`, no new mapper function is needed — `map_generic` handles all
@@ -534,7 +538,7 @@ Every catalog tool must appear in the probe contract (`test_governed_tool_covera
 
 | Mapper | Registry | Live adapter + plugin | Gateway LLM E2E |
 |--------|----------|----------------------|-----------------|
-| native (`terminal`, `process`, …) | `GATEWAY_E2E_PROBE_SYMBOLS` | deterministic ALLOW/BLOCK (+ patch semantic) | yes (`test_gateway_e2e.py`) |
+| native (`terminal`, …) | `GATEWAY_E2E_PROBE_SYMBOLS` | deterministic ALLOW/BLOCK (+ patch semantic) | yes (`test_gateway_e2e.py`) |
 | `generic` | derived via `mapper: generic` | semantic smoke (ALLOW or BLOCK) | no |
 
 Add native probe functions to `tests/hermes_gateway/test_gateway_e2e.py` and register symbols
@@ -703,7 +707,7 @@ Expect: `POST /v1/responses ALLOW (attempt 1/3)`, passes 1/2a/2b.
 RUN_HERMES_GATEWAY_E2E=1 ./tests/scripts/test-hermes-gateway-e2e.sh
 ```
 
-Runs ALLOW/BLOCK/semantic probes for `terminal`, `process`, `write_file`, `patch`
+Runs ALLOW/BLOCK/semantic probes for `terminal`, `write_file`, `patch`
 (including V4A delete via `patch`) across greenfield, idempotent, and external-`HERMES_BIN` paths.
 Generic catalog tools (e.g. `cronjob`) are live-tested only — no gateway LLM probe.
 
@@ -730,7 +734,8 @@ catalog tool (native ALLOW/BLOCK + generic semantic smoke for e.g. `cronjob`).
 | `/v1/toolsets` has tool, model doesn’t call it | Config surface ≠ registry surface | [`hermes-plugin-registration-order.md`](./hermes-plugin-registration-order.md) |
 | Model calls tool, IntentFrame logs empty | Ungoverned at runtime | `HERMES_GOVERNANCE_YAML` path; gateway stderr `Hermes governance config:` |
 | Validate always BLOCK | Mapper/policy mismatch | adapter log; `doctor hermes` contract lines |
-| `read_terminal` in terminal toolset | Full builtin discovery in plugin | Use selective preload only |
+| `read_terminal` in terminal toolset | Full builtin discovery in plugin (`discover_builtin_tools` or `import model_tools` at register) | Selective preload only; schema hooks via `get_definitions` — see [`hermes-governance-execute-code-and-schema-hooks.md`](./hermes-governance-execute-code-and-schema-hooks.md) |
+| `execute_code` missing `reason` in schema probe | Only `get_definitions` hooked, not `build_execute_code_schema` | Hermes rebuilds `execute_code` after `get_definitions`; patch the builder |
 | Gateway health timeout | Crash on boot | sandbox `gateway.log` |
 | Stale governance after edit | Process not restarted | restart adapter + gateway |
 | `patch replace ALLOW` fails Pass 2a (overwrite BLOCK) | Same marker/file reused across passes | Pass-unique marker + `seed_patch_replace_target` |
@@ -755,6 +760,8 @@ catalog tool (native ALLOW/BLOCK + generic semantic smoke for e.g. `cronjob`).
 | Preload map | [`integrations/hermes/plugin/intentframe-gate/builtin_preload.py`](../integrations/hermes/plugin/intentframe-gate/builtin_preload.py) |
 | Gate + wrap | [`integrations/hermes/plugin/intentframe-gate/gate.py`](../integrations/hermes/plugin/intentframe-gate/gate.py) |
 | Registry hook | [`integrations/hermes/plugin/intentframe-gate/registry_hook.py`](../integrations/hermes/plugin/intentframe-gate/registry_hook.py) |
+| Schema hooks | [`integrations/hermes/plugin/intentframe-gate/tool_definitions_hook.py`](../integrations/hermes/plugin/intentframe-gate/tool_definitions_hook.py) |
+| execute_code + schema lessons | [`docs/hermes-governance-execute-code-and-schema-hooks.md`](./hermes-governance-execute-code-and-schema-hooks.md) |
 | Adapter mapper | [`integrations/hermes/adapter/src/hermes_adapter/mapper.py`](../integrations/hermes/adapter/src/hermes_adapter/mapper.py) |
 | CLI integrate | [`intentframe-integrations-cli/.../hermes_integrate.py`](../intentframe-integrations-cli/src/intentframe_integrations/hermes_integrate.py) |
 | Gateway env | [`intentframe-integrations-cli/.../hermes_gateway.py`](../intentframe-integrations-cli/src/intentframe_integrations/hermes_gateway.py) |

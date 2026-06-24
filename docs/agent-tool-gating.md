@@ -213,7 +213,7 @@ coarse. (Grounded in the Hermes registry — see Section 5.)
 
 | Risk class | Govern (examples) |
 |------------|-------------------|
-| Local shell / process | `terminal`, `process` |
+| Local shell | `terminal` |
 | Local file writes | `write_file`, `patch` |
 | Code execution | `execute_code` |
 | Computer / device control | `computer_use`, `ha_call_service` |
@@ -254,7 +254,7 @@ tools (reads stay ungoverned):
 
 | Hermes tool | IntentFrame action(s) |
 |-------------|----------------------|
-| `terminal`, `process` | `RUN_COMMAND` |
+| `terminal` | `RUN_COMMAND` |
 | `write_file`, `patch` (update/add) | `WRITE_HOST_FILE` |
 | `patch` (V4A delete) | `DELETE_HOST_FILE` |
 
@@ -298,7 +298,7 @@ Hermes' own toolsets mix reads and writes — proof that you must select by name
 
 [`adapter/src/hermes_adapter/mapper.py`](../integrations/hermes/adapter/src/hermes_adapter/mapper.py)
 dispatches through the governance contract — each entry names a `mapper` kind
-(`terminal`, `process`, `write_file`, `patch`):
+(`terminal`, `write_file`, `patch`):
 
 ```python
 def map_tool(tool, args):
@@ -374,7 +374,7 @@ seeding as `start hermes`. Explicit shell exports (e.g. test harness
 
 **Tests:** catalog-wide integration tests generate a throwaway all-governed yaml
 from the default template via `HERMES_GOVERNANCE_YAML`; they never mutate runtime
-user config. Gateway E2E accepts `HERMES_E2E_GOVERNED_TOOLS=terminal,process` to
+user config. Gateway E2E accepts `HERMES_E2E_GOVERNED_TOOLS=terminal,write_file` to
 scope which governed tools get LLM probes (plugin gate only — not Hermes toolsets).
 Before adapter and gateway start, E2E asserts that `os.environ["HERMES_GOVERNANCE_YAML"]`
 matches the governance snapshot and agrees with `build_gateway_env()` /

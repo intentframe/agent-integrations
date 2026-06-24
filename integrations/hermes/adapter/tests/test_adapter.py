@@ -49,15 +49,69 @@ class TestMapper(unittest.TestCase):
         self.assertEqual(intents[0]["action"], "RUN_COMMAND")
         self.assertEqual(intents[0]["command"], "echo hi")
         self.assertEqual(intents[0]["reason"], "List files")
+        self.assertNotIn("hermes_args", intents[0])
 
-    def test_map_process(self) -> None:
-        from hermes_adapter.mapper import map_process
+    def test_map_terminal_hermes_args_remainder(self) -> None:
+        from hermes_adapter.mapper import map_terminal
 
-        intents = map_process(
-            {"action": "kill", "session_id": "abc", "reason": "Stop runaway"}
+        intents = map_terminal(
+            {
+                "command": "pytest -v",
+                "background": True,
+                "timeout": 600,
+                "reason": "Run tests in background",
+            }
         )
+        intent = intents[0]
+        self.assertEqual(intent["command"], "pytest -v")
+        self.assertNotIn("command", intent["hermes_args"])
+        self.assertEqual(
+            intent["hermes_args"],
+            {"background": True, "timeout": 600},
+        )
+
+    def test_map_execute_code(self) -> None:
+        import shlex
+
+        from hermes_adapter.mapper import map_execute_code
+
+        code = 'print("hi")'
+        intents = map_execute_code({"code": code, "reason": "Run probe script"})
+        self.assertEqual(len(intents), 1)
         self.assertEqual(intents[0]["action"], "RUN_COMMAND")
-        self.assertIn("process:kill", intents[0]["command"])
+        self.assertEqual(intents[0]["command"], f"python -c {shlex.quote(code)}")
+        self.assertEqual(intents[0]["reason"], "Run probe script")
+        self.assertEqual(intents[0]["target"], "execute_code (11 chars)")
+        self.assertNotIn("hermes_args", intents[0])
+
+    def test_map_execute_code_hermes_args_remainder(self) -> None:
+        from hermes_adapter.mapper import map_execute_code
+
+        intents = map_execute_code(
+            {
+                "code": 'print("ok")',
+                "task_id": "abc",
+                "reason": "Run probe script",
+            }
+        )
+        intent = intents[0]
+        self.assertNotIn("code", intent["hermes_args"])
+        self.assertEqual(intent["hermes_args"], {"task_id": "abc"})
+
+    def test_map_execute_code_missing_code(self) -> None:
+        from hermes_adapter.mapper import ValidationError, map_execute_code
+
+        with self.assertRaises(ValidationError):
+            map_execute_code({"reason": "noop"})
+
+    def test_map_execute_code_block_shaped_code(self) -> None:
+        import shlex
+
+        from hermes_adapter.mapper import map_execute_code
+
+        code = 'import subprocess\nsubprocess.run("sudo echo intentframe-e2e-block-probe")'
+        intents = map_execute_code({"code": code, "reason": "Block probe"})
+        self.assertEqual(intents[0]["command"], f"python -c {shlex.quote(code)}")
 
     def test_map_write_file(self) -> None:
         from hermes_adapter.mapper import map_write_file
@@ -68,6 +122,23 @@ class TestMapper(unittest.TestCase):
         self.assertEqual(intents[0]["action"], "WRITE_HOST_FILE")
         self.assertEqual(intents[0]["path"], "~/notes.txt")
         self.assertEqual(intents[0]["content"], "hello")
+        self.assertNotIn("hermes_args", intents[0])
+
+    def test_map_write_file_hermes_args_remainder(self) -> None:
+        from hermes_adapter.mapper import map_write_file
+
+        intents = map_write_file(
+            {
+                "path": "~/notes.txt",
+                "content": "hello",
+                "cross_profile": True,
+                "reason": "Save notes",
+            }
+        )
+        intent = intents[0]
+        self.assertNotIn("path", intent["hermes_args"])
+        self.assertNotIn("content", intent["hermes_args"])
+        self.assertEqual(intent["hermes_args"], {"cross_profile": True})
 
     def test_map_patch_replace(self) -> None:
         from hermes_adapter.mapper import map_patch
@@ -86,6 +157,28 @@ class TestMapper(unittest.TestCase):
         self.assertEqual(intents[0]["path"], "~/x.py")
         self.assertNotIn("patch_op_index", intents[0])
         self.assertNotIn("patch_operations", intents[0])
+        self.assertNotIn("hermes_args", intents[0])
+
+    def test_map_patch_replace_hermes_args_excludes_mapped(self) -> None:
+        from hermes_adapter.mapper import map_patch
+
+        intents = map_patch(
+            {
+                "mode": "replace",
+                "path": "~/x.py",
+                "old_string": "a",
+                "new_string": "b",
+                "replace_all": True,
+                "cross_profile": True,
+                "reason": "Fix typo",
+            }
+        )
+        remainder = intents[0]["hermes_args"]
+        self.assertNotIn("path", remainder)
+        self.assertNotIn("old_string", remainder)
+        self.assertNotIn("new_string", remainder)
+        self.assertNotIn("mode", remainder)
+        self.assertEqual(remainder, {"replace_all": True, "cross_profile": True})
 
     def test_map_patch_v4a_multi_file(self) -> None:
         from hermes_adapter.mapper import map_patch
@@ -119,6 +212,32 @@ class TestMapper(unittest.TestCase):
         self.assertIn("~/b.py", intents[1]["content"])
         self.assertNotIn("~/a.py", intents[1]["content"])
         self.assertIsNot(intents[0]["patch_operations"], intents[1]["patch_operations"])
+        self.assertNotIn("hermes_args", intents[0])
+
+    def test_map_patch_v4a_hermes_args_excludes_patch_blob(self) -> None:
+        from hermes_adapter.mapper import map_patch
+
+        patch = (
+            "*** Begin Patch\n"
+            "*** Update File: ~/a.py\n"
+            "@@\n"
+            "-old\n"
+            "+new\n"
+            "*** End Patch"
+        )
+        intents = map_patch(
+            {
+                "mode": "patch",
+                "patch": patch,
+                "cross_profile": True,
+                "reason": "Bulk edit",
+            }
+        )
+        for intent in intents:
+            remainder = intent["hermes_args"]
+            self.assertNotIn("patch", remainder)
+            self.assertNotIn("mode", remainder)
+            self.assertEqual(remainder, {"cross_profile": True})
 
     def test_map_patch_v4a_scoped_content_excludes_siblings(self) -> None:
         from hermes_adapter.mapper import map_patch
@@ -178,18 +297,22 @@ class TestMapper(unittest.TestCase):
         self.assertEqual(intents[1]["reason"], "Mixed edit [patch op 2/2: delete ~/drop.py]")
 
     def test_missing_reason(self) -> None:
-        from hermes_adapter.mapper import ValidationError, map_terminal
+        from hermes_adapter.mapper import ValidationError, map_execute_code, map_terminal
 
         with self.assertRaises(ValidationError):
             map_terminal({"command": "echo hi"})
+        with self.assertRaises(ValidationError):
+            map_execute_code({"code": 'print("hi")'})
 
     def test_supported_tools(self) -> None:
         from hermes_adapter.mapper import supported_tools
 
         tools = supported_tools()
         self.assertIn("terminal", tools)
+        self.assertIn("execute_code", tools)
         self.assertIn("write_file", tools)
         self.assertIn("patch", tools)
+        self.assertEqual(tools["execute_code"], "RUN_COMMAND")
         self.assertEqual(tools["write_file"], "WRITE_HOST_FILE")
         self.assertEqual(tools["patch"], "WRITE_HOST_FILE")
 
@@ -198,6 +321,15 @@ class TestMapper(unittest.TestCase):
 
         with self.assertRaises(ValidationError):
             map_tool("read_file", {"reason": "noop"})
+
+    def test_hermes_args_remainder_helper(self) -> None:
+        from hermes_adapter.mapper import hermes_args_remainder
+
+        remainder = hermes_args_remainder(
+            {"command": "x", "background": True, "reason": "why", "timeout": None},
+            frozenset({"command"}),
+        )
+        self.assertEqual(remainder, {"background": True})
 
     def test_map_generic_cronjob(self) -> None:
         from hermes_adapter.mapper import map_generic, map_tool
@@ -216,6 +348,16 @@ class TestMapper(unittest.TestCase):
             {"action": "list", "reason": "List scheduled jobs for audit"},
         )
         self.assertEqual(mapped, intents)
+
+    def test_map_tool_execute_code(self) -> None:
+        import shlex
+
+        from hermes_adapter.mapper import map_execute_code, map_tool
+
+        args = {"code": 'print("ok")', "reason": "Run probe script"}
+        mapped = map_tool("execute_code", args)
+        self.assertEqual(mapped, map_execute_code(args))
+        self.assertEqual(mapped[0]["command"], f'python -c {shlex.quote(args["code"])}')
 
 
 class TestValidateService(unittest.TestCase):

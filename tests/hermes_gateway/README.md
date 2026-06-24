@@ -48,7 +48,7 @@ the validate-only gate). It does **not** enable/disable Hermes native tools on
 | Variable | Effect |
 |----------|--------|
 | *(unset)* | Temp yaml with **all** catalog tools IntentFrame-governed |
-| `HERMES_E2E_GOVERNED_TOOLS=terminal,process` | Temp yaml with only those tools governed; LLM probes run for that subset |
+| `HERMES_E2E_GOVERNED_TOOLS=terminal,write_file` | Temp yaml with only those tools governed; LLM probes run for that subset |
 | `HERMES_GOVERNANCE_YAML=/path/to/tools.yaml` | Use your yaml as-is; skip auto-generation |
 
 Examples:
@@ -57,8 +57,8 @@ Examples:
 # All governed tools (default)
 RUN_HERMES_GATEWAY_E2E=1 ./tests/scripts/test-hermes-gateway-e2e.sh
 
-# Only terminal + process LLM probes (IntentFrame-governed subset)
-HERMES_E2E_GOVERNED_TOOLS=terminal,process \
+# Only terminal + write_file LLM probes (IntentFrame-governed subset)
+HERMES_E2E_GOVERNED_TOOLS=terminal,write_file \
   RUN_HERMES_GATEWAY_E2E=1 ./tests/scripts/test-hermes-gateway-e2e.sh
 ```
 
@@ -84,7 +84,6 @@ yaml all catalog tools are governed; use `HERMES_E2E_GOVERNED_TOOLS` to scope LL
 | Tool | Deterministic ALLOW probe | Deterministic BLOCK probe | Semantic (ALLOW or BLOCK) |
 |------|---------------------------|---------------------------|---------------------------|
 | `terminal` | `printf '<marker>'` | `sudo echo …` | — |
-| `process` | `action: list` | `action: run`, `data` contains `sudo` | — |
 | `write_file` | path under `~/…` | path under `/etc/…` | — |
 | `patch` (replace) | replace under `~/…` (harness seeds file with `"a"` first) | replace under `/etc/…` | — |
 | `patch` (V4A mixed) | — | Update `~/…` + Delete `/etc/…` (fail-closed batch) | Update `~/…` + Delete `~/…` (per-intent AE/Guardian; batch fails if any op BLOCKs) |
@@ -102,7 +101,7 @@ IntentFrame** chain, not open-ended agent behavior. Harness setup (not policy we
 |-----------|-------|-----|
 | **`seed_patch_replace_target()`** | `tests/hermes_tool_probes.py`; called from `run_patch_replace_allow_with_retries` | `patch replace` requires an existing file with `old_string`; harness writes `"a"` before each attempt |
 | **Pass-unique markers** | `_pass_marker_slug()` in `test_gateway_e2e.py` → suffix `-p1`, `-p2a`, `-p2b` | Pass 2a reuses Pass 1 sandbox; unique markers avoid overwrite BLOCK on stale files |
-| **Explicit block prompts** | `run_write_file_block_once`, `run_process_block_once`, `run_patch_replace_block_once`, `run_patch_v4a_mixed_block_once` in `api_client.py` | Keep `/etc/…`, `sudo`, and V4A delete paths verbatim; one tool call; no rewrite to `~/` or `/tmp` |
+| **Explicit block prompts** | `run_write_file_block_once`, `run_patch_replace_block_once`, `run_patch_v4a_mixed_block_once` in `api_client.py` | Keep `/etc/…`, `sudo`, and V4A delete paths verbatim; one tool call; no rewrite to `~/` or `/tmp` |
 
 Block assertions still require blocked tool output and the expected path/command shape.
 Allow assertions still fail on blocked output.
@@ -151,7 +150,7 @@ When `/v1/responses` reaches the plugin and adapter:
 1. Adapter handshake on first validate
 2. One or more intent evaluations per governed tool call (multi-intent `patch` emits several)
 
-With the default all-governed yaml, a full pass runs many probes (terminal, process,
+With the default all-governed yaml, a full pass runs many probes (terminal,
 write_file, patch replace + block + V4A semantic + V4A block), so expect **multiple**
 intent blocks in `intentframe-server.log` — not a fixed count of four.
 
@@ -261,7 +260,8 @@ noise; still sends the full `tools=` list upstream).
 
 The registry count and toolsets count differ by design — not every listed toolset
 name becomes a registry definition on the LLM path. See
-[`docs/hermes-intentframe-integration-guide.md`](../../docs/hermes-intentframe-integration-guide.md#two-different-tool-surfaces-do-not-conflate).
+[`docs/hermes-intentframe-integration-guide.md`](../../docs/hermes-intentframe-integration-guide.md#two-different-tool-surfaces-do-not-conflate)
+and [`docs/hermes-governance-execute-code-and-schema-hooks.md`](../../docs/hermes-governance-execute-code-and-schema-hooks.md).
 
 ### Assertions
 
@@ -312,5 +312,7 @@ These were gaps between production behavior and what the toolsets live harness a
 | **Partial governed coverage** | Toolsets test skipped `cronjob` while production governs it | Probe and provider dump used `gateway_e2e_probe_tool_names()` (native E2E tier only) | Probe uses `governed_tool_names()`; live test asserts `template_governed_tool_names()` on the request dump |
 | **Preload map drift** | Adding a governed builtin required editing a hardcoded Python dict | `GOVERNED_BUILTIN_MODULES` lived in `builtin_preload.py`, separate from `tools.yaml` | `builtin_module: tools.<module>` per tool in repo `tools.yaml`; plugin preload imports enabled specs; shared + plugin loaders validate `tools.` prefix |
 | **`cronjob` schema probe failure** | Probe reported `cronjob missing from get_tool_definitions()` despite yaml preload | Preload registered `cronjob`, but Hermes `check_cronjob_requirements()` filters it unless `HERMES_GATEWAY_SESSION=1` (or interactive/exec env); probe subprocess lacked that env while the gateway had it | `_run_schema_probe()` sets `probe_env["HERMES_GATEWAY_SESSION"] = "1"` to mirror the running gateway |
+| **`read_terminal` in toolsets live test** | `terminal` toolset included `read_terminal` | Plugin imported `model_tools` at register → module-level `discover_builtin_tools()` | Schema hooks via `registry.get_definitions` + `build_execute_code_schema`; never import `model_tools` at plugin load — see [`hermes-governance-execute-code-and-schema-hooks.md`](../../docs/hermes-governance-execute-code-and-schema-hooks.md) |
+| **`execute_code` missing `reason` in probe** | Dynamic schema rebuild after `get_definitions` | Hermes `_compute_tool_definitions` calls `build_execute_code_schema` after registry schemas | Patch `build_execute_code_schema` to run `inject_reason` on its return value |
 
 Guarded by `test_governed_tool_coverage.py` (`test_toolsets_live_verifies_full_governed_catalog`) and loader parity in `tests/hermes_plugin/test_gate.py` (`builtin_module` must match between plugin and shared loaders).

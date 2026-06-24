@@ -27,13 +27,13 @@ tools:
     blocked_response: terminal_json
     builtin_module: tools.terminal_tool
 
-  process:
+  execute_code:
     enabled: true
     action: RUN_COMMAND
-    risk: local_process
-    mapper: process
+    risk: code_execution
+    mapper: execute_code  # Python -> python -c … for command_shield (see mapper.py)
     blocked_response: generic_json
-    builtin_module: tools.process_registry
+    builtin_module: tools.code_execution_tool
 
   write_file:
     enabled: true

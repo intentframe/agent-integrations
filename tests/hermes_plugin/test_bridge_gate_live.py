@@ -18,12 +18,12 @@ for path in (TESTS_DIR, ADAPTER_TESTS):
 from _loader import load_plugin_module  # noqa: E402
 from live_fixtures import (  # noqa: E402
     CRONJOB_SEMANTIC_ARGS,
+    EXECUTE_CODE_ALLOW_ARGS,
+    EXECUTE_CODE_BLOCK_ARGS,
     PATCH_ALLOW_REPLACE_ARGS,
     PATCH_BLOCK_REPLACE_ARGS,
     PATCH_V4A_BLOCK_ARGS,
     PATCH_V4A_MIXED_HOME_DELETE_ARGS,
-    PROCESS_ALLOW_ARGS,
-    PROCESS_BLOCK_ARGS,
     WRITE_ALLOW_ARGS,
     WRITE_BLOCK_ARGS,
 )
@@ -88,13 +88,13 @@ class TestLiveBridgeGate(unittest.TestCase):
         self.assertEqual(body["status"], "blocked")
         delegate.assert_not_called()
 
-    def test_allow_process(self) -> None:
+    def test_execute_code_semantic(self) -> None:
         delegate = MagicMock(return_value='{"status": "ok"}')
-        self._assert_allowed("process", PROCESS_ALLOW_ARGS, delegate=delegate)
+        self._assert_semantic_gate("execute_code", EXECUTE_CODE_ALLOW_ARGS, delegate=delegate)
 
-    def test_block_process(self) -> None:
+    def test_block_execute_code(self) -> None:
         delegate = MagicMock()
-        self._assert_blocked("process", PROCESS_BLOCK_ARGS, delegate=delegate)
+        self._assert_blocked("execute_code", EXECUTE_CODE_BLOCK_ARGS, delegate=delegate)
 
     def test_allow_write_file(self) -> None:
         delegate = MagicMock(return_value='{"status": "ok"}')

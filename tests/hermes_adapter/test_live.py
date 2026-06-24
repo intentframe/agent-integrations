@@ -19,12 +19,12 @@ for path in (HERE, TESTS_DIR):
 from intentframe_validation_helpers import assert_adapter_semantic_validate  # noqa: E402
 from live_fixtures import (  # noqa: E402
     CRONJOB_SEMANTIC_ARGS,
+    EXECUTE_CODE_ALLOW_ARGS,
+    EXECUTE_CODE_BLOCK_ARGS,
     PATCH_ALLOW_REPLACE_ARGS,
     PATCH_BLOCK_REPLACE_ARGS,
     PATCH_V4A_BLOCK_ARGS,
     PATCH_V4A_MIXED_HOME_DELETE_ARGS,
-    PROCESS_ALLOW_ARGS,
-    PROCESS_BLOCK_ARGS,
     WRITE_ALLOW_ARGS,
     WRITE_BLOCK_ARGS,
 )
@@ -78,12 +78,12 @@ class TestLiveHermesAdapter(unittest.TestCase):
         self.assertEqual(agent_response.get("exit_code"), -1)
         self.assertEqual(agent_response.get("status"), "blocked")
 
-    def test_allow_process(self) -> None:
-        body = self._validate_tool("process", PROCESS_ALLOW_ARGS)
-        self.assertTrue(body["allowed"])
+    def test_execute_code_semantic(self) -> None:
+        body = self._validate_tool("execute_code", EXECUTE_CODE_ALLOW_ARGS)
+        assert_adapter_semantic_validate(body)
 
-    def test_block_process(self) -> None:
-        body = self._validate_tool("process", PROCESS_BLOCK_ARGS)
+    def test_block_execute_code(self) -> None:
+        body = self._validate_tool("execute_code", EXECUTE_CODE_BLOCK_ARGS)
         self.assertFalse(body["allowed"])
         self.assertIn("agent_response", body)
 

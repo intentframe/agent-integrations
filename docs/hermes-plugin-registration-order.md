@@ -21,6 +21,7 @@ Related: [`hermes-intentframe-integration-guide.md`](./hermes-intentframe-integr
 | Fix | **`preload_governed_builtins(governed)`** then generic snapshot loop with `ctx.register_tool(..., override=True)` for each governed name. See [`builtin_preload.py`](../integrations/hermes/plugin/intentframe-gate/builtin_preload.py). |
 | Not the cause | Wrong yaml, reason wording, or LLM flakiness (same model + Hermes passed on old plugin). **`/v1/toolsets` showing `terminal` is not proof the LLM received it.** |
 | Avoid | Full `discover_builtin_tools()` in the plugin — side effects like `read_terminal` break the toolsets contract. |
+| Avoid | `import model_tools` during plugin `register()` — same side effect (module-level `discover_builtin_tools()`). |
 
 Full integration / add-tool checklist:
 [`hermes-intentframe-integration-guide.md`](./hermes-intentframe-integration-guide.md).
@@ -400,20 +401,26 @@ Unit tests: [`tests/hermes_plugin/test_builtin_preload.py`](../tests/hermes_plug
 
 [`integrations/hermes/plugin/intentframe-gate/__init__.py`](../integrations/hermes/plugin/intentframe-gate/__init__.py):
 
-1. **`install_registry_hook()`** — gate future `registry.register` calls (MCP refresh).
-2. **`preload_governed_builtins(governed)`** — import governed Hermes builtin modules
-   before snapshot (gateway load-order fix).
-3. **Snapshot loop** — generic wrap for all governed names with `override=True`.
+1. **`install_registry_hook()`** — gate future `registry.register` calls (MCP refresh); inject `reason` on `registry.get_definitions`.
+2. **`preload_governed_builtins(governed)`** — import governed Hermes builtin modules before snapshot (gateway load-order fix).
+3. **`install_execute_code_schema_hook()`** — inject `reason` after Hermes dynamic `execute_code` schema rebuild.
+4. **Snapshot loop** — generic handler wrap for all governed names with `override=True`.
 
 | File | Role |
 |------|------|
 | [`builtin_preload.py`](../integrations/hermes/plugin/intentframe-gate/builtin_preload.py) | Preload from yaml ``builtin_module`` + selective ``importlib.import_module`` |
 | [`schema.py`](../integrations/hermes/plugin/intentframe-gate/schema.py) | `inject_reason()` — terminal-specific reason text branch |
 | [`gate.py`](../integrations/hermes/plugin/intentframe-gate/gate.py) | Validate via adapter, strip `reason`, delegate |
-| [`registry_hook.py`](../integrations/hermes/plugin/intentframe-gate/registry_hook.py) | Patch `registry.register` for dynamic tools |
+| [`registry_hook.py`](../integrations/hermes/plugin/intentframe-gate/registry_hook.py) | Patch `registry.register` + `registry.get_definitions` |
+| [`tool_definitions_hook.py`](../integrations/hermes/plugin/intentframe-gate/tool_definitions_hook.py) | `finalize_governed_tool_schemas` + `build_execute_code_schema` hook |
+
+**Schema finalization:** do **not** import `model_tools` at plugin load. See
+[`hermes-governance-execute-code-and-schema-hooks.md`](./hermes-governance-execute-code-and-schema-hooks.md).
 
 When adding a governed Hermes **builtin**, set ``builtin_module: tools.<module>`` in the
 repo catalog template (see [`test_builtin_preload.py`](../tests/hermes_plugin/test_builtin_preload.py)).
+If Hermes rebuilds the tool schema after `get_definitions` (like `execute_code`), add a
+dedicated builder hook — `get_definitions` alone is not enough.
 
 ---
 
@@ -421,7 +428,7 @@ repo catalog template (see [`test_builtin_preload.py`](../tests/hermes_plugin/te
 
 | Tool | Gateway E2E | Registration note |
 |------|-------------|-------------------|
-| `terminal`, `process`, `write_file`, `patch`, `cronjob` | Probed when in scoped yaml | ``builtin_module`` in repo ``tools.yaml`` — preload + snapshot |
+| `terminal`, `write_file`, `patch`, `cronjob`, `execute_code` | Probed when in scoped yaml | ``builtin_module`` in repo ``tools.yaml`` — preload + snapshot |
 
 Delete coverage uses `patch` V4A `*** Delete File:` ops (maps to `DELETE_HOST_FILE`).
 
@@ -467,6 +474,7 @@ attempt 1/3; that isolates the regression to plugin registration, not the LLM.
 ## References
 
 - **Integration guide (add/change tools):** [`hermes-intentframe-integration-guide.md`](./hermes-intentframe-integration-guide.md)
+- **execute_code + schema hooks (June 2026):** [`hermes-governance-execute-code-and-schema-hooks.md`](./hermes-governance-execute-code-and-schema-hooks.md)
 - Plugin README: [`integrations/hermes/plugin/intentframe-gate/README.md`](../integrations/hermes/plugin/intentframe-gate/README.md)
 - Gating overview: [`docs/agent-tool-gating.md`](./agent-tool-gating.md)
 - E2E harness: [`tests/hermes_gateway/`](../tests/hermes_gateway/),

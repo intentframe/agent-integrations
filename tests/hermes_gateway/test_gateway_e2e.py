@@ -36,12 +36,12 @@ from api_client import (  # noqa: E402
     get_toolsets,
     run_allow_with_retries,
     run_block_once,
+    run_execute_code_allow_with_retries,
+    run_execute_code_block_once,
     run_patch_replace_allow_with_retries,
     run_patch_replace_block_once,
     run_patch_v4a_mixed_block_once,
     run_patch_v4a_mixed_home_delete_semantic_with_retries,
-    run_process_allow_with_retries,
-    run_process_block_once,
     run_write_file_allow_with_retries,
     run_write_file_block_once,
     wait_health,
@@ -211,13 +211,19 @@ def _run_api_allow_block(env: IsolatedEnv, *, label: str) -> None:
         step(f"{label}: POST /v1/responses BLOCK (policy should deny sudo)")
         run_block_once(host=API_HOST, port=env.api_port, api_key=env.api_key)
 
-    if "process" in governed:
-        probes_ran.add("process")
-        step(f"{label}: POST /v1/responses process ALLOW")
-        run_process_allow_with_retries(host=API_HOST, port=env.api_port, api_key=env.api_key)
+    if "execute_code" in governed:
+        probes_ran.add("execute_code")
+        exec_marker = f"intentframe-hermes-exec-ok-{env.run_id}-{pass_slug}"
+        step(f"{label}: POST /v1/responses execute_code ALLOW")
+        run_execute_code_allow_with_retries(
+            host=API_HOST,
+            port=env.api_port,
+            api_key=env.api_key,
+            marker=exec_marker,
+        )
 
-        step(f"{label}: POST /v1/responses process BLOCK (sudo in mapped RUN_COMMAND)")
-        run_process_block_once(host=API_HOST, port=env.api_port, api_key=env.api_key)
+        step(f"{label}: POST /v1/responses execute_code BLOCK (policy should deny sudo in code)")
+        run_execute_code_block_once(host=API_HOST, port=env.api_port, api_key=env.api_key)
 
     if "write_file" in governed:
         probes_ran.add("write_file")

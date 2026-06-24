@@ -47,10 +47,10 @@ class TestGovernanceLoader(unittest.TestCase):
         with governance_env():
             catalog = load_tool_catalog()
             self.assertEqual(catalog["terminal"].builtin_module, "tools.terminal_tool")
-            self.assertEqual(catalog["process"].builtin_module, "tools.process_registry")
             self.assertEqual(catalog["write_file"].builtin_module, "tools.file_tools")
             self.assertEqual(catalog["patch"].builtin_module, "tools.file_tools")
             self.assertEqual(catalog["cronjob"].builtin_module, "tools.cronjob_tools")
+            self.assertEqual(catalog["execute_code"].builtin_module, "tools.code_execution_tool")
 
     def test_invalid_builtin_module_prefix_raises(self) -> None:
         from hermes_governance.loader import load_tool_catalog

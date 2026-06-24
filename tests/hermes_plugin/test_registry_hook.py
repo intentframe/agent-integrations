@@ -18,8 +18,6 @@ from governance_fixtures import PluginGovernanceEnvMixin  # noqa: E402
 
 registry_hook_mod = load_plugin_module("registry_hook")
 gate_mod = load_plugin_module("gate")
-schema_mod = load_plugin_module("schema")
-governance_mod = load_plugin_module("governance_loader")
 
 
 class RegistryEntry:
@@ -44,6 +42,20 @@ class FakeRegistry:
     def __init__(self) -> None:
         self.entries: dict[str, RegistryEntry] = {}
         self.register_calls = 0
+        self.get_definitions_calls = 0
+
+    def get_definitions(self, tool_names, *, quiet=False):
+        del quiet
+        self.get_definitions_calls += 1
+        selected = tool_names if tool_names is not None else self.entries.keys()
+        return [
+            {
+                "type": "function",
+                "function": self.entries[name].schema,
+            }
+            for name in selected
+            if name in self.entries
+        ]
 
     def register(
         self,
@@ -101,7 +113,7 @@ class TestRegistryHook(PluginGovernanceEnvMixin, unittest.TestCase):
         )
 
         entry = registry.entries["write_file"]
-        self.assertIn("reason", entry.schema["parameters"]["properties"])
+        self.assertNotIn("reason", entry.schema["parameters"]["properties"])
         self.assertTrue(getattr(entry.handler, gate_mod.GATED_MARKER, False))
 
     def test_refresh_reregistration_stays_gated(self) -> None:
@@ -123,10 +135,62 @@ class TestRegistryHook(PluginGovernanceEnvMixin, unittest.TestCase):
         registry.register("write_file", "file", schema, refreshed, override=True)
 
         entry = registry.entries["write_file"]
-        self.assertIn("reason", entry.schema["parameters"]["properties"])
+        self.assertNotIn("reason", entry.schema["parameters"]["properties"])
         self.assertTrue(getattr(entry.handler, gate_mod.GATED_MARKER, False))
         self.assertNotEqual(entry.handler, original)
         self.assertNotEqual(entry.handler, refreshed)
+
+    def test_install_registry_hook_does_not_import_model_tools(self) -> None:
+        registry = FakeRegistry()
+        registry_mod = types.ModuleType("tools.registry")
+        registry_mod.registry = registry
+        sys.modules["tools.registry"] = registry_mod
+
+        self.assertNotIn("model_tools", sys.modules)
+        registry_hook_mod.install_registry_hook()
+        self.assertNotIn("model_tools", sys.modules)
+
+    def test_get_definitions_injects_reason_for_governed_tools(self) -> None:
+        registry = FakeRegistry()
+        registry.entries["write_file"] = RegistryEntry(
+            name="write_file",
+            handler=lambda args, **kw: "ok",
+            schema={
+                "name": "write_file",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"path": {"type": "string"}},
+                    "required": ["path"],
+                },
+            },
+        )
+        registry.entries["vision_analyze"] = RegistryEntry(
+            name="vision_analyze",
+            handler=lambda args, **kw: "ok",
+            schema={
+                "name": "vision_analyze",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"image": {"type": "string"}},
+                    "required": ["image"],
+                },
+            },
+        )
+
+        registry_mod = types.ModuleType("tools.registry")
+        registry_mod.registry = registry
+        sys.modules["tools.registry"] = registry_mod
+
+        registry_hook_mod.install_registry_hook()
+        tool_defs = registry.get_definitions({"write_file", "vision_analyze"})
+        by_name = {td["function"]["name"]: td["function"] for td in tool_defs}
+
+        write_fn = by_name["write_file"]
+        self.assertIn("reason", write_fn["parameters"]["properties"])
+        self.assertIn("reason", write_fn["parameters"]["required"])
+
+        vision_fn = by_name["vision_analyze"]
+        self.assertNotIn("reason", vision_fn["parameters"]["properties"])
 
 
 def main() -> int:

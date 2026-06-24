@@ -7,7 +7,7 @@
 # IntentFrame governance (temp throwaway yaml; does not touch real ~/.intentframe runtime):
 #   Default: all catalog tools IntentFrame-governed (temp yaml via HERMES_GOVERNANCE_YAML).
 #   Scoped LLM probes to a governed subset only (plugin gate — not Hermes toolsets):
-#     HERMES_E2E_GOVERNED_TOOLS=terminal,process RUN_HERMES_GATEWAY_E2E=1 ./tests/scripts/test-hermes-gateway-e2e.sh
+#     HERMES_E2E_GOVERNED_TOOLS=terminal,write_file RUN_HERMES_GATEWAY_E2E=1 ./tests/scripts/test-hermes-gateway-e2e.sh
 #   Explicit yaml override (skip auto-generation):
 #     HERMES_GOVERNANCE_YAML=/path/to/tools.yaml RUN_HERMES_GATEWAY_E2E=1 ...
 #
