@@ -260,7 +260,8 @@ noise; still sends the full `tools=` list upstream).
 
 The registry count and toolsets count differ by design — not every listed toolset
 name becomes a registry definition on the LLM path. See
-[`docs/hermes-intentframe-integration-guide.md`](../../docs/hermes-intentframe-integration-guide.md#two-different-tool-surfaces-do-not-conflate).
+[`docs/hermes-intentframe-integration-guide.md`](../../docs/hermes-intentframe-integration-guide.md#two-different-tool-surfaces-do-not-conflate)
+and [`docs/hermes-governance-execute-code-and-schema-hooks.md`](../../docs/hermes-governance-execute-code-and-schema-hooks.md).
 
 ### Assertions
 
@@ -311,5 +312,7 @@ These were gaps between production behavior and what the toolsets live harness a
 | **Partial governed coverage** | Toolsets test skipped `cronjob` while production governs it | Probe and provider dump used `gateway_e2e_probe_tool_names()` (native E2E tier only) | Probe uses `governed_tool_names()`; live test asserts `template_governed_tool_names()` on the request dump |
 | **Preload map drift** | Adding a governed builtin required editing a hardcoded Python dict | `GOVERNED_BUILTIN_MODULES` lived in `builtin_preload.py`, separate from `tools.yaml` | `builtin_module: tools.<module>` per tool in repo `tools.yaml`; plugin preload imports enabled specs; shared + plugin loaders validate `tools.` prefix |
 | **`cronjob` schema probe failure** | Probe reported `cronjob missing from get_tool_definitions()` despite yaml preload | Preload registered `cronjob`, but Hermes `check_cronjob_requirements()` filters it unless `HERMES_GATEWAY_SESSION=1` (or interactive/exec env); probe subprocess lacked that env while the gateway had it | `_run_schema_probe()` sets `probe_env["HERMES_GATEWAY_SESSION"] = "1"` to mirror the running gateway |
+| **`read_terminal` in toolsets live test** | `terminal` toolset included `read_terminal` | Plugin imported `model_tools` at register → module-level `discover_builtin_tools()` | Schema hooks via `registry.get_definitions` + `build_execute_code_schema`; never import `model_tools` at plugin load — see [`hermes-governance-execute-code-and-schema-hooks.md`](../../docs/hermes-governance-execute-code-and-schema-hooks.md) |
+| **`execute_code` missing `reason` in probe** | Dynamic schema rebuild after `get_definitions` | Hermes `_compute_tool_definitions` calls `build_execute_code_schema` after registry schemas | Patch `build_execute_code_schema` to run `inject_reason` on its return value |
 
 Guarded by `test_governed_tool_coverage.py` (`test_toolsets_live_verifies_full_governed_catalog`) and loader parity in `tests/hermes_plugin/test_gate.py` (`builtin_module` must match between plugin and shared loaders).

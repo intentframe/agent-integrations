@@ -11,6 +11,8 @@ if str(TESTS_DIR) not in sys.path:
 
 from hermes_tool_probes import (  # noqa: E402
     cronjob_semantic_args,
+    execute_code_allow_args,
+    execute_code_block_args,
     patch_replace_allow_args,
     patch_replace_block_args,
     patch_v4a_block_args,
@@ -28,6 +30,8 @@ PATCH_BLOCK_REPLACE_ARGS = patch_replace_block_args()
 PATCH_V4A_MIXED_HOME_DELETE_ARGS = patch_v4a_mixed_home_delete_args(marker=_LIVE_MARKER)
 PATCH_V4A_BLOCK_ARGS = patch_v4a_block_args(marker=_LIVE_MARKER)
 CRONJOB_SEMANTIC_ARGS = cronjob_semantic_args()
+EXECUTE_CODE_ALLOW_ARGS = execute_code_allow_args(marker=_LIVE_MARKER)
+EXECUTE_CODE_BLOCK_ARGS = execute_code_block_args()
 
 # Back-compat aliases
 PATCH_V4A_MIXED_ALLOW_ARGS = PATCH_V4A_MIXED_HOME_DELETE_ARGS

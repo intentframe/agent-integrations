@@ -16,6 +16,7 @@ if str(_TESTS_DIR) not in sys.path:
     sys.path.insert(0, str(_TESTS_DIR))
 
 from hermes_tool_probes import (  # noqa: E402
+    execute_code_block_args,
     patch_replace_allow_args,
     patch_replace_block_args,
     patch_v4a_block_args,
@@ -325,6 +326,104 @@ def run_block_once(*, host: str, port: int, api_key: str) -> TerminalCall:
         instructions=instructions,
     )
     return assert_block_response(body)
+
+
+def assert_execute_code_allow(body: dict[str, Any], *, marker: str) -> ToolCall:
+    calls = extract_tool_calls(body, tool_name="execute_code")
+    if not calls:
+        raise AssertionError(
+            f"No execute_code function_call in response: {json.dumps(body)[:2000]}"
+        )
+
+    call = calls[-1]
+    code = str(call.arguments.get("code", ""))
+    if marker not in code and marker not in call.output:
+        raise AssertionError(
+            f"Allow test missing marker {marker!r} in code={code!r} output={call.output!r}"
+        )
+    if _looks_blocked(call.output):
+        raise AssertionError(f"Expected allow but got blocked output: {call.output!r}")
+    return call
+
+
+def assert_execute_code_block(body: dict[str, Any]) -> ToolCall:
+    calls = extract_tool_calls(body, tool_name="execute_code")
+    if not calls:
+        raise AssertionError(
+            f"No execute_code function_call in block response: {json.dumps(body)[:2000]}"
+        )
+
+    call = calls[-1]
+    code = str(call.arguments.get("code", "")).lower()
+    if "sudo" not in code:
+        raise AssertionError(f"Block test code unexpected: {code!r}")
+    if not _looks_blocked(call.output):
+        raise AssertionError(f"Expected blocked tool output, got: {call.output!r}")
+    return call
+
+
+def run_execute_code_allow_with_retries(
+    *,
+    host: str,
+    port: int,
+    api_key: str,
+    marker: str,
+    attempts: int = 3,
+) -> ToolCall:
+    from cli_runner import step
+
+    code = f"print({marker!r})"
+    instructions = (
+        "You are running an automated integration test. "
+        "You MUST call the execute_code tool exactly once and no other tools."
+    )
+    last_error: Exception | None = None
+    for attempt in range(1, attempts + 1):
+        step(f"POST /v1/responses execute_code ALLOW (attempt {attempt}/{attempts})")
+        prompt = (
+            f"Call the execute_code tool exactly once with code: {code} "
+            f"and reason: 'IntentFrame E2E execute_code allow {attempt}'. "
+            "Do not explain; just run the tool."
+        )
+        try:
+            body = post_responses(
+                host=host,
+                port=port,
+                api_key=api_key,
+                prompt=prompt,
+                instructions=instructions,
+            )
+            return assert_execute_code_allow(body, marker=marker)
+        except (AssertionError, RuntimeError) as exc:
+            last_error = exc
+    raise AssertionError(
+        f"execute_code allow test failed after {attempts} attempts: {last_error}"
+    ) from last_error
+
+
+def run_execute_code_block_once(*, host: str, port: int, api_key: str) -> ToolCall:
+    from cli_runner import step
+
+    step("POST /v1/responses execute_code BLOCK (policy should deny sudo in code)")
+    args = execute_code_block_args(reason="IntentFrame E2E execute_code block test")
+    code = args["code"]
+    prompt = (
+        "Call the execute_code tool exactly once with this exact code and no other tools:\n"
+        f"{code}\n"
+        f"Use reason: '{args['reason']}'."
+    )
+    instructions = (
+        "You are running an automated integration test. "
+        "You MUST call the execute_code tool exactly once and no other tools."
+    )
+    body = post_responses(
+        host=host,
+        port=port,
+        api_key=api_key,
+        prompt=prompt,
+        instructions=instructions,
+    )
+    return assert_execute_code_block(body)
 
 
 def assert_write_file_allow(body: dict[str, Any], *, marker: str) -> ToolCall:

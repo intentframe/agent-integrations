@@ -12,7 +12,7 @@ from typing import Any
 import yaml
 
 VALID_BLOCKED_RESPONSES = frozenset({"terminal_json", "generic_json"})
-VALID_MAPPER_KINDS = frozenset({"terminal", "write_file", "patch", "generic"})
+VALID_MAPPER_KINDS = frozenset({"terminal", "write_file", "patch", "generic", "execute_code"})
 BUILTIN_MODULE_PREFIX = "tools."
 
 

@@ -166,10 +166,10 @@ class ProviderRequestContractTests(unittest.TestCase):
             "model": "gpt-4o-mini",
             "tools": [
                 _tool("terminal"),
-                _tool("execute_code", reason_required=False),
+                _tool("execute_code"),
             ],
         }
-        governed = frozenset({"terminal"})
+        governed = frozenset({"terminal", "execute_code"})
         text = format_provider_tools_snapshot(
             body,
             governed,
@@ -178,9 +178,8 @@ class ProviderRequestContractTests(unittest.TestCase):
         self.assertIn("model='gpt-4o-mini'", text)
         self.assertIn("request_dump=/tmp/dump.json", text)
         self.assertIn("terminal [governed, reason_required=True]", text)
-        self.assertIn("execute_code", text)
-        self.assertNotIn("execute_code [governed", text)
-        self.assertIn("['terminal']", text)
+        self.assertIn("execute_code [governed, reason_required=True]", text)
+        self.assertIn("['execute_code', 'terminal']", text)
 
     def test_tool_reason_required(self) -> None:
         fn = _tool("terminal")["function"]

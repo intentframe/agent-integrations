@@ -70,6 +70,49 @@ class TestMapper(unittest.TestCase):
             {"background": True, "timeout": 600},
         )
 
+    def test_map_execute_code(self) -> None:
+        import shlex
+
+        from hermes_adapter.mapper import map_execute_code
+
+        code = 'print("hi")'
+        intents = map_execute_code({"code": code, "reason": "Run probe script"})
+        self.assertEqual(len(intents), 1)
+        self.assertEqual(intents[0]["action"], "RUN_COMMAND")
+        self.assertEqual(intents[0]["command"], f"python -c {shlex.quote(code)}")
+        self.assertEqual(intents[0]["reason"], "Run probe script")
+        self.assertEqual(intents[0]["target"], "execute_code (11 chars)")
+        self.assertNotIn("hermes_args", intents[0])
+
+    def test_map_execute_code_hermes_args_remainder(self) -> None:
+        from hermes_adapter.mapper import map_execute_code
+
+        intents = map_execute_code(
+            {
+                "code": 'print("ok")',
+                "task_id": "abc",
+                "reason": "Run probe script",
+            }
+        )
+        intent = intents[0]
+        self.assertNotIn("code", intent["hermes_args"])
+        self.assertEqual(intent["hermes_args"], {"task_id": "abc"})
+
+    def test_map_execute_code_missing_code(self) -> None:
+        from hermes_adapter.mapper import ValidationError, map_execute_code
+
+        with self.assertRaises(ValidationError):
+            map_execute_code({"reason": "noop"})
+
+    def test_map_execute_code_block_shaped_code(self) -> None:
+        import shlex
+
+        from hermes_adapter.mapper import map_execute_code
+
+        code = 'import subprocess\nsubprocess.run("sudo echo intentframe-e2e-block-probe")'
+        intents = map_execute_code({"code": code, "reason": "Block probe"})
+        self.assertEqual(intents[0]["command"], f"python -c {shlex.quote(code)}")
+
     def test_map_write_file(self) -> None:
         from hermes_adapter.mapper import map_write_file
 
@@ -254,18 +297,22 @@ class TestMapper(unittest.TestCase):
         self.assertEqual(intents[1]["reason"], "Mixed edit [patch op 2/2: delete ~/drop.py]")
 
     def test_missing_reason(self) -> None:
-        from hermes_adapter.mapper import ValidationError, map_terminal
+        from hermes_adapter.mapper import ValidationError, map_execute_code, map_terminal
 
         with self.assertRaises(ValidationError):
             map_terminal({"command": "echo hi"})
+        with self.assertRaises(ValidationError):
+            map_execute_code({"code": 'print("hi")'})
 
     def test_supported_tools(self) -> None:
         from hermes_adapter.mapper import supported_tools
 
         tools = supported_tools()
         self.assertIn("terminal", tools)
+        self.assertIn("execute_code", tools)
         self.assertIn("write_file", tools)
         self.assertIn("patch", tools)
+        self.assertEqual(tools["execute_code"], "RUN_COMMAND")
         self.assertEqual(tools["write_file"], "WRITE_HOST_FILE")
         self.assertEqual(tools["patch"], "WRITE_HOST_FILE")
 
@@ -301,6 +348,16 @@ class TestMapper(unittest.TestCase):
             {"action": "list", "reason": "List scheduled jobs for audit"},
         )
         self.assertEqual(mapped, intents)
+
+    def test_map_tool_execute_code(self) -> None:
+        import shlex
+
+        from hermes_adapter.mapper import map_execute_code, map_tool
+
+        args = {"code": 'print("ok")', "reason": "Run probe script"}
+        mapped = map_tool("execute_code", args)
+        self.assertEqual(mapped, map_execute_code(args))
+        self.assertEqual(mapped[0]["command"], f'python -c {shlex.quote(args["code"])}')
 
 
 class TestValidateService(unittest.TestCase):

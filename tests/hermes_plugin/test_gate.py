@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import sys
+import types
 import unittest
 from pathlib import Path
 from typing import Any
@@ -22,6 +23,7 @@ from hermes_governance_fixtures import ensure_shared_loader_importable  # noqa: 
 schema_mod = load_plugin_module("schema")
 gate_mod = load_plugin_module("gate")
 governance_mod = load_plugin_module("governance_loader")
+tool_defs_mod = load_plugin_module("tool_definitions_hook")
 
 
 class FakeValidator:
@@ -73,6 +75,95 @@ class TestSchema(unittest.TestCase):
             twice["parameters"]["required"].count("reason"),
             1,
         )
+
+
+class TestToolDefinitionsHook(PluginGovernanceEnvMixin, unittest.TestCase):
+    def test_finalize_governed_tool_schemas_injects_reason_after_dynamic_rebuild(self) -> None:
+        tool_defs = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "execute_code",
+                    "description": "Run Python",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"code": {"type": "string"}},
+                        "required": ["code"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "vision_analyze",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"image": {"type": "string"}},
+                        "required": ["image"],
+                    },
+                },
+            },
+        ]
+
+        finalized = tool_defs_mod.finalize_governed_tool_schemas(tool_defs)
+
+        execute_fn = finalized[0]["function"]
+        self.assertIn("reason", execute_fn["parameters"]["properties"])
+        self.assertIn("reason", execute_fn["parameters"]["required"])
+
+        distractor_fn = finalized[1]["function"]
+        self.assertNotIn("reason", distractor_fn["parameters"]["properties"])
+
+    def test_finalize_governed_tool_schemas_is_idempotent(self) -> None:
+        tool_defs = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "terminal",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "command": {"type": "string"},
+                            "reason": {"type": "string"},
+                        },
+                        "required": ["command", "reason"],
+                    },
+                },
+            }
+        ]
+
+        once = tool_defs_mod.finalize_governed_tool_schemas(tool_defs)
+        twice = tool_defs_mod.finalize_governed_tool_schemas(once)
+
+        required = twice[0]["function"]["parameters"]["required"]
+        self.assertEqual(required.count("reason"), 1)
+
+    def test_execute_code_schema_hook_injects_reason(self) -> None:
+        code_exec_mod = types.ModuleType("tools.code_execution_tool")
+
+        def original_build_execute_code_schema(*args: Any, **kwargs: Any) -> dict[str, Any]:
+            del args, kwargs
+            return {
+                "name": "execute_code",
+                "description": "Run Python",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"code": {"type": "string"}},
+                    "required": ["code"],
+                },
+            }
+
+        code_exec_mod.build_execute_code_schema = original_build_execute_code_schema
+        tools_mod = types.ModuleType("tools")
+        tools_mod.code_execution_tool = code_exec_mod
+        sys.modules["tools"] = tools_mod
+        sys.modules["tools.code_execution_tool"] = code_exec_mod
+
+        tool_defs_mod.install_execute_code_schema_hook()
+        built = code_exec_mod.build_execute_code_schema({"terminal"})
+
+        self.assertIn("reason", built["parameters"]["properties"])
+        self.assertIn("reason", built["parameters"]["required"])
 
 
 class TestPluginGovernance(PluginGovernanceEnvMixin, unittest.TestCase):

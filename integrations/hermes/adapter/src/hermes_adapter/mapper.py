@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import shlex
 from dataclasses import dataclass
 from typing import Any, Callable, Literal
 
@@ -104,6 +105,25 @@ def _host_file_intent(
     if patch_operations is not None:
         intent["patch_operations"] = patch_operations
     return intent
+
+
+# command_shield max_command_length is 10_000; leave room for ``python -c `` wrapper.
+_EXECUTE_CODE_MAX_BODY = 9500
+
+
+def map_execute_code(args: dict[str, Any]) -> list[IntentDict]:
+    """Map Hermes execute_code (Python) to RUN_COMMAND for command_shield analysis."""
+    code = _require_str(args, "code")
+    reason = validate_reason(args.get("reason"))
+    body = code[:_EXECUTE_CODE_MAX_BODY]
+    command = f"python -c {shlex.quote(body)}"
+    intent = {
+        "action": "RUN_COMMAND",
+        "command": command,
+        "reason": reason,
+        "target": f"execute_code ({len(code)} chars)"[:200],
+    }
+    return [_attach_hermes_args(intent, args, frozenset({"code"}))]
 
 
 def map_terminal(args: dict[str, Any]) -> list[IntentDict]:
@@ -288,6 +308,7 @@ def map_generic(tool: str, args: dict[str, Any], *, action: str) -> list[IntentD
 
 MAPPERS: dict[str, MapperFn | GenericMapperFn] = {
     "terminal": map_terminal,
+    "execute_code": map_execute_code,
     "write_file": map_write_file,
     "patch": map_patch,
 }

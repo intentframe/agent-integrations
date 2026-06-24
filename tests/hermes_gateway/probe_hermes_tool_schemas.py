@@ -96,7 +96,7 @@ def main() -> int:
         if entry and not gated:
             errors.append(f"{tool_name}: registry handler missing intentframe gate marker")
 
-    for distractor in ("vision_analyze", "execute_code", "skill_manage"):
+    for distractor in ("vision_analyze", "skill_manage"):
         fn = by_name.get(distractor)
         if fn is None:
             errors.append(f"expected distractor {distractor!r} on api_server surface")

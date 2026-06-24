@@ -108,3 +108,18 @@ def patch_v4a_block_args(*, marker: str, reason: str = "E2E V4A patch update hom
 def cronjob_semantic_args(*, reason: str = "List scheduled jobs for audit") -> dict[str, str]:
     """Low-risk cronjob intent — AE/Guardian outcome is semantic (ALLOW or BLOCK)."""
     return {"action": "list", "reason": reason}
+
+
+def execute_code_allow_args(*, marker: str, reason: str | None = None) -> dict[str, str]:
+    return {
+        "code": f"print({marker!r})",
+        "reason": reason or "Live execute_code allow test",
+    }
+
+
+def execute_code_block_args(*, reason: str = "E2E execute_code block probe") -> dict[str, str]:
+    # Harmless shell command blocked via the ``sudo`` pattern (mirrors terminal E2E).
+    return {
+        "code": 'import subprocess\nsubprocess.run("sudo echo intentframe-e2e-block-probe")',
+        "reason": reason,
+    }
