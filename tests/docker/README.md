@@ -177,6 +177,8 @@ After a path-policy block, chat should show tool `status: blocked` and a file-mu
 
 More on IntentFrame log layers: `tests/hermes_gateway/README.md` (sandbox paths; same filenames under `/root/.intentframe` in Docker).
 
+Captured manual session write-ups (chat + audit trail): [`logs/`](./logs/).
+
 Reset (fresh install):
 
 ```bash
