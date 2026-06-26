@@ -30,9 +30,10 @@ Docs: [`docs/agent-tool-gating.md`](../../docs/agent-tool-gating.md),
 Public install (curl, no clone):
 
 ```bash
-curl -fsSL https://github.com/intentframe/agent-integrations/raw/main/scripts/install-hermes.sh | bash
+curl -fsSL https://github.com/intentframe/agent-integrations/raw/main/scripts/install-hermes-plugin.sh | bash
 export OPENAI_API_KEY=sk-...
-~/.intentframe/agent-integrations/bin/intentframe-integrations run hermes
+intentframe-integrations start hermes
+hermes dashboard
 ```
 
 From the **repo root**:
