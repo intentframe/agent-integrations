@@ -179,6 +179,44 @@ More on IntentFrame log layers: `tests/hermes_gateway/README.md` (sandbox paths;
 
 Captured manual session write-ups (chat + audit trail): [`logs/`](./logs/).
 
+### Verify CLI on PATH (fresh container)
+
+After a greenfield install (`down -v` then `up`), the installer runs as root and symlinks into `/usr/local/bin`. These checks do **not** need an interactive shell or sourcing:
+
+```bash
+DC="docker compose -f tests/docker/docker-compose.test.yml"
+
+# 1. Greenfield (picks up install script from GitHub main, or VERSION=your-branch)
+$DC down -v
+export OPENAI_API_KEY=sk-...
+$DC up -d
+
+# 2. Direct exec — the case that must work (no bash, no rc)
+$DC exec hermes-intentframe intentframe-integrations --help
+
+# 3. Strict default PATH only (no ~/.local/bin in env)
+$DC exec hermes-intentframe env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+  intentframe-integrations --help
+
+# 4. Symlinks point at the venv binary
+$DC exec hermes-intentframe ls -la /usr/local/bin/intentframe-integrations /root/.local/bin/intentframe-integrations
+```
+
+**Test your local install script** (before merge) by mounting it into a one-off container:
+
+```bash
+docker run --rm -it \
+  -v "$(pwd)/scripts/install-hermes-plugin.sh:/install.sh:ro" \
+  ghcr.io/astral-sh/uv:python3.14-bookworm-slim \
+  bash -lc 'apt-get update -qq && apt-get install -y -qq curl tar ca-certificates git && bash /install.sh'
+
+# then inside that container (still running):
+command -v intentframe-integrations
+env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin intentframe-integrations --help
+```
+
+Or pin your branch in compose: `export VERSION=your-branch` before `up` (script is fetched from GitHub).
+
 Reset (fresh install):
 
 ```bash
