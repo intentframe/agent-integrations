@@ -6,9 +6,9 @@
 # Or: cp tests/docker/.env.example tests/docker/.env  (set key there)
 #
 # Open http://localhost:9119/chat — ask Hermes to run a terminal command.
-# Verify IntentFrame gating:
+# Verify gating / logs: tests/docker/README.md#logs-and-analysis-inside-the-container
 #   docker compose -f tests/docker/docker-compose.test.yml exec hermes-intentframe \
-#     tail -f /root/.intentframe/integrations/hermes/adapter.log
+#     tail -f /root/.intentframe/logs/intentframe-server.log
 #
 # Reset volumes (greenfield reinstall):
 #   docker compose -f tests/docker/docker-compose.test.yml down -v

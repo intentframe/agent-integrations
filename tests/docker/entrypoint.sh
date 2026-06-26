@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# User journey: GitHub install → seed Hermes config + dashboard auth → start stack → dashboard.
+# Docker harness: GitHub install → seed OpenAI + dashboard auth (0.0.0.0 only) → up hermes → dashboard.
 set -euo pipefail
 
 export PATH="/root/.local/bin:/usr/local/bin:${PATH}"
@@ -125,8 +125,9 @@ step "Starting Hermes dashboard on 0.0.0.0:9119"
 echo ""
 echo "  Open http://localhost:9119/chat"
 echo "  Dashboard auth: ${HERMES_DASHBOARD_USER:-hermes} / ${HERMES_DASHBOARD_PASSWORD:-docker-test}"
-echo "  Verify gating: docker compose -f tests/docker/docker-compose.test.yml exec hermes-intentframe \\"
-echo "    tail -f /root/.intentframe/integrations/hermes/adapter.log"
+echo "  Logs / gating analysis: tests/docker/README.md#logs-and-analysis-inside-the-container"
+echo "  Tail policy log: docker compose -f tests/docker/docker-compose.test.yml exec hermes-intentframe \\"
+echo "    tail -f /root/.intentframe/logs/intentframe-server.log"
 echo ""
 
 exec hermes dashboard --host 0.0.0.0 --no-open
