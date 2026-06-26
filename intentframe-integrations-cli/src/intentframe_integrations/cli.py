@@ -39,6 +39,7 @@ from intentframe_integrations.hermes_integrate import (
     format_env_exports,
     integrate_hermes,
 )
+from intentframe_integrations.hermes_uninstall import uninstall_hermes
 from intentframe_integrations.hermes_governance_edit import (
     GovernanceEditError,
     list_governed_tools,
@@ -453,6 +454,29 @@ def _cmd_integrate(
     return 0
 
 
+def _cmd_uninstall(agent: str, *, remove_hermes: bool) -> int:
+    if agent != "hermes":
+        print(f"ERROR: uninstall is only implemented for hermes (got {agent!r})", file=sys.stderr)
+        return 1
+
+    stop_hermes_gateway(quiet=True)
+    stop_adapter("hermes", quiet=True)
+    _run_backend(["stop"])
+
+    pack = load_integration_pack(agent_config_path("hermes"))
+    result = uninstall_hermes(pack, remove_hermes=remove_hermes)
+    for msg in result.messages:
+        print(msg)
+
+    print("\nIntentFrame removed from this machine (~/.intentframe, plugin, CLI, shell PATH block).")
+    if remove_hermes:
+        print("Hermes removed (~/.hermes and hermes CLI symlinks).")
+    else:
+        print("Hermes is still installed (~/.hermes). To remove it too:")
+        print("  intentframe-integrations uninstall hermes --remove-hermes")
+    return 0
+
+
 def _cmd_install_hermes(*, version: str | None, force: bool) -> int:
     try:
         result = install_hermes_agent(version=version, force=force)
@@ -753,6 +777,17 @@ def main(argv: list[str] | None = None) -> int:
         help="Overwrite runtime policy.yaml from the shipped default (default: keep user config)",
     )
 
+    p_uninstall = sub.add_parser(
+        "uninstall",
+        help="Remove all IntentFrame traces (plugin, ~/.intentframe, CLI, shell PATH block)",
+    )
+    p_uninstall.add_argument("agent", choices=agents)
+    p_uninstall.add_argument(
+        "--remove-hermes",
+        action="store_true",
+        help="Also remove entire ~/.hermes and hermes CLI symlinks (all Hermes data)",
+    )
+
     p_policy = sub.add_parser(
         "policy",
         help="Show, set, reload, or reset runtime agent policy.yaml",
@@ -906,6 +941,11 @@ def main(argv: list[str] | None = None) -> int:
                 skip_config=args.skip_config,
                 reset_governance=args.reset_governance,
                 reset_policy=args.reset_policy,
+            )
+        case "uninstall":
+            return _cmd_uninstall(
+                args.agent,
+                remove_hermes=args.remove_hermes,
             )
         case "policy":
             match args.policy_command:

@@ -17,6 +17,7 @@ hermes dashboard
 ```bash
 intentframe-integrations install hermes
 intentframe-integrations integrate hermes
+intentframe-integrations uninstall hermes
 intentframe-integrations doctor hermes
 intentframe-integrations governance list hermes
 intentframe-integrations policy show hermes

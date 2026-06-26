@@ -47,6 +47,20 @@ curl -fsSL https://github.com/intentframe/agent-integrations/raw/main/scripts/in
 
 **Requires:** Linux or macOS, network, `curl`. Installs [uv](https://github.com/astral-sh/uv) when missing. Runs the **full** Hermes installer by default (setup wizard when needed). Puts `intentframe-integrations` on PATH: `/usr/local/bin` when writable (root/Docker/Linux), always `~/.local/bin` (plus shell config on Mac when `/usr/local/bin` is not writable).
 
+**Headless install** (skip Hermes setup wizard + browser engine — for testers who already have API keys):
+
+```bash
+curl -fsSL https://github.com/intentframe/agent-integrations/raw/main/scripts/install-hermes-plugin.sh | bash -s -- --headless
+```
+
+From a git clone (same flags):
+
+```bash
+bash scripts/install-hermes-plugin.sh --headless
+```
+
+After headless install, set `OPENAI_API_KEY` (and run `hermes setup` if chat returns 401). Then the same [three commands](#run-three-commands) as below.
+
 ---
 
 ## Run (three commands)
@@ -66,6 +80,20 @@ tail -f ~/.intentframe/integrations/hermes/adapter.log
 ```
 
 Try something policy should block (e.g. `sudo …`) and look for `BLOCK` in the log.
+
+**Uninstall IntentFrame** (removes plugin, all of `~/.intentframe`, CLI symlinks, installer PATH block in shell rc):
+
+```bash
+intentframe-integrations uninstall hermes
+```
+
+**Remove Hermes too** (all Hermes data: config, sessions, logs, skills, agent checkout):
+
+```bash
+intentframe-integrations uninstall hermes --remove-hermes
+```
+
+Uninstall deletes the CLI and the `~/.intentframe` pack, so there is no "reintegrate." To use IntentFrame again, do a fresh install (the `curl … install-hermes-plugin.sh` line above). Details: [docs/hermes-cli.md](docs/hermes-cli.md#uninstall).
 
 ---
 

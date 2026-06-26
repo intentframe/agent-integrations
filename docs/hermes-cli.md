@@ -7,6 +7,31 @@
 
 User-facing quick start: [README.md](../README.md).
 
+## Install
+
+**Default** (full Hermes install — setup wizard when needed):
+
+```bash
+curl -fsSL https://github.com/intentframe/agent-integrations/raw/main/scripts/install-hermes-plugin.sh | bash
+```
+
+**Headless** (skip Hermes setup wizard + browser engine — testers with `OPENAI_API_KEY` already set; same as Docker/CI):
+
+```bash
+curl -fsSL https://github.com/intentframe/agent-integrations/raw/main/scripts/install-hermes-plugin.sh | bash -s -- --headless
+```
+
+From a git clone:
+
+```bash
+bash scripts/install-hermes-plugin.sh              # full
+bash scripts/install-hermes-plugin.sh --headless   # headless
+```
+
+Pin a branch: `VERSION=my-branch curl -fsSL … | bash -s -- --headless`
+
+After headless install, export `OPENAI_API_KEY` and run `hermes setup` if chat returns 401.
+
 ## Happy path
 
 ```bash
@@ -23,12 +48,61 @@ intentframe-integrations stop           # tear down
 ```bash
 intentframe-integrations install hermes [--version VERSION] [--force]
 intentframe-integrations integrate hermes [--copy] [--skip-config]
+intentframe-integrations uninstall hermes [--remove-hermes]
 intentframe-integrations doctor hermes [--install-only]
 ```
 
 - **`install`** — Hermes Agent into `~/.intentframe/integrations/hermes/hermes-agent-venv/`
-- **`integrate`** — copy plugin to `~/.hermes/plugins/intentframe-gate`, seed governance/policy templates, merge `plugins.enabled`
+- **`integrate`** — re-wire an **already-installed** pack into Hermes: copy plugin to `~/.hermes/plugins/intentframe-gate`, seed governance/policy templates, merge `plugins.enabled`. Reads the plugin source from `~/.intentframe/agent-integrations` — it does **not** download anything. Use it after editing config or with `--reset-policy` / `--reset-governance`, not to reinstall.
+- **`uninstall`** — remove all IntentFrame traces: plugin, entire `~/.intentframe`, CLI symlinks, installer PATH block in shell rc. Add `--remove-hermes` to also delete `~/.hermes` and `hermes` CLI symlinks.
 - **`doctor`** — verify binary, plugin, adapter socket
+
+> **After `uninstall` you must do a fresh install to use IntentFrame again.** Uninstall deletes the `~/.intentframe` pack and the `intentframe-integrations` CLI itself, so `integrate` is no longer available. Re-run the install script (see [Reinstall](#reinstall)).
+
+### Uninstall
+
+Remove IntentFrame only (Hermes stays):
+
+```bash
+intentframe-integrations stop
+intentframe-integrations uninstall hermes
+```
+
+Remove IntentFrame **and** Hermes (all data):
+
+```bash
+intentframe-integrations uninstall hermes --remove-hermes
+```
+
+What gets removed:
+
+| Target | `uninstall hermes` | `+ --remove-hermes` |
+|--------|-------------------|---------------------|
+| `~/.hermes/plugins/intentframe-gate` | yes | yes |
+| `intentframe-gate` in `~/.hermes/config.yaml` | yes | yes |
+| IntentFrame keys in `~/.hermes/.env` | yes | yes |
+| Entire `~/.intentframe/` | yes | yes |
+| `intentframe-integrations` CLI symlinks | yes | yes |
+| Installer PATH block in `~/.zshrc` / `.bashrc` / `.profile` | yes | yes |
+| Entire `~/.hermes/` (config, sessions, logs, skills, agent) | no | yes |
+| `hermes` CLI symlinks | no | yes |
+
+If the CLI is already gone, manual Hermes removal:
+
+```bash
+rm -rf ~/.hermes
+rm -f ~/.local/bin/hermes /usr/local/bin/hermes
+```
+
+### Reinstall
+
+`uninstall` removes the CLI and the `~/.intentframe` pack, so there is nothing left to `integrate`. To use IntentFrame again, always do a **fresh install**:
+
+```bash
+curl -fsSL https://github.com/intentframe/agent-integrations/raw/main/scripts/install-hermes-plugin.sh | bash
+```
+
+This re-downloads the pack, reinstalls the plugin, and puts the CLI back on PATH. There is no "reintegrate" shortcut after uninstall.
 
 Hermes binary resolution order: `HERMES_BIN` → `hermes` on `PATH` → managed venv from `install`.
 

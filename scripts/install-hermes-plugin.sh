@@ -23,8 +23,8 @@ while [[ $# -gt 0 ]]; do
       cat <<'EOF'
 Usage: install-hermes-plugin.sh [--headless]
 
-  --headless   Skip Hermes setup wizard and browser engine (Docker/CI only).
-               Default: full Hermes install for real users.
+  --headless   Skip Hermes setup wizard and browser engine (faster; for testers/CI/Docker).
+               Default: full Hermes install for end users.
 EOF
       exit 0
       ;;
