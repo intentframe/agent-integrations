@@ -30,8 +30,8 @@ export PATH="${HOME}/.local/bin:${PATH}"
 if have hermes && hermes --version >/dev/null 2>&1; then
   step "Using existing Hermes: $(hermes --version)"
 else
-  step "Installing latest Hermes (official installer)"
-  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
+  step "Installing latest Hermes (official installer; skip setup + browser for faster headless install)"
+  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --skip-setup --skip-browser
   export PATH="${HOME}/.local/bin:${PATH}"
 fi
 
@@ -43,17 +43,18 @@ curl -fsSL "https://github.com/${ORG}/${REPO}/archive/refs/heads/${VERSION}.tar.
 export INTENTFRAME_INTEGRATIONS_ROOT="${INSTALL_DIR}"
 cd "${INSTALL_DIR}"
 
-IF="${INSTALL_DIR}/bin/intentframe-integrations"
+IF_DEV="${INSTALL_DIR}/bin/intentframe-integrations"
+IF_CLI="${INSTALL_DIR}/.venv/bin/intentframe-integrations"
 
 step "Installing Python workspace"
 uv sync --all-packages
 
 step "Installing IntentFrame plugin into Hermes"
-"${IF}" integrate hermes --copy
+"${IF_CLI}" integrate hermes --copy
 
 step "Installing intentframe-integrations on PATH (${LOCAL_BIN})"
 mkdir -p "${LOCAL_BIN}"
-ln -sf "${IF}" "${LOCAL_BIN}/intentframe-integrations"
+ln -sf "${IF_CLI}" "${LOCAL_BIN}/intentframe-integrations"
 
 # 4. Env so CLI + web + gateway all hit the adapter
 step "Writing plugin env to ${HERMES_ENV}"
