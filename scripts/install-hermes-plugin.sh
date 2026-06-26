@@ -3,11 +3,37 @@
 #
 #   curl -fsSL https://github.com/intentframe/agent-integrations/raw/main/scripts/install-hermes-plugin.sh | bash
 #
+# Docker / CI (skip Hermes setup wizard + browser engine):
+#   curl -fsSL .../install-hermes-plugin.sh | bash -s -- --headless
+#
 # Then:
 #   export OPENAI_API_KEY=sk-...
 #   intentframe-integrations up hermes
 #   hermes dashboard            # http://localhost:9119
 set -euo pipefail
+
+HEADLESS=false
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --headless)
+      HEADLESS=true
+      shift
+      ;;
+    -h|--help)
+      cat <<'EOF'
+Usage: install-hermes-plugin.sh [--headless]
+
+  --headless   Skip Hermes setup wizard and browser engine (Docker/CI only).
+               Default: full Hermes install for real users.
+EOF
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1 (try --help)" >&2
+      exit 1
+      ;;
+  esac
+done
 
 ORG="${ORG:-intentframe}"
 REPO="${REPO:-agent-integrations}"
@@ -17,6 +43,7 @@ LOCAL_BIN="${HOME}/.local/bin"
 SYSTEM_BIN="/usr/local/bin"
 HERMES_ENV="${HOME}/.hermes/.env"
 CLI_SYSTEM=""
+HERMES_SUMMARY=""
 
 step() { printf '\n==> %s\n' "$*"; }
 have() { command -v "$1" >/dev/null 2>&1; }
@@ -62,10 +89,19 @@ export PATH="${HOME}/.local/bin:${PATH}"
 
 # 2. Hermes: use existing, else official install
 if have hermes && hermes --version >/dev/null 2>&1; then
-  step "Using existing Hermes: $(hermes --version)"
+  HERMES_VER="$(hermes --version 2>/dev/null || true)"
+  step "Using existing Hermes: ${HERMES_VER}"
+  HERMES_SUMMARY="Reused existing Hermes (${HERMES_VER})"
 else
-  step "Installing latest Hermes (official installer; skip setup + browser for faster headless install)"
-  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --skip-setup --skip-browser
+  if [[ "${HEADLESS}" == true ]]; then
+    step "Installing latest Hermes (headless: skip setup wizard + browser engine)"
+    curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --skip-setup --skip-browser
+    HERMES_SUMMARY="Installed Hermes 0.17+ (headless — no setup wizard; configure API keys yourself)"
+  else
+    step "Installing latest Hermes (official installer — full setup)"
+    curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
+    HERMES_SUMMARY="Installed Hermes (full install — setup wizard runs when needed)"
+  fi
   export PATH="${HOME}/.local/bin:${PATH}"
 fi
 
@@ -111,19 +147,33 @@ if [[ -n "${CLI_SYSTEM}" ]]; then
   CLI:     ${LOCAL_BIN}/intentframe-integrations"
 fi
 
+HERMES_NEXT=""
+if [[ "${HEADLESS}" == true ]]; then
+  HERMES_NEXT="
+Hermes (headless): run hermes setup if API keys are not configured yet."
+fi
+
 cat <<EOF
 
 Done.
 
-Installed:
-  Plugin:  ~/.hermes/plugins/intentframe-gate
+Hermes:
+  ${HERMES_SUMMARY}
+  Plugin:  ~/.hermes/plugins/intentframe-gate (enabled in ~/.hermes/config.yaml)
+  Config:  ~/.hermes/config.yaml
+  Env:     ~/.hermes/.env (adapter socket + governance paths)
+
+IntentFrame:
 ${CLI_LINES}
   Pack:    ${INSTALL_DIR}
+  Policy:  ~/.intentframe/integrations/hermes/policy.yaml
+  Tools:   ~/.intentframe/integrations/hermes/governance/tools.yaml
 
 Next:
   export OPENAI_API_KEY=sk-...
   intentframe-integrations up hermes
   hermes dashboard        # http://localhost:9119  → Chat
+${HERMES_NEXT}
 
 Verify gating:  tail -f ~/.intentframe/integrations/hermes/adapter.log
 

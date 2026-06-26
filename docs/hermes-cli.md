@@ -1,7 +1,7 @@
 # Hermes CLI reference
 
 `intentframe-integrations` orchestrates IntentFrame + Hermes. Install it via
-[install-hermes-plugin.sh](../scripts/install-hermes-plugin.sh) (symlinks to `/usr/local/bin` when writable and `~/.local/bin`) or from this repo's `bin/`.
+[install-hermes-plugin.sh](../scripts/install-hermes-plugin.sh) (full Hermes install by default; `--headless` for Docker/CI) or from this repo's `bin/`.
 
 **CLI on PATH:** the installer symlinks the real binary from `~/.intentframe/agent-integrations/.venv/bin/intentframe-integrations` into `/usr/local/bin` when that directory is writable (root, Docker, many Linux installs) and always into `~/.local/bin`. On Mac without a writable `/usr/local/bin`, open a new terminal after install (shell rc is updated). No sourcing required for direct `docker exec … intentframe-integrations` when `/usr/local/bin` is used.
 

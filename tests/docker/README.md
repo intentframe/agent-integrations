@@ -1,10 +1,10 @@
 # Docker test: Hermes web chat user journey
 
-Production-like install: the container runs the same GitHub install script as a real user (`curl …/install-hermes-plugin.sh | bash`). Only `entrypoint.sh` is mounted — it seeds Docker-only config (OpenAI provider, dashboard auth for `0.0.0.0`) and starts services.
+Production-like install: the container runs the same GitHub install script as a real user (`curl …/install-hermes-plugin.sh | bash -s -- --headless`). Only `entrypoint.sh` is mounted — it seeds Docker-only config (OpenAI provider, dashboard auth for `0.0.0.0`) and starts services.
 
 User-facing install and chat flow: [README.md](../../README.md).
 
-Hermes is installed with `--skip-setup --skip-browser` (headless). OpenAI model/provider are seeded like `tests/hermes_gateway/isolation.py`. Dashboard basic auth is seeded so Hermes can bind `0.0.0.0` for Docker port publishing (required since Hermes 0.17+).
+Hermes is installed with `--headless` (skip setup wizard + browser engine). OpenAI model/provider are seeded in entrypoint like `tests/hermes_gateway/isolation.py`. Dashboard basic auth is seeded so Hermes can bind `0.0.0.0` for Docker port publishing (required since Hermes 0.17+).
 
 ```bash
 export OPENAI_API_KEY=sk-...

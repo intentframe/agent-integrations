@@ -45,7 +45,7 @@ No git clone. One script installs Hermes (if needed), the integration pack, and 
 curl -fsSL https://github.com/intentframe/agent-integrations/raw/main/scripts/install-hermes-plugin.sh | bash
 ```
 
-**Requires:** Linux or macOS, network, `curl`. Installs [uv](https://github.com/astral-sh/uv) when missing. Puts `intentframe-integrations` on PATH: `/usr/local/bin` when writable (root/Docker/Linux), always `~/.local/bin` (plus shell config on Mac when `/usr/local/bin` is not writable).
+**Requires:** Linux or macOS, network, `curl`. Installs [uv](https://github.com/astral-sh/uv) when missing. Runs the **full** Hermes installer by default (setup wizard when needed). Puts `intentframe-integrations` on PATH: `/usr/local/bin` when writable (root/Docker/Linux), always `~/.local/bin` (plus shell config on Mac when `/usr/local/bin` is not writable).
 
 ---
 
@@ -74,7 +74,7 @@ Try something policy should block (e.g. `sudo …`) and look for `BLOCK` in the 
 | Requirement | Notes |
 |-------------|--------|
 | `OPENAI_API_KEY` | Required for `up hermes` and chat |
-| Hermes LLM config | Install uses `--skip-setup` for speed. If chat returns **401**, run `hermes setup` and pick OpenAI, or edit `~/.hermes/config.yaml` |
+| Hermes LLM config | Full install runs `hermes setup` when needed. If chat returns **401**, run `hermes setup` or edit `~/.hermes/config.yaml` |
 | `intentframe-integrations` on PATH | Installer symlinks `/usr/local/bin` (when writable) and `~/.local/bin`; no manual `export PATH` on root/Docker |
 
 ---
