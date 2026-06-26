@@ -4,6 +4,19 @@ IntentFrame agent integration monorepo: validate-only backend, bridge clients, a
 
 ## Quick start (Hermes)
 
+Public install (no clone):
+
+```bash
+curl -fsSL https://github.com/intentframe/agent-integrations/raw/main/scripts/install-hermes.sh | bash
+```
+
+Then start:
+
+```bash
+export OPENAI_API_KEY=sk-...
+~/.intentframe/agent-integrations/bin/intentframe-integrations run hermes
+```
+
 From repo root after `uv sync --all-packages`:
 
 ```bash

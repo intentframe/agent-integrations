@@ -111,22 +111,23 @@ def _verify_hermes_binary(binary: Path) -> bool:
 
 
 def resolve_hermes_bin() -> Path | None:
-    """Resolve Hermes CLI: HERMES_BIN → managed install → PATH."""
+    """Resolve Hermes CLI: HERMES_BIN → PATH → managed install."""
     override = os.environ.get("HERMES_BIN")
     if override:
         path = Path(os.path.expanduser(override))
         if path.is_file() and _verify_hermes_binary(path):
             return path
 
-    managed = managed_hermes_bin()
-    if managed.is_file() and _verify_hermes_binary(managed):
-        return managed
-
     discovered = shutil.which("hermes")
     if discovered:
         path = Path(discovered)
         if _verify_hermes_binary(path):
             return path
+
+    managed = managed_hermes_bin()
+    if managed.is_file() and _verify_hermes_binary(managed):
+        return managed
+
     return None
 
 

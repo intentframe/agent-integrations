@@ -95,8 +95,8 @@ bin/intentframe-integrations run hermes
 Hermes binary resolution order:
 
 1. `HERMES_BIN` if set
-2. Managed install from `install hermes`
-3. `hermes` on `PATH` (standalone user install)
+2. `hermes` on `PATH` (your existing install — any version)
+3. Managed install from `install hermes` (only when nothing on PATH)
 
 ## Hermes stack
 

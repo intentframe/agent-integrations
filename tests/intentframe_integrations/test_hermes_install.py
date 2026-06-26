@@ -82,20 +82,24 @@ class TestHermesResolver(unittest.TestCase):
             with patch.dict(os.environ, {"HERMES_BIN": str(binary)}, clear=False):
                 self.assertEqual(resolve_hermes_bin(), binary)
 
-    def test_resolve_managed_before_path(self) -> None:
+    def test_resolve_path_before_managed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp) / "home"
             home.mkdir()
+            path_hermes = Path(tmp) / "bin" / "hermes"
+            path_hermes.parent.mkdir(parents=True)
+            path_hermes.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            path_hermes.chmod(0o755)
 
             with patch_home(home):
-                binary = managed_hermes_bin()
-                binary.parent.mkdir(parents=True)
-                binary.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
-                binary.chmod(0o755)
-                with patch.dict(os.environ, {}, clear=True):
+                managed = managed_hermes_bin()
+                managed.parent.mkdir(parents=True)
+                managed.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+                managed.chmod(0o755)
+                with patch.dict(os.environ, {"PATH": str(path_hermes.parent)}, clear=True):
                     os.environ["HOME"] = str(home)
                     resolved = resolve_hermes_bin()
-                    self.assertEqual(resolved, binary)
+                    self.assertEqual(resolved, path_hermes)
 
 
 class TestHermesInstall(unittest.TestCase):
