@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# User journey: install plugin → seed OpenAI config → start stack → Hermes dashboard.
+# User journey: GitHub install → seed Hermes config + dashboard auth → start stack → dashboard.
 set -euo pipefail
 
 export PATH="/root/.local/bin:/usr/local/bin:${PATH}"
@@ -19,15 +19,10 @@ apt-get install -y -qq curl tar ca-certificates xz-utils git
 rm -rf /var/lib/apt/lists/*
 
 if ! have intentframe-integrations; then
-  if [[ -f /install-hermes-plugin.sh ]]; then
-    step "Installing from mounted /install-hermes-plugin.sh"
-    bash /install-hermes-plugin.sh
-  else
-    version="${VERSION:-main}"
-    url="https://github.com/intentframe/agent-integrations/raw/${version}/scripts/install-hermes-plugin.sh"
-    step "Installing from ${url}"
-    curl -fsSL "${url}" | bash
-  fi
+  version="${VERSION:-main}"
+  url="https://github.com/intentframe/agent-integrations/raw/${version}/scripts/install-hermes-plugin.sh"
+  step "Installing from ${url}"
+  curl -fsSL "${url}" | bash
 fi
 
 if [[ -z "${OPENAI_API_KEY:-}" ]]; then
@@ -37,8 +32,8 @@ fi
 
 export PATH="/root/.local/bin:/usr/local/bin:${PATH}"
 
-seed_hermes_openai_config() {
-  step "Seeding Hermes OpenAI config (provider=${HERMES_PROVIDER}, model=${HERMES_MODEL})"
+seed_hermes_runtime_config() {
+  step "Seeding Hermes config (provider=${HERMES_PROVIDER}, model=${HERMES_MODEL})"
   local python_bin=""
   for candidate in \
     /usr/local/lib/hermes-agent/venv/bin/python \
@@ -60,12 +55,15 @@ seed_hermes_openai_config() {
   HERMES_PROVIDER="${HERMES_PROVIDER}" \
   HERMES_API_MODE="${HERMES_API_MODE}" \
   HERMES_MODEL="${HERMES_MODEL}" \
+  HERMES_DASHBOARD_USER="${HERMES_DASHBOARD_USER:-hermes}" \
+  HERMES_DASHBOARD_PASSWORD="${HERMES_DASHBOARD_PASSWORD:-docker-test}" \
   OPENAI_API_KEY="${OPENAI_API_KEY}" \
   "${python_bin}" - <<'PY'
 import os
 from pathlib import Path
 
 import yaml
+from plugins.dashboard_auth.basic import hash_password
 
 home = Path(os.environ["HERMES_HOME"])
 config_path = home / "config.yaml"
@@ -84,6 +82,15 @@ if not isinstance(model_cfg, dict):
 model_cfg["provider"] = os.environ["HERMES_PROVIDER"]
 model_cfg["default"] = os.environ["HERMES_MODEL"]
 model_cfg["api_mode"] = os.environ["HERMES_API_MODE"]
+
+dashboard_cfg = cfg.get("dashboard")
+if not isinstance(dashboard_cfg, dict):
+    dashboard_cfg = {}
+    cfg["dashboard"] = dashboard_cfg
+dashboard_cfg["basic_auth"] = {
+    "username": os.environ["HERMES_DASHBOARD_USER"],
+    "password_hash": hash_password(os.environ["HERMES_DASHBOARD_PASSWORD"]),
+}
 
 home.mkdir(parents=True, exist_ok=True)
 config_path.write_text(
@@ -107,7 +114,7 @@ env_path.write_text(
 PY
 }
 
-seed_hermes_openai_config
+seed_hermes_runtime_config
 
 step "Starting IntentFrame backend + Hermes adapter"
 intentframe-integrations start hermes
@@ -115,8 +122,9 @@ intentframe-integrations start hermes
 step "Starting Hermes dashboard on 0.0.0.0:9119"
 echo ""
 echo "  Open http://localhost:9119/chat"
+echo "  Dashboard auth: ${HERMES_DASHBOARD_USER:-hermes} / ${HERMES_DASHBOARD_PASSWORD:-docker-test}"
 echo "  Verify gating: docker compose -f tests/docker/docker-compose.test.yml exec hermes-intentframe \\"
 echo "    tail -f /root/.intentframe/integrations/hermes/adapter.log"
 echo ""
 
-exec hermes dashboard --host 0.0.0.0 --insecure --no-open
+exec hermes dashboard --host 0.0.0.0 --no-open

@@ -1,13 +1,21 @@
 # Docker test: Hermes web chat user journey
 
-Non-interactive: skips Hermes setup wizard and Playwright/Chromium install (`--skip-setup --skip-browser`), then seeds OpenAI config (same as `tests/hermes_gateway/isolation.py`). Compose project name is `hermes-intentframe-test` (not `docker`).
+Production-like install: the container runs the same GitHub install script as a real user (`curl …/install-hermes-plugin.sh | bash`). Only `entrypoint.sh` is mounted — it seeds test config and starts services.
+
+Hermes is installed with `--skip-setup --skip-browser` (headless). OpenAI model/provider are seeded like `tests/hermes_gateway/isolation.py`. Dashboard basic auth is seeded so Hermes can bind `0.0.0.0` for Docker port publishing (required since Hermes 0.17+).
 
 ```bash
 export OPENAI_API_KEY=sk-...
 docker compose -f tests/docker/docker-compose.test.yml up
 ```
 
-Open **http://localhost:9119/chat**.
+Open **http://localhost:9119/chat** — sign in with default credentials `hermes` / `docker-test` (override via `HERMES_DASHBOARD_USER` / `HERMES_DASHBOARD_PASSWORD`).
+
+Pin a GitHub branch or tag for the install script and integration pack:
+
+```bash
+export VERSION=my-branch
+```
 
 Optional model override:
 

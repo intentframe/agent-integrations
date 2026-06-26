@@ -25,11 +25,12 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:?set OPENAI_API_KEY or use tests/docker/.env}
       VERSION: ${VERSION:-main}
       INTENTFRAME_HERMES_E2E_MODEL: ${INTENTFRAME_HERMES_E2E_MODEL:-gpt-4o-mini}
+      HERMES_DASHBOARD_USER: ${HERMES_DASHBOARD_USER:-hermes}
+      HERMES_DASHBOARD_PASSWORD: ${HERMES_DASHBOARD_PASSWORD:-docker-test}
     volumes:
       - intentframe-data:/root/.intentframe
       - hermes-data:/root/.hermes
       - ./entrypoint.sh:/entrypoint.sh:ro
-      - ../../scripts/install-hermes-plugin.sh:/install-hermes-plugin.sh:ro
     entrypoint: ["bash", "/entrypoint.sh"]
 
 volumes:
