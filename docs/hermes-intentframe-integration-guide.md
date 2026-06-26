@@ -195,6 +195,8 @@ bin/intentframe-integrations start hermes      # IntentFrame backend + adapter o
 bin/intentframe-integrations gateway start hermes --api-server
 ```
 
+**Uninstall / reinstall:** `intentframe-integrations uninstall hermes` removes IntentFrame; add `--remove-hermes` to wipe `~/.hermes` too. After uninstall, re-run the [install script](../scripts/install-hermes-plugin.sh) — not `integrate`. Details: [hermes-cli.md#uninstall](hermes-cli.md#uninstall).
+
 What `integrate hermes` does (evidence):
 
 ```35:37:intentframe-integrations-cli/src/intentframe_integrations/hermes_integrate.py

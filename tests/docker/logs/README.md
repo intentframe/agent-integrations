@@ -5,6 +5,7 @@ Captured audit trails from manual Hermes + IntentFrame dashboard runs in Docker.
 **Related docs**
 
 - [README.md](../../../README.md) — install + run (end users)
+- [docs/hermes-cli.md](../../../docs/hermes-cli.md) — install, uninstall, PATH, full CLI reference
 - [tests/docker/README.md](../README.md) — Docker smoke test, log paths, chat probes
 - [docs/hermes-intentframe-integration-guide.md](../../../docs/hermes-intentframe-integration-guide.md) — architecture and troubleshooting
 - [docs/agent-tool-gating.md](../../../docs/agent-tool-gating.md) — what “governed” means

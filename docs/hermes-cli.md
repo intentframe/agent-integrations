@@ -3,19 +3,25 @@
 `intentframe-integrations` orchestrates IntentFrame + Hermes. Install it via
 [install-hermes-plugin.sh](../scripts/install-hermes-plugin.sh) (full Hermes install by default; `--headless` for Docker/CI) or from this repo's `bin/`.
 
-**CLI on PATH:** the installer symlinks the real binary from `~/.intentframe/agent-integrations/.venv/bin/intentframe-integrations` into `/usr/local/bin` when that directory is writable (root, Docker, many Linux installs) and always into `~/.local/bin`. On Mac without a writable `/usr/local/bin`, open a new terminal after install (shell rc is updated). No sourcing required for direct `docker exec … intentframe-integrations` when `/usr/local/bin` is used.
+**CLI on PATH:** the installer symlinks `intentframe-integrations` from `~/.intentframe/agent-integrations/.venv/bin/` into `~/.local/bin` and `/usr/local/bin` when that directory is writable (root, Docker, many Linux installs). On Mac, open a new terminal and run `command -v intentframe-integrations` to confirm.
 
 User-facing quick start: [README.md](../README.md).
 
 ## Install
 
-**Default** (full Hermes install — setup wizard when needed):
+The [install script](../scripts/install-hermes-plugin.sh) downloads the integration pack, installs Hermes (if missing), copies the plugin, and symlinks the CLI. It is the **only** way to do a fresh install after `uninstall`.
+
+### Default (end users)
+
+Full Hermes install — setup wizard runs when needed:
 
 ```bash
 curl -fsSL https://github.com/intentframe/agent-integrations/raw/main/scripts/install-hermes-plugin.sh | bash
 ```
 
-**Headless** (skip Hermes setup wizard + browser engine — testers with `OPENAI_API_KEY` already set; same as Docker/CI):
+### Headless (testers / CI / Docker)
+
+Skips Hermes setup wizard and browser engine. You must set `OPENAI_API_KEY` yourself (run `hermes setup` if chat returns 401):
 
 ```bash
 curl -fsSL https://github.com/intentframe/agent-integrations/raw/main/scripts/install-hermes-plugin.sh | bash -s -- --headless
@@ -28,9 +34,44 @@ bash scripts/install-hermes-plugin.sh              # full
 bash scripts/install-hermes-plugin.sh --headless   # headless
 ```
 
-Pin a branch: `VERSION=my-branch curl -fsSL … | bash -s -- --headless`
+Pin a branch: `VERSION=my-branch curl -fsSL …/install-hermes-plugin.sh | bash -s -- --headless`
 
-After headless install, export `OPENAI_API_KEY` and run `hermes setup` if chat returns 401.
+### PATH and shell rc
+
+Every install:
+
+1. Symlinks `intentframe-integrations` → `~/.local/bin/`
+2. Symlinks `intentframe-integrations` → `/usr/local/bin/` when writable (root / Docker / many Linux installs)
+
+Additionally, the installer **may** append to `~/.zshrc`, `~/.bashrc`, or `~/.profile`:
+
+- Only if the file **exists**
+- Only if it does **not** already contain `.local/bin` (uv, Hermes, or a prior install often satisfy this)
+
+When appended, the block is tagged:
+
+```bash
+# Added by IntentFrame Hermes installer
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+If Hermes already put `~/.local/bin` on PATH, you will **not** see that comment — PATH still works via the existing line.
+
+**Check in a new terminal:**
+
+```bash
+command -v intentframe-integrations
+command -v hermes
+```
+
+### `integrate` vs install script
+
+| Command | Downloads pack? | When to use |
+|---------|-----------------|-------------|
+| `curl … install-hermes-plugin.sh` | Yes | First install; **only** way to reinstall after `uninstall` |
+| `intentframe-integrations integrate hermes` | No | Re-wire plugin/config while pack still exists at `~/.intentframe/agent-integrations` |
+
+`integrate` reads the plugin from the on-disk pack. After `uninstall`, the pack and CLI are gone — run the install script again.
 
 ## Happy path
 
@@ -61,48 +102,90 @@ intentframe-integrations doctor hermes [--install-only]
 
 ### Uninstall
 
-Remove IntentFrame only (Hermes stays):
+Stop the stack first, then uninstall:
 
 ```bash
-intentframe-integrations stop
-intentframe-integrations uninstall hermes
+intentframe-integrations stop || true
+intentframe-integrations uninstall hermes              # IntentFrame only; Hermes stays
+intentframe-integrations uninstall hermes --remove-hermes   # IntentFrame + all of Hermes
 ```
 
-Remove IntentFrame **and** Hermes (all data):
+If the CLI is already gone, use the repo copy:
 
 ```bash
-intentframe-integrations uninstall hermes --remove-hermes
+cd /path/to/agent-integrations
+./bin/intentframe-integrations uninstall hermes --remove-hermes
 ```
 
-What gets removed:
+#### What gets removed
 
 | Target | `uninstall hermes` | `+ --remove-hermes` |
 |--------|-------------------|---------------------|
 | `~/.hermes/plugins/intentframe-gate` | yes | yes |
 | `intentframe-gate` in `~/.hermes/config.yaml` | yes | yes |
-| IntentFrame keys in `~/.hermes/.env` | yes | yes |
-| Entire `~/.intentframe/` | yes | yes |
-| `intentframe-integrations` CLI symlinks | yes | yes |
-| Installer PATH block in `~/.zshrc` / `.bashrc` / `.profile` | yes | yes |
-| Entire `~/.hermes/` (config, sessions, logs, skills, agent) | no | yes |
-| `hermes` CLI symlinks | no | yes |
+| IntentFrame keys in `~/.hermes/.env` (`IF_*`, `HERMES_GOVERNANCE_YAML`, etc.) | yes | yes |
+| `~/.hermes/*.intentframe.bak` config backups | yes | yes |
+| Entire `~/.intentframe/` (pack, venv, backend, logs, policy, adapter) | yes | yes |
+| `intentframe-integrations` CLI symlinks (`~/.local/bin`, `/usr/local/bin`) | yes | yes |
+| Installer PATH block (`# Added by IntentFrame Hermes installer` only) | yes | yes |
+| Entire `~/.hermes/` (config, agent checkout, sessions, logs, skills, cron) | **no** | **yes** |
+| `hermes` CLI symlinks (`~/.local/bin`, `/usr/local/bin`) | **no** | **yes** |
 
-If the CLI is already gone, manual Hermes removal:
+With `--remove-hermes`, all Hermes user data and source under `~/.hermes` is deleted. You do **not** need a separate official Hermes uninstall command.
+
+#### What is **not** removed
+
+| Left behind | Why |
+|-------------|-----|
+| `export PATH=…~/.local/bin…` from **uv** or **official Hermes** (no IntentFrame marker) | Uninstall only strips our tagged block |
+| Homebrew packages (e.g. `ffmpeg` installed during Hermes setup) | System packages |
+| Git dev clone (`~/…/agent-integrations`) | Not part of user install |
+| Docker named volumes | Use `docker compose … down -v` separately |
+
+#### Verify
+
+Run in a **new terminal** after uninstall:
 
 ```bash
-rm -rf ~/.hermes
-rm -f ~/.local/bin/hermes /usr/local/bin/hermes
+command -v intentframe-integrations || echo "IF CLI: gone"
+command -v hermes || echo "hermes CLI: gone"
+test -e ~/.intentframe || echo "~/.intentframe: gone"
+test -e ~/.hermes || echo "~/.hermes: gone"
+grep -F 'IntentFrame Hermes installer' ~/.zshrc ~/.bashrc ~/.profile 2>/dev/null \
+  || echo "IntentFrame installer rc block: gone (or never added)"
+```
+
+After `uninstall hermes` (without `--remove-hermes`): `~/.hermes` should still exist; `~/.intentframe` and `intentframe-integrations` should be gone.
+
+After `uninstall hermes --remove-hermes`: all four checks should report **gone**.
+
+#### Manual fallback (CLI already deleted)
+
+IntentFrame only:
+
+```bash
+rm -rf ~/.intentframe
+rm -f ~/.local/bin/intentframe-integrations /usr/local/bin/intentframe-integrations
+rm -rf ~/.hermes/plugins/intentframe-gate
+```
+
+IntentFrame + Hermes:
+
+```bash
+rm -rf ~/.intentframe ~/.hermes
+rm -f ~/.local/bin/intentframe-integrations ~/.local/bin/hermes
+rm -f /usr/local/bin/intentframe-integrations /usr/local/bin/hermes
 ```
 
 ### Reinstall
 
-`uninstall` removes the CLI and the `~/.intentframe` pack, so there is nothing left to `integrate`. To use IntentFrame again, always do a **fresh install**:
+`uninstall` deletes the CLI and `~/.intentframe/agent-integrations`. There is nothing left to `integrate`. Always re-run the install script:
 
 ```bash
 curl -fsSL https://github.com/intentframe/agent-integrations/raw/main/scripts/install-hermes-plugin.sh | bash
+# or headless:
+curl -fsSL https://github.com/intentframe/agent-integrations/raw/main/scripts/install-hermes-plugin.sh | bash -s -- --headless
 ```
-
-This re-downloads the pack, reinstalls the plugin, and puts the CLI back on PATH. There is no "reintegrate" shortcut after uninstall.
 
 Hermes binary resolution order: `HERMES_BIN` → `hermes` on `PATH` → managed venv from `install`.
 

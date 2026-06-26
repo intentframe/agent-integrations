@@ -216,3 +216,17 @@ Reset (fresh install):
 ```bash
 docker compose -f tests/docker/docker-compose.test.yml down -v
 ```
+
+### Test uninstall (inside container)
+
+```bash
+docker compose -f tests/docker/docker-compose.test.yml exec hermes-intentframe intentframe-integrations uninstall hermes --remove-hermes
+```
+
+Verify from the host (CLI should be gone):
+
+```bash
+docker compose -f tests/docker/docker-compose.test.yml exec hermes-intentframe command -v intentframe-integrations || echo "gone"
+```
+
+Full uninstall scope and verify steps: [docs/hermes-cli.md#uninstall](../../docs/hermes-cli.md#uninstall).

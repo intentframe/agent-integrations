@@ -16,15 +16,16 @@ hermes dashboard
 
 ```bash
 intentframe-integrations install hermes
-intentframe-integrations integrate hermes
-intentframe-integrations uninstall hermes
+intentframe-integrations integrate hermes    # re-wire only; pack must exist
+intentframe-integrations uninstall hermes              # IntentFrame only
+intentframe-integrations uninstall hermes --remove-hermes   # full wipe
 intentframe-integrations doctor hermes
 intentframe-integrations governance list hermes
 intentframe-integrations policy show hermes
 intentframe-integrations stop
 ```
 
-See [docs/hermes-cli.md](../docs/hermes-cli.md) for every flag, env var, and advanced gateway flow.
+Install / uninstall / PATH: [docs/hermes-cli.md](../docs/hermes-cli.md#install). Uninstall tables and verify steps: [docs/hermes-cli.md#uninstall](../docs/hermes-cli.md#uninstall). After uninstall, re-run the curl install script — not `integrate`.
 
 ## Run from repo
 

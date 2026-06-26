@@ -4,7 +4,7 @@
 
 Hermes gives you a capable agent with terminal, files, and tools. IntentFrame adds the governance layer: every dangerous action crosses a policy boundary first. The model proposes; IntentFrame judges; only then does Hermes execute.
 
-[Install](#install) · [Run](#run-three-commands) · [CLI reference](docs/hermes-cli.md) · [Integration guide](docs/hermes-intentframe-integration-guide.md) · [IntentFrame core](https://github.com/intentframe/intentframe)
+[Install](#install) · [Run](#run-three-commands) · [Uninstall](#uninstall) · [CLI reference](docs/hermes-cli.md) · [Integration guide](docs/hermes-intentframe-integration-guide.md) · [IntentFrame core](https://github.com/intentframe/intentframe)
 
 ---
 
@@ -45,7 +45,9 @@ No git clone. One script installs Hermes (if needed), the integration pack, and 
 curl -fsSL https://github.com/intentframe/agent-integrations/raw/main/scripts/install-hermes-plugin.sh | bash
 ```
 
-**Requires:** Linux or macOS, network, `curl`. Installs [uv](https://github.com/astral-sh/uv) when missing. Runs the **full** Hermes installer by default (setup wizard when needed). Puts `intentframe-integrations` on PATH: `/usr/local/bin` when writable (root/Docker/Linux), always `~/.local/bin` (plus shell config on Mac when `/usr/local/bin` is not writable).
+**Requires:** Linux or macOS, network, `curl`. Installs [uv](https://github.com/astral-sh/uv) when missing. Runs the **full** Hermes installer by default (setup wizard when needed).
+
+**PATH:** symlinks `intentframe-integrations` to `~/.local/bin` and `/usr/local/bin` when writable. May append `~/.local/bin` to shell rc only if it is not already there — see [docs/hermes-cli.md#install](docs/hermes-cli.md#install).
 
 **Headless install** (skip Hermes setup wizard + browser engine — for testers who already have API keys):
 
@@ -81,19 +83,37 @@ tail -f ~/.intentframe/integrations/hermes/adapter.log
 
 Try something policy should block (e.g. `sudo …`) and look for `BLOCK` in the log.
 
-**Uninstall IntentFrame** (removes plugin, all of `~/.intentframe`, CLI symlinks, installer PATH block in shell rc):
+---
+
+## Uninstall
 
 ```bash
-intentframe-integrations uninstall hermes
+intentframe-integrations stop || true
+intentframe-integrations uninstall hermes              # IntentFrame only; Hermes stays
+intentframe-integrations uninstall hermes --remove-hermes   # IntentFrame + all of Hermes
 ```
 
-**Remove Hermes too** (all Hermes data: config, sessions, logs, skills, agent checkout):
+| Command | Effect |
+|---------|--------|
+| `uninstall hermes` | Remove IntentFrame (`~/.intentframe`, plugin, CLI). **Hermes stays** at `~/.hermes`. |
+| `+ --remove-hermes` | Also delete all of `~/.hermes` (config, agent source, sessions, logs) and `hermes` CLI symlinks. |
+
+Uninstall removes the `intentframe-integrations` CLI and pack — there is no `integrate` afterward. To use IntentFrame again, run the [install script](#install) again (not `integrate`).
+
+**Verify** (new terminal):
 
 ```bash
-intentframe-integrations uninstall hermes --remove-hermes
+command -v intentframe-integrations || echo "IF CLI: gone"
+command -v hermes || echo "hermes CLI: gone"
+test -e ~/.intentframe || echo "~/.intentframe: gone"
+test -e ~/.hermes || echo "~/.hermes: gone"
+grep -F 'IntentFrame Hermes installer' ~/.zshrc ~/.bashrc ~/.profile 2>/dev/null \
+  || echo "IntentFrame installer rc block: gone (or never added)"
 ```
 
-Uninstall deletes the CLI and the `~/.intentframe` pack, so there is no "reintegrate." To use IntentFrame again, do a fresh install (the `curl … install-hermes-plugin.sh` line above). Details: [docs/hermes-cli.md](docs/hermes-cli.md#uninstall).
+After `uninstall hermes` only: `~/.hermes` should still exist. After `--remove-hermes`: all checks should report **gone**.
+
+Full tables (what is / is not removed): [docs/hermes-cli.md#uninstall](docs/hermes-cli.md#uninstall).
 
 ---
 
@@ -103,7 +123,7 @@ Uninstall deletes the CLI and the `~/.intentframe` pack, so there is no "reinteg
 |-------------|--------|
 | `OPENAI_API_KEY` | Required for `up hermes` and chat |
 | Hermes LLM config | Full install runs `hermes setup` when needed. If chat returns **401**, run `hermes setup` or edit `~/.hermes/config.yaml` |
-| `intentframe-integrations` on PATH | Installer symlinks `/usr/local/bin` (when writable) and `~/.local/bin`; no manual `export PATH` on root/Docker |
+| `intentframe-integrations` on PATH | Installer symlinks `~/.local/bin` and `/usr/local/bin` (when writable); may skip shell rc if `~/.local/bin` already present |
 
 ---
 
