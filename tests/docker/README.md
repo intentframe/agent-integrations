@@ -15,7 +15,7 @@ Open **http://localhost:9119/chat** — sign in with default credentials `hermes
 
 The entrypoint clears Hermes’s default OpenRouter `base_url` so `OPENAI_API_KEY` hits OpenAI directly, and runs `intentframe-integrations up hermes` before the dashboard (IntentFrame + adapter + gateway).
 
-Pin a GitHub branch or tag for the install script and integration pack:
+Pin a GitHub **branch** for the install script and integration pack (tags not supported yet — see [docs/hermes-known-limitations.md](../../docs/hermes-known-limitations.md)):
 
 ```bash
 export VERSION=my-branch

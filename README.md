@@ -63,6 +63,8 @@ bash scripts/install-hermes-plugin.sh --headless
 
 After headless install, set `OPENAI_API_KEY` (and run `hermes setup` if chat returns 401). Then the same [three commands](#run-three-commands) as below.
 
+**Known limitations** (version pinning, full uninstall on root/Docker): [docs/hermes-known-limitations.md](docs/hermes-known-limitations.md).
+
 ---
 
 ## Run (three commands)
@@ -96,7 +98,7 @@ intentframe-integrations uninstall hermes --remove-hermes   # IntentFrame + all 
 | Command | Effect |
 |---------|--------|
 | `uninstall hermes` | Remove IntentFrame (`~/.intentframe`, plugin, CLI). **Hermes stays** at `~/.hermes`. |
-| `+ --remove-hermes` | Also delete all of `~/.hermes` (config, agent source, sessions, logs) and `hermes` CLI symlinks. |
+| `+ --remove-hermes` | Also delete all of `~/.hermes` (config, sessions, logs) and `hermes` CLI symlinks. Root/Linux FHS code under `/usr/local/lib/hermes-agent/` is **not** removed yet — [caveats](docs/hermes-known-limitations.md). |
 
 Uninstall removes the `intentframe-integrations` CLI and pack — there is no `integrate` afterward. To use IntentFrame again, run the [install script](#install) again (not `integrate`).
 
@@ -159,6 +161,7 @@ docker compose -f tests/docker/docker-compose.test.yml up
 | Doc | Audience |
 |-----|----------|
 | [docs/hermes-cli.md](docs/hermes-cli.md) | CLI commands — governance, policy, gateway, env vars |
+| [docs/hermes-known-limitations.md](docs/hermes-known-limitations.md) | Install/uninstall caveats and roadmap |
 | [docs/hermes-intentframe-integration-guide.md](docs/hermes-intentframe-integration-guide.md) | Architecture, adding tools, troubleshooting |
 | [tests/docker/logs/](tests/docker/logs/README.md) | Captured Docker chat + gating audit sessions (example probes) |
 | [integrations/hermes/README.md](integrations/hermes/README.md) | Monorepo dev reference |

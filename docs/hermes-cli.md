@@ -7,6 +7,8 @@
 
 User-facing quick start: [README.md](../README.md).
 
+Known limitations (community install / uninstall caveats): [hermes-known-limitations.md](hermes-known-limitations.md).
+
 ## Install
 
 The [install script](../scripts/install-hermes-plugin.sh) downloads the integration pack, installs Hermes (if missing), copies the plugin, and symlinks the CLI. It is the **only** way to do a fresh install after `uninstall`.
@@ -34,7 +36,7 @@ bash scripts/install-hermes-plugin.sh              # full
 bash scripts/install-hermes-plugin.sh --headless   # headless
 ```
 
-Pin a branch: `VERSION=my-branch curl -fsSL …/install-hermes-plugin.sh | bash -s -- --headless`
+Pin a **branch** (not a git tag): `VERSION=my-branch curl -fsSL …/install-hermes-plugin.sh | bash -s -- --headless`. See [known limitations](hermes-known-limitations.md#version-pins-branches-only-not-git-tags).
 
 ### PATH and shell rc
 
@@ -131,12 +133,13 @@ cd /path/to/agent-integrations
 | Entire `~/.hermes/` (config, agent checkout, sessions, logs, skills, cron) | **no** | **yes** |
 | `hermes` CLI symlinks (`~/.local/bin`, `/usr/local/bin`) | **no** | **yes** |
 
-With `--remove-hermes`, all Hermes user data and source under `~/.hermes` is deleted. You do **not** need a separate official Hermes uninstall command.
+With `--remove-hermes`, all Hermes **user data** under `~/.hermes` is deleted, plus `hermes` CLI symlinks. On a normal per-user install that is a full Hermes wipe. On **root/Linux FHS** installs, Hermes code under `/usr/local/lib/hermes-agent/` is left behind — see [known limitations](hermes-known-limitations.md#--remove-hermes-does-not-remove-root-fhs-hermes-code).
 
 #### What is **not** removed
 
 | Left behind | Why |
 |-------------|-----|
+| `/usr/local/lib/hermes-agent/` (root FHS Hermes install on Linux) | Not in uninstall scope yet — [manual cleanup](hermes-known-limitations.md#--remove-hermes-does-not-remove-root-fhs-hermes-code) |
 | `export PATH=…~/.local/bin…` from **uv** or **official Hermes** (no IntentFrame marker) | Uninstall only strips our tagged block |
 | Homebrew packages (e.g. `ffmpeg` installed during Hermes setup) | System packages |
 | Git dev clone (`~/…/agent-integrations`) | Not part of user install |
@@ -175,6 +178,8 @@ IntentFrame + Hermes:
 rm -rf ~/.intentframe ~/.hermes
 rm -f ~/.local/bin/intentframe-integrations ~/.local/bin/hermes
 rm -f /usr/local/bin/intentframe-integrations /usr/local/bin/hermes
+# root/Linux FHS Hermes only:
+sudo rm -rf /usr/local/lib/hermes-agent
 ```
 
 ### Reinstall
