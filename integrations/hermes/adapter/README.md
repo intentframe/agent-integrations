@@ -9,6 +9,12 @@ IntentFrame bridge (`~/.intentframe/backend/bridge.sock`) using
 ## Run (normally via CLI)
 
 ```bash
+bin/intentframe-integrations up hermes
+```
+
+Low-level (adapter only, no gateway):
+
+```bash
 bin/intentframe-integrations start hermes
 ```
 

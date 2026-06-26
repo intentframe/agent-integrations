@@ -6,13 +6,15 @@
 
 Related:
 
+- [README.md](../README.md) — install + chat (end users)
+- [hermes-cli.md](./hermes-cli.md) — full CLI reference
 - [`hermes-intentframe-state-report.md`](./hermes-intentframe-state-report.md) — current integration snapshot (catalog, tests, limitations)
 - [`hermes-plugin-registration-order.md`](./hermes-plugin-registration-order.md) — load-order bug, preload fix, evidence
 - [`hermes-governance-execute-code-and-schema-hooks.md`](./hermes-governance-execute-code-and-schema-hooks.md) — `execute_code` governance, schema hooks, `read_terminal` lessons (June 2026)
 - [`hermes-outbound-messaging-and-cronjob-governance.md`](./hermes-outbound-messaging-and-cronjob-governance.md) — proactive outbound send (`hermes send`, cron `deliver`), cronjob governance, AE/Guardian visibility, v1 deferrals
 - [`agent-tool-gating.md`](./agent-tool-gating.md) — portable gating pattern
 - [`NATIVE_KIT_INTEGRATION.md`](./NATIVE_KIT_INTEGRATION.md) — native-kit bundles, policy alignment
-- [`integrations/hermes/README.md`](../integrations/hermes/README.md) — CLI quick start
+- [`integrations/hermes/README.md`](../integrations/hermes/README.md) — monorepo dev reference
 - [`integrations/hermes/plugin/intentframe-gate/README.md`](../integrations/hermes/plugin/intentframe-gate/README.md) — plugin env and architecture
 
 ---
@@ -165,15 +167,30 @@ Automated check:
 
 ## Integration checklist (production CLI path)
 
-From repo root, with `OPENAI_API_KEY` set:
+End-user one-liner (after [install script](../scripts/install-hermes-plugin.sh)):
+
+```bash
+export OPENAI_API_KEY=sk-...
+intentframe-integrations up hermes
+hermes dashboard
+```
+
+From repo root, with `OPENAI_API_KEY` set (step-by-step + HTTP API server):
 
 ```bash
 uv sync --all-packages
 
 bin/intentframe-integrations install hermes
-bin/intentframe-integrations start hermes      # IntentFrame backend + adapter
 bin/intentframe-integrations integrate hermes   # plugin symlink + config + governance seed
+bin/intentframe-integrations up hermes            # backend + adapter + gateway
 bin/intentframe-integrations doctor hermes        # contract alignment checks
+bin/intentframe-integrations gateway start hermes --api-server   # only if gateway not already up
+```
+
+Low-level split (tests/debug):
+
+```bash
+bin/intentframe-integrations start hermes      # IntentFrame backend + adapter only
 bin/intentframe-integrations gateway start hermes --api-server
 ```
 

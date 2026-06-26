@@ -75,7 +75,7 @@ When adding a governed Hermes builtin:
 
 The Hermes gateway process and adapter sidecar inherit these from the CLI parent
 environment. If `HERMES_GOVERNANCE_YAML` is already set when you run
-`intentframe-integrations start hermes` or `gateway start hermes`, that value is
+`intentframe-integrations up hermes`, `start hermes`, or `gateway start hermes`, that value is
 preserved (the CLI does not overwrite it with the sandbox default from
 `agent.json`). `integrate hermes` prints the effective export lines for manual shells.
 

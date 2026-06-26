@@ -3,137 +3,40 @@
 User-facing orchestrator for agent profiles under `integrations/`. Delegates runtime work to
 `if-integration-backend` and manages per-agent adapter sidecars.
 
-## Commands
+**Hermes users:** start with the [root README](../README.md) (install + three commands to chat).
+Full command reference: [docs/hermes-cli.md](../docs/hermes-cli.md).
+
+## Hermes (summary)
 
 ```bash
-intentframe-integrations install hermes [--version VERSION] [--force]
-intentframe-integrations up hermes [--no-seed] [--skip-if-exists]
-intentframe-integrations start hermes [--no-seed] [--skip-if-exists]
-intentframe-integrations start --agent-config path/to/agent.json [--no-seed]
-intentframe-integrations integrate hermes [--copy] [--skip-config]
-intentframe-integrations gateway start hermes [--api-server] [--api-port PORT] [--api-key KEY]
-intentframe-integrations gateway stop hermes
-intentframe-integrations run hermes [-- extra hermes gateway args]
-intentframe-integrations stop
-intentframe-integrations status
-intentframe-integrations seed hermes [--skip-if-exists]
-intentframe-integrations test [--agent-config path/to/agent.json]
-intentframe-integrations doctor hermes [--install-only]
+export OPENAI_API_KEY=sk-...
+intentframe-integrations up hermes
+hermes dashboard
+```
+
+```bash
+intentframe-integrations install hermes
+intentframe-integrations integrate hermes
+intentframe-integrations doctor hermes
 intentframe-integrations governance list hermes
-intentframe-integrations governance enable hermes <tool>
-intentframe-integrations governance disable hermes <tool>
 intentframe-integrations policy show hermes
-intentframe-integrations policy reload hermes
-intentframe-integrations policy set hermes <path/to/policy.yaml>
-intentframe-integrations policy reset hermes
+intentframe-integrations stop
 ```
 
-`governance enable|disable` toggles **IntentFrame governance** for a catalog tool
-(yaml `enabled: true/false`). It does not enable or disable Hermes native tools.
-After toggling, **restart Hermes gateway + adapter** (governance is loaded at process
-start). IntentFrame backend does not need restart.
-See [`docs/agent-tool-gating.md`](../docs/agent-tool-gating.md#terminology-what-governed-means).
+See [docs/hermes-cli.md](../docs/hermes-cli.md) for every flag, env var, and advanced gateway flow.
 
-**Policy** lives at `~/.intentframe/integrations/<agent>/policy.yaml` (copied from the
-shipped template on first `integrate` or `start`). Edit that file, then
-`policy reload <agent>`. Use `policy set` to install an external yaml, or
-`policy reset` to restore the shipped default. Changes apply immediately — no
-gateway restart needed.
-
-**Pack activation** — every command that loads an agent profile through
-`load_and_activate_pack()` (in `integration_pack.py`) applies the same runtime
-setup:
-
-1. Load `agent.json` → `IntegrationPack`
-2. Apply `agent.json` `env` via `os.environ.setdefault` (explicit shell exports win)
-3. For Hermes: seed runtime `governance/tools.yaml` and `generic_actions.manifest`
-   if missing (so manifest paths in env always point at real files)
-
-Used by `start`, `integrate`, `doctor`, `gateway start`, `run`, and all
-`policy *` commands. Policy validation rebuilds bundle registry from the CLI
-process environment — it must see the same manifest path the backend used at boot.
-
-**Runtime artifacts** (copied on first `integrate` or seeded on first `start`, never auto-overwritten):
-
-- `governance/tools.yaml` — user toggles via `governance enable|disable`
-- `governance/generic_actions.manifest` — static dev-shipped superset of generic action IDs
-- `policy.yaml` — user edits via policy CLI
-
-There is no `sync` command — dev-maintained repo templates plus golden test
-`tests/intentframe_integrations/test_actions_manifest.py`. See
-[`integrations/hermes/governance/README.md`](../integrations/hermes/governance/README.md#derived-artifacts-sync-replacement).
-
-Run from repo root via `bin/intentframe-integrations` or:
+## Run from repo
 
 ```bash
-uv run --package intentframe-integrations-cli intentframe-integrations start hermes
-```
-
-## Hermes production flow
-
-Greenfield user (no Hermes installed):
-
-```bash
-export OPENAI_API_KEY=sk-...
-bin/intentframe-integrations install hermes
-bin/intentframe-integrations integrate hermes
 bin/intentframe-integrations up hermes
-bin/intentframe-integrations doctor hermes
-bin/intentframe-integrations gateway start hermes --api-server
 ```
 
-Returning user / one-liner:
+Or:
 
 ```bash
-export OPENAI_API_KEY=sk-...
-bin/intentframe-integrations run hermes
+uv run --package intentframe-integrations-cli intentframe-integrations up hermes
 ```
 
-`install hermes` installs Hermes Agent into a managed venv at
-`~/.intentframe/integrations/hermes/hermes-agent-venv/`. Hermes data lives under
-`HERMES_HOME` (default `~/.hermes`).
+## Other agents
 
-Hermes binary resolution order:
-
-1. `HERMES_BIN` if set
-2. `hermes` on `PATH` (your existing install — any version)
-3. Managed install from `install hermes` (only when nothing on PATH)
-
-## Hermes stack
-
-1. `install hermes` — Hermes Agent CLI (managed venv, pinned version)
-2. `integrate hermes` — plugin + runtime governance/policy templates
-3. `up hermes` — backend bridge + adapter + Hermes gateway (ready for `hermes dashboard`)
-4. `start hermes` — backend bridge + adapter only (low-level; tests/debug)
-5. `gateway start hermes` — launch Hermes gateway only (optionally with API server)
-6. `stop` — stop gateway started by orchestrator, adapters, and backend runtime
-
-`gateway start hermes` always invokes `hermes gateway run` (foreground process). Extra gateway
-args are normalized to run flags only; service subcommands are ignored. Stop uses process-group
-termination and verifies the PID is still a Hermes gateway before trusting stale PID files.
-
-The CLI does **not** configure Hermes LLM model or provider — only plugin install, config merge,
-adapter sync, and gateway lifecycle.
-
-## Environment variables (Hermes)
-
-| Variable | Set by | Effect |
-|----------|--------|--------|
-| `HERMES_GOVERNANCE_YAML` | `agent.json` default; override in shell or test harness | Which tools are **IntentFrame-governed** at runtime. All pack-loading commands apply via `setdefault` — explicit shell value wins over `agent.json`. |
-| `IF_DYNAMIC_BUNDLE_MANIFEST` | `agent.json` default | Path to runtime `generic_actions.manifest` (generic `HERMES_*` action IDs). Backend dynamic bundle reads this at boot; policy `reload`/`set`/`reset` validate against the same registry — CLI applies this env via `load_and_activate_pack` before validation. |
-| `IF_AGENT_ADAPTER_SOCKET` | `agent.json` | UDS path for plugin → adapter validate calls. |
-
-**Env precedence:** explicit `os.environ` → `agent.json` defaults (`setdefault`) → seeded runtime files at those paths. Dev/test harnesses may export overrides before any CLI command; they are never clobbered.
-
-`integrate hermes` prints `export …` lines from `format_env_exports()`: values already
-present in the shell (including `HERMES_GOVERNANCE_YAML`) win over `agent.json` defaults.
-
-`gateway start hermes` logs the effective governance path to stderr:
-
-```text
-  Hermes governance config: /path/to/tools.yaml
-```
-
-See `integrations/hermes/README.md` for architecture and governed-tool terminology.
-Opt-in gateway E2E (sandbox, log paths, troubleshooting): `tests/hermes_gateway/README.md`.
-Concepts: [`docs/agent-tool-gating.md`](docs/agent-tool-gating.md#terminology-what-governed-means).
+Agent profiles live under `integrations/<agent>/agent.json`. Use `start --agent-config` for custom profiles.

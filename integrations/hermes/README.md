@@ -1,5 +1,7 @@
 # Hermes integration
 
+**End users:** [README.md](../../README.md) (install + chat) · [docs/hermes-cli.md](../../docs/hermes-cli.md) (CLI reference)
+
 Hermes does **not** ship an IntentFrame executor pack or runtime. This folder provides:
 
 | Path | Purpose |
@@ -32,7 +34,7 @@ Public install (curl, no clone):
 ```bash
 curl -fsSL https://github.com/intentframe/agent-integrations/raw/main/scripts/install-hermes-plugin.sh | bash
 export OPENAI_API_KEY=sk-...
-intentframe-integrations start hermes
+intentframe-integrations up hermes
 hermes dashboard
 ```
 
@@ -43,15 +45,16 @@ uv sync --all-packages
 export OPENAI_API_KEY=sk-...
 
 bin/intentframe-integrations install hermes
-bin/intentframe-integrations run hermes
+bin/intentframe-integrations integrate hermes
+bin/intentframe-integrations up hermes
 ```
 
-Or step by step:
+Or step by step (includes API-server gateway for HTTP testing):
 
 ```bash
 bin/intentframe-integrations install hermes
-bin/intentframe-integrations start hermes
 bin/intentframe-integrations integrate hermes
+bin/intentframe-integrations start hermes
 bin/intentframe-integrations doctor hermes
 bin/intentframe-integrations gateway start hermes --api-server
 ```
@@ -112,8 +115,11 @@ Policy changes apply immediately — no gateway or adapter restart needed.
 
 ## Commands
 
+Full reference: [docs/hermes-cli.md](../../docs/hermes-cli.md).
+
 ```bash
 bin/intentframe-integrations install hermes [--version VERSION] [--force]
+bin/intentframe-integrations up hermes
 bin/intentframe-integrations start hermes
 bin/intentframe-integrations integrate hermes [--copy] [--skip-config] [--reset-governance] [--reset-policy]
 bin/intentframe-integrations doctor hermes [--install-only]

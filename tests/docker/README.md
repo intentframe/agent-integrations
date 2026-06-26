@@ -29,11 +29,7 @@ export INTENTFRAME_HERMES_E2E_MODEL=gpt-4o-mini
 
 ## Logs and analysis (inside the container)
 
-All paths below are inside the container (`hermes-intentframe-test`). Prefix commands with:
-
-```bash
-DC="docker compose -f tests/docker/docker-compose.test.yml exec hermes-intentframe"
-```
+All paths below are inside the container (`hermes-intentframe-test`). Run from the repo root; service name is `hermes-intentframe`.
 
 ### Log map
 
@@ -58,7 +54,7 @@ Per-service stdout also lands under `/root/.intentframe/logs/` (`policy-registry
 ### Tail while testing
 
 ```bash
-$DC tail -f /root/.intentframe/logs/intentframe-server.log
+docker compose -f tests/docker/docker-compose.test.yml exec hermes-intentframe tail -f /root/.intentframe/logs/intentframe-server.log
 ```
 
 In another terminal, use chat at http://localhost:9119/chat. Each governed tool call should produce at least one `INTENT #N` block.
@@ -66,13 +62,13 @@ In another terminal, use chat at http://localhost:9119/chat. Each governed tool 
 Optional second tail for semantic blocks (AE + Guardian take several seconds):
 
 ```bash
-$DC tail -f /root/.intentframe/logs/guardian_outputs.log
+docker compose -f tests/docker/docker-compose.test.yml exec hermes-intentframe tail -f /root/.intentframe/logs/guardian_outputs.log
 ```
 
 List every log file:
 
 ```bash
-$DC find /root/.intentframe /root/.hermes/logs -name '*.log' | sort
+docker compose -f tests/docker/docker-compose.test.yml exec hermes-intentframe find /root/.intentframe /root/.hermes/logs -name '*.log' | sort
 ```
 
 ### What to look for in `intentframe-server.log`
@@ -92,7 +88,7 @@ Hermes dashboard chat may also append a **File-mutation verifier** footer when `
 `agent.log` shows tool results and timing, not always full arguments. For the literal `function.arguments` JSON:
 
 ```bash
-$DC python3 <<'PY'
+docker compose -f tests/docker/docker-compose.test.yml exec hermes-intentframe python3 <<'PY'
 import sqlite3, json
 conn = sqlite3.connect("/root/.hermes/state.db")
 cur = conn.cursor()
@@ -115,7 +111,7 @@ PY
 Filter by path or probe name:
 
 ```bash
-$DC python3 -c "
+docker compose -f tests/docker/docker-compose.test.yml exec hermes-intentframe python3 -c "
 import sqlite3, json
 c = sqlite3.connect('/root/.hermes/state.db')
 for mid, tc in c.execute(
@@ -136,7 +132,7 @@ The adapter maps Hermes tools to bridge `/validate` bodies. Examples:
 **Deterministic path block** — `bundle-sdk.log` (terminal hook on `enforce_constraints`):
 
 ```bash
-$DC grep 'e2e-block-probe' /root/.intentframe/logs/bundle-sdk.log | tail -1 | python3 -m json.tool
+docker compose -f tests/docker/docker-compose.test.yml exec hermes-intentframe grep 'e2e-block-probe' /root/.intentframe/logs/bundle-sdk.log | tail -1 | python3 -m json.tool
 ```
 
 Look for `"phase": "enforce_constraints"`, `"terminal": true`, `"matched_gate": "constraint"`.
@@ -144,13 +140,13 @@ Look for `"phase": "enforce_constraints"`, `"terminal": true`, `"matched_gate": 
 **Semantic block** — `guardian_outputs.log` includes the full intent under `converted_output.intent`:
 
 ```bash
-$DC grep 'bashrc' /root/.intentframe/logs/guardian_outputs.log | tail -1 | python3 -m json.tool
+docker compose -f tests/docker/docker-compose.test.yml exec hermes-intentframe grep 'bashrc' /root/.intentframe/logs/guardian_outputs.log | tail -1 | python3 -m json.tool
 ```
 
 AE detail (scope mismatch, hidden behaviors):
 
 ```bash
-$DC grep 'bashrc' /root/.intentframe/logs/analysis_outputs.log | tail -1 | python3 -m json.tool
+docker compose -f tests/docker/docker-compose.test.yml exec hermes-intentframe grep 'bashrc' /root/.intentframe/logs/analysis_outputs.log | tail -1 | python3 -m json.tool
 ```
 
 ### Example chat probes
@@ -184,22 +180,20 @@ Captured manual session write-ups (chat + audit trail): [`logs/`](./logs/).
 After a greenfield install (`down -v` then `up`), the installer runs as root and symlinks into `/usr/local/bin`. These checks do **not** need an interactive shell or sourcing:
 
 ```bash
-DC="docker compose -f tests/docker/docker-compose.test.yml"
-
 # 1. Greenfield (picks up install script from GitHub main, or VERSION=your-branch)
-$DC down -v
+docker compose -f tests/docker/docker-compose.test.yml down -v
 export OPENAI_API_KEY=sk-...
-$DC up -d
+docker compose -f tests/docker/docker-compose.test.yml up -d
 
 # 2. Direct exec — the case that must work (no bash, no rc)
-$DC exec hermes-intentframe intentframe-integrations --help
+docker compose -f tests/docker/docker-compose.test.yml exec hermes-intentframe intentframe-integrations --help
 
 # 3. Strict default PATH only (no ~/.local/bin in env)
-$DC exec hermes-intentframe env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+docker compose -f tests/docker/docker-compose.test.yml exec hermes-intentframe env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
   intentframe-integrations --help
 
 # 4. Symlinks point at the venv binary
-$DC exec hermes-intentframe ls -la /usr/local/bin/intentframe-integrations /root/.local/bin/intentframe-integrations
+docker compose -f tests/docker/docker-compose.test.yml exec hermes-intentframe ls -la /usr/local/bin/intentframe-integrations /root/.local/bin/intentframe-integrations
 ```
 
 **Test your local install script** (before merge) by mounting it into a one-off container:
