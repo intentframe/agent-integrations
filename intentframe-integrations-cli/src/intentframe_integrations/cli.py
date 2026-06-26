@@ -24,6 +24,8 @@ from intentframe_integrations.adapter_lifecycle import (
 )
 from intentframe_integrations.hermes_gateway import (
     HermesGatewayError,
+    gateway_log_file,
+    is_gateway_running,
     start_hermes_gateway,
     stop_hermes_gateway,
 )
@@ -170,6 +172,60 @@ def _start_pack(
                 _run_backend(["stop"])
             return ec
 
+    return 0
+
+
+def _rollback_start(pack: IntegrationPack) -> None:
+    """Stop adapter + backend after a failed ``up`` (gateway is stopped if it started)."""
+    stop_hermes_gateway(quiet=True)
+    if pack.adapter is not None:
+        stop_adapter(pack.agent.agent_id, quiet=True)
+    _run_backend(["stop"])
+
+
+def _gateway_status_line() -> str:
+    if is_gateway_running():
+        return "gateway: running"
+    return "gateway: not running"
+
+
+def _cmd_up(agent: str, *, seed: bool, skip_if_exists: bool) -> int:
+    """Start IntentFrame runtime + adapter + Hermes gateway (chat-ready stack)."""
+    if agent != "hermes":
+        print(f"ERROR: up is only implemented for hermes (got {agent!r})", file=sys.stderr)
+        return 1
+
+    if (ec := _require_openai_api_key()) is not None:
+        return ec
+
+    pack = load_and_activate_pack(agent)
+    ec = _start_pack(pack, seed=seed, skip_if_exists=skip_if_exists)
+    if ec:
+        return ec
+
+    if resolve_hermes_bin() is None:
+        print(
+            "ERROR: Hermes CLI not found — run: intentframe-integrations install hermes",
+            file=sys.stderr,
+        )
+        _rollback_start(pack)
+        return 1
+
+    try:
+        start_hermes_gateway(pack)
+    except HermesGatewayError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        _rollback_start(pack)
+        return 1
+
+    print(
+        f"\nHermes + IntentFrame stack is up for agent {agent!r}.\n"
+        f"Backend bridge: ~/.intentframe/backend/bridge.sock\n"
+        f"{adapter_status_line(pack)}\n"
+        f"{_gateway_status_line()}\n"
+        f"Gateway log: {gateway_log_file()}\n"
+        "Next: hermes dashboard   # http://localhost:9119/chat"
+    )
     return 0
 
 
@@ -607,6 +663,22 @@ def main(argv: list[str] | None = None) -> int:
         help="Pass --skip-if-exists to seed-policy",
     )
 
+    p_up = sub.add_parser(
+        "up",
+        help="Start IntentFrame runtime + adapter + Hermes gateway (ready for hermes dashboard)",
+    )
+    p_up.add_argument("agent", choices=agents, help="Integration profile (hermes)")
+    p_up.add_argument(
+        "--no-seed",
+        action="store_true",
+        help="Skip seed-policy after start",
+    )
+    p_up.add_argument(
+        "--skip-if-exists",
+        action="store_true",
+        help="Pass --skip-if-exists to seed-policy",
+    )
+
     sub.add_parser("stop", help="Stop agent adapters, IntentFrame runtime, and bridge")
     sub.add_parser("status", help="Runtime, bridge, and adapter status")
 
@@ -790,6 +862,12 @@ def main(argv: list[str] | None = None) -> int:
             if args.agent is None:
                 parser.error("agent name or --agent-config is required")
             return _cmd_start(
+                args.agent,
+                seed=not args.no_seed,
+                skip_if_exists=args.skip_if_exists,
+            )
+        case "up":
+            return _cmd_up(
                 args.agent,
                 seed=not args.no_seed,
                 skip_if_exists=args.skip_if_exists,

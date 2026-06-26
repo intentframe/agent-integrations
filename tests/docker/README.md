@@ -9,7 +9,9 @@ export OPENAI_API_KEY=sk-...
 docker compose -f tests/docker/docker-compose.test.yml up
 ```
 
-Open **http://localhost:9119/chat** — sign in with default credentials `hermes` / `docker-test` (override via `HERMES_DASHBOARD_USER` / `HERMES_DASHBOARD_PASSWORD`).
+Open **http://localhost:9119/chat** — sign in with default credentials `hermes` / `docker-test` (override via `HERMES_DASHBOARD_USER` / `HERMES_DASHBOARD_PASSWORD`). If you already have a session cookie, use **Log out** first to see the login screen.
+
+The entrypoint clears Hermes’s default OpenRouter `base_url` so `OPENAI_API_KEY` hits OpenAI directly, and runs `intentframe-integrations up hermes` before the dashboard (IntentFrame + adapter + gateway).
 
 Pin a GitHub branch or tag for the install script and integration pack:
 

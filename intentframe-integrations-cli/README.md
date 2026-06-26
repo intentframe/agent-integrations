@@ -7,6 +7,7 @@ User-facing orchestrator for agent profiles under `integrations/`. Delegates run
 
 ```bash
 intentframe-integrations install hermes [--version VERSION] [--force]
+intentframe-integrations up hermes [--no-seed] [--skip-if-exists]
 intentframe-integrations start hermes [--no-seed] [--skip-if-exists]
 intentframe-integrations start --agent-config path/to/agent.json [--no-seed]
 intentframe-integrations integrate hermes [--copy] [--skip-config]
@@ -75,8 +76,8 @@ Greenfield user (no Hermes installed):
 ```bash
 export OPENAI_API_KEY=sk-...
 bin/intentframe-integrations install hermes
-bin/intentframe-integrations start hermes
 bin/intentframe-integrations integrate hermes
+bin/intentframe-integrations up hermes
 bin/intentframe-integrations doctor hermes
 bin/intentframe-integrations gateway start hermes --api-server
 ```
@@ -101,11 +102,11 @@ Hermes binary resolution order:
 ## Hermes stack
 
 1. `install hermes` — Hermes Agent CLI (managed venv, pinned version)
-2. `start hermes` — backend bridge + adapter sidecar (`~/.intentframe/integrations/hermes/`)
-3. `integrate hermes` — plugin symlink + adapter venv sync + copy runtime governance,
-   actions manifest, and policy templates (first use only)
-4. `gateway start hermes` — launch Hermes gateway (optionally with API server)
-5. `stop` — stop gateway started by orchestrator, adapters, and backend runtime
+2. `integrate hermes` — plugin + runtime governance/policy templates
+3. `up hermes` — backend bridge + adapter + Hermes gateway (ready for `hermes dashboard`)
+4. `start hermes` — backend bridge + adapter only (low-level; tests/debug)
+5. `gateway start hermes` — launch Hermes gateway only (optionally with API server)
+6. `stop` — stop gateway started by orchestrator, adapters, and backend runtime
 
 `gateway start hermes` always invokes `hermes gateway run` (foreground process). Extra gateway
 args are normalized to run flags only; service subcommands are ignored. Stop uses process-group

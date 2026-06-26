@@ -5,7 +5,7 @@
 #
 # Then:
 #   export OPENAI_API_KEY=sk-...
-#   intentframe-integrations start hermes
+#   intentframe-integrations up hermes
 #   hermes dashboard            # http://localhost:9119
 set -euo pipefail
 
@@ -72,7 +72,7 @@ cat <<EOF
 Done.
 
   export OPENAI_API_KEY=sk-...
-  intentframe-integrations start hermes
+  intentframe-integrations up hermes
   hermes dashboard        # http://localhost:9119  → Chat
 
 Verify gating:  tail -f ~/.intentframe/integrations/hermes/adapter.log
