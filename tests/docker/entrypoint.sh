@@ -82,6 +82,8 @@ if not isinstance(model_cfg, dict):
 model_cfg["provider"] = os.environ["HERMES_PROVIDER"]
 model_cfg["default"] = os.environ["HERMES_MODEL"]
 model_cfg["api_mode"] = os.environ["HERMES_API_MODE"]
+if os.environ["HERMES_PROVIDER"] == "openai-api":
+    model_cfg.pop("base_url", None)
 
 dashboard_cfg = cfg.get("dashboard")
 if not isinstance(dashboard_cfg, dict):
@@ -116,8 +118,8 @@ PY
 
 seed_hermes_runtime_config
 
-step "Starting IntentFrame backend + Hermes adapter"
-intentframe-integrations start hermes
+step "Starting Hermes + IntentFrame stack (chat-ready)"
+intentframe-integrations up hermes
 
 step "Starting Hermes dashboard on 0.0.0.0:9119"
 echo ""
