@@ -1,5 +1,7 @@
 # Docker manual test session — Hermes gating audit
 
+**Related:** [session logs index](./README.md) · [Docker test README](../README.md) · [root README](../../../README.md) · [integration guide](../../../docs/hermes-intentframe-integration-guide.md)
+
 **Date:** 2026-06-26  
 **Environment:** `tests/docker/docker-compose.test.yml` (`hermes-intentframe-test`)  
 **UI:** http://localhost:9119/chat (dashboard basic auth `hermes` / `docker-test`)  

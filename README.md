@@ -102,6 +102,8 @@ docker compose -f tests/docker/docker-compose.test.yml up
 
 → **http://localhost:9119/chat** (default login `hermes` / `docker-test`). Details: [tests/docker/README.md](tests/docker/README.md).
 
+**Example session** (chat probes + full IntentFrame audit trail): [tests/docker/logs/2026-06-26-hermes-gating-session.md](tests/docker/logs/2026-06-26-hermes-gating-session.md) · [all session logs](tests/docker/logs/README.md).
+
 ---
 
 ## Documentation
@@ -110,6 +112,7 @@ docker compose -f tests/docker/docker-compose.test.yml up
 |-----|----------|
 | [docs/hermes-cli.md](docs/hermes-cli.md) | CLI commands — governance, policy, gateway, env vars |
 | [docs/hermes-intentframe-integration-guide.md](docs/hermes-intentframe-integration-guide.md) | Architecture, adding tools, troubleshooting |
+| [tests/docker/logs/](tests/docker/logs/README.md) | Captured Docker chat + gating audit sessions (example probes) |
 | [integrations/hermes/README.md](integrations/hermes/README.md) | Monorepo dev reference |
 | [IntentFrame](https://github.com/intentframe/intentframe) | Core runtime — threat model, principles, Actor SDK |
 
@@ -134,6 +137,7 @@ uv sync --all-packages
 | `if-integration-clients/` | Bridge clients (Python + TypeScript) |
 | `tests/hermes_gateway/` | Opt-in gateway E2E (isolated sandbox) |
 | `tests/docker/` | Production-like Docker user journey |
+| `tests/docker/logs/` | Captured manual gating sessions (chat + audit trail) |
 
 ```bash
 RUN_HERMES_GATEWAY_E2E=1 ./scripts/e2e.sh   # optional, slow + networked

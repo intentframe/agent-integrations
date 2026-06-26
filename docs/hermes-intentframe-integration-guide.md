@@ -16,6 +16,7 @@ Related:
 - [`NATIVE_KIT_INTEGRATION.md`](./NATIVE_KIT_INTEGRATION.md) — native-kit bundles, policy alignment
 - [`integrations/hermes/README.md`](../integrations/hermes/README.md) — monorepo dev reference
 - [`integrations/hermes/plugin/intentframe-gate/README.md`](../integrations/hermes/plugin/intentframe-gate/README.md) — plugin env and architecture
+- [`tests/docker/logs/`](../tests/docker/logs/README.md) — captured Docker chat sessions with full gating audit (example probes)
 
 ---
 
