@@ -19,12 +19,15 @@ from if_security_backend.bridge.config import BridgeConfigError
 
 @dataclass(frozen=True)
 class AdapterSpec:
-    """Sidecar adapter configuration from agent.json."""
+    """Sidecar adapter configuration from agent.json.
+
+    The adapter runs in this CLI's interpreter (the workspace ``.venv``); there
+    is no separate adapter venv, so agent.json no longer carries a Python pin.
+    """
 
     runtime: str
     socket: str
     source_dir: Path
-    python: str
     module: str
 
     def socket_path(self) -> Path:
@@ -59,10 +62,6 @@ def _parse_adapter(raw: object, *, base_dir: Path) -> AdapterSpec | None:
     if not source_dir.is_absolute():
         source_dir = (base_dir / source_dir).resolve()
 
-    python = raw.get("python", "3.12")
-    if not isinstance(python, str) or not python.strip():
-        raise BridgeConfigError("adapter.python must be a non-empty string")
-
     module = raw.get("module", "hermes_adapter.main")
     if not isinstance(module, str) or not module.strip():
         raise BridgeConfigError("adapter.module must be a non-empty string")
@@ -71,7 +70,6 @@ def _parse_adapter(raw: object, *, base_dir: Path) -> AdapterSpec | None:
         runtime=runtime.strip(),
         socket=socket.strip(),
         source_dir=source_dir,
-        python=python.strip(),
         module=module.strip(),
     )
 

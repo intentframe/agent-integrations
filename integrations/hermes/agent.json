@@ -12,7 +12,6 @@
   "policy_file": "policy.yaml",
   "adapter": {
     "runtime": "python",
-    "python": "3.12",
     "module": "hermes_adapter.main",
     "source": "adapter",
     "socket": "~/.intentframe/integrations/hermes/adapter.sock"

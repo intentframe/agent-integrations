@@ -29,7 +29,6 @@ class TestIntegrationPack(unittest.TestCase):
         pack = load_integration_pack(REPO_ROOT / "integrations/hermes/agent.json")
         self.assertIsNotNone(pack.adapter)
         assert pack.adapter is not None
-        self.assertEqual(pack.adapter.python, "3.12")
         self.assertEqual(pack.adapter.module, "hermes_adapter.main")
         self.assertTrue(pack.adapter.source_dir.is_dir())
 
@@ -44,7 +43,6 @@ class TestIntegrationPack(unittest.TestCase):
                         "bridge_secret": "secret",
                         "adapter": {
                             "runtime": "python",
-                            "python": "3.11",
                             "module": "custom_adapter.main",
                             "source": "adapter",
                             "socket": "/tmp/custom.sock",
@@ -56,7 +54,6 @@ class TestIntegrationPack(unittest.TestCase):
             (Path(tmp) / "adapter").mkdir()
             pack = load_integration_pack(cfg)
             assert pack.adapter is not None
-            self.assertEqual(pack.adapter.python, "3.11")
             self.assertEqual(pack.adapter.module, "custom_adapter.main")
 
 

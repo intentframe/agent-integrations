@@ -7,8 +7,10 @@ enforced by ``tests/intentframe_integrations/test_actions_manifest.py``.
 
 from __future__ import annotations
 
+import importlib.resources
 import os
 import shutil
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -16,12 +18,11 @@ from typing import Any
 import yaml
 
 from intentframe_integrations.adapter_lifecycle import (
+    adapter_importable,
     adapter_log_file,
     adapter_status_line,
-    adapter_venv_python,
-    integration_state_dir,
+    adapter_top_package,
     is_adapter_running,
-    sync_adapter_venv,
 )
 from intentframe_integrations.hermes_install import install_status_lines, resolve_hermes_bin
 from intentframe_integrations.hermes_paths import (
@@ -57,11 +58,10 @@ def plugin_source_dir() -> Path:
 
 
 def executor_profile_path() -> Path:
+    # Shipped inside the if_security_backend package; resolves correctly in both
+    # editable (dev) and wheel (user) installs without repo_root().
     return (
-        repo_root()
-        / "if-integration-backend"
-        / "src"
-        / "if_security_backend"
+        Path(str(importlib.resources.files("if_security_backend")))
         / "config"
         / "profiles"
         / "executor.yaml"
@@ -326,11 +326,14 @@ def integrate_hermes(
 
     adapter_synced = False
     if sync_adapter and pack.adapter is not None:
-        sync_adapter_venv(pack)
-        adapter_synced = True
-        messages.append(
-            f"Adapter venv synced at {integration_state_dir(pack.agent.agent_id) / '.venv'}"
-        )
+        top_package = adapter_top_package(pack)
+        if adapter_importable(pack):
+            adapter_synced = True
+            messages.append(f"Adapter package {top_package!r} available ({sys.executable})")
+        else:
+            messages.append(
+                f"Adapter package {top_package!r} not importable — run: uv sync --all-packages"
+            )
 
     if reset_governance:
         gov_dest = reset_runtime_governance_yaml(pack.agent.agent_id)
@@ -589,11 +592,13 @@ def doctor_hermes(
         lines.append(f"  {adapter_status_line(pack)}")
         if not is_adapter_running(pack.agent.agent_id):
             ok = False
-        venv_py = adapter_venv_python(pack.agent.agent_id)
-        if venv_py.is_file():
-            lines.append(f"  adapter venv: {venv_py.parent.parent}")
+        top_package = adapter_top_package(pack)
+        if adapter_importable(pack):
+            lines.append(f"  adapter package: {top_package} importable ({sys.executable})")
         else:
-            lines.append("  adapter venv: not synced — run: intentframe-integrations integrate hermes")
+            lines.append(
+                f"  adapter package: {top_package} not importable — run: uv sync --all-packages"
+            )
             ok = False
         log = adapter_log_file(pack.agent.agent_id)
         if log.is_file():

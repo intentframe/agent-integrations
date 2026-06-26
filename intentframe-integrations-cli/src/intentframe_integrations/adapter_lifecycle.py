@@ -2,16 +2,15 @@
 
 from __future__ import annotations
 
+import importlib.util
 import os
 import signal
 import subprocess
 import sys
 import time
-import tomllib
 from pathlib import Path
 
 from intentframe_integrations.integration_pack import IntegrationPack
-from intentframe_integrations.paths import repo_root
 
 
 class AdapterError(Exception):
@@ -30,13 +29,16 @@ def adapter_log_file(agent_id: str) -> Path:
     return integration_state_dir(agent_id) / "adapter.log"
 
 
-def _venv_bin_dir(venv_dir: Path) -> Path:
-    return venv_dir / ("Scripts" if os.name == "nt" else "bin")
+def adapter_python() -> Path:
+    """Interpreter used to launch adapter sidecars.
 
-
-def adapter_venv_python(agent_id: str) -> Path:
-    exe = "python.exe" if os.name == "nt" else "python"
-    return _venv_bin_dir(integration_state_dir(agent_id) / ".venv") / exe
+    The adapter runs in the same workspace environment as this CLI. Both dev and
+    user installs provision that environment with ``uv sync --all-packages``,
+    which installs the adapter package, so the sidecar is launched with the
+    current interpreter. This keeps dev and user flows identical and removes any
+    second venv built at runtime.
+    """
+    return Path(sys.executable)
 
 
 def _read_pid(path: Path) -> int | None:
@@ -84,77 +86,29 @@ def is_adapter_running(agent_id: str) -> bool:
     return pid is not None and _pid_alive(pid)
 
 
-def _adapter_package_name(pack: IntegrationPack) -> str:
-    pyproject = pack.adapter.source_dir / "pyproject.toml"
-    data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
-    project = data.get("project")
-    if not isinstance(project, dict):
-        raise AdapterError(f"Invalid adapter pyproject.toml: {pyproject}")
-    name = project.get("name")
-    if not isinstance(name, str) or not name.strip():
-        raise AdapterError(f"adapter package name missing in {pyproject}")
-    return name.strip()
-
-
-def sync_adapter_venv(
-    pack: IntegrationPack,
-) -> Path:
+def adapter_top_package(pack: IntegrationPack) -> str:
     if pack.adapter is None:
         raise AdapterError(f"Agent {pack.agent.agent_id!r} has no adapter configured")
+    return pack.adapter.module.split(".", 1)[0]
 
-    if not pack.adapter.source_dir.is_dir():
-        raise AdapterError(f"Adapter source not found: {pack.adapter.source_dir}")
 
-    state_dir = integration_state_dir(pack.agent.agent_id)
-    state_dir.mkdir(parents=True, exist_ok=True)
-    venv_python = adapter_venv_python(pack.agent.agent_id)
+def adapter_importable(pack: IntegrationPack) -> bool:
+    """True when the adapter package is importable in the current interpreter."""
+    return importlib.util.find_spec(adapter_top_package(pack)) is not None
 
-    venv_dir = state_dir / ".venv"
-    adapter_python = pack.adapter.python
-    if not venv_python.is_file():
-        subprocess.check_call(
-            [
-                "uv",
-                "venv",
-                str(venv_dir),
-                "--python",
-                adapter_python,
-                "--no-project",
-            ],
+
+def ensure_adapter_importable(pack: IntegrationPack) -> None:
+    """Fail early with actionable guidance if the adapter package is missing.
+
+    The adapter runs in this CLI's interpreter; ``uv sync --all-packages``
+    installs it for both dev and user installs. No second venv is built.
+    """
+    if not adapter_importable(pack):
+        top_package = adapter_top_package(pack)
+        raise AdapterError(
+            f"Adapter package {top_package!r} is not importable in this "
+            f"environment ({sys.executable}). Run: uv sync --all-packages"
         )
-
-    # Install from workspace lock via exported requirements (reproducible, Python 3.11+ venv).
-    package_name = _adapter_package_name(pack)
-    constraints = state_dir / "adapter-requirements.txt"
-    subprocess.check_call(
-        [
-            "uv",
-            "export",
-            "--directory",
-            str(repo_root()),
-            "--package",
-            package_name,
-            "--no-hashes",
-            "-q",
-            "-o",
-            str(constraints),
-        ],
-    )
-    subprocess.check_call(
-        [
-            "uv",
-            "pip",
-            "install",
-            "--python",
-            str(venv_python),
-            "--project",
-            str(pack.adapter.source_dir),
-            "-q",
-            "-r",
-            str(constraints),
-        ],
-    )
-    return venv_python
 
 
 def _adapter_env(pack: IntegrationPack) -> dict[str, str]:
@@ -185,7 +139,8 @@ def start_adapter(
         print(f"Adapter already running for {agent_id!r} (pid {pid})", file=sys.stderr)
         return pid or 0
 
-    venv_python = sync_adapter_venv(pack)
+    ensure_adapter_importable(pack)
+    python_exe = adapter_python()
     sock = pack.adapter.socket_path()
     sock.parent.mkdir(parents=True, exist_ok=True)
     sock.unlink(missing_ok=True)
@@ -193,7 +148,7 @@ def start_adapter(
     log_path = adapter_log_file(agent_id)
     log_fh = open(log_path, "a", encoding="utf-8")
     cmd = [
-        str(venv_python),
+        str(python_exe),
         "-m",
         pack.adapter.module,
         "--socket",

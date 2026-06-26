@@ -13,81 +13,51 @@ CLI_SRC = REPO_ROOT / "intentframe-integrations-cli" / "src"
 if str(CLI_SRC) not in sys.path:
     sys.path.insert(0, str(CLI_SRC))
 
-from intentframe_integrations.adapter_lifecycle import _adapter_package_name  # noqa: E402
+from intentframe_integrations.adapter_lifecycle import (  # noqa: E402
+    AdapterError,
+    adapter_importable,
+    adapter_python,
+    adapter_top_package,
+    ensure_adapter_importable,
+)
 from intentframe_integrations.integration_pack import load_integration_pack  # noqa: E402
 
 
 class TestAdapterLifecycle(unittest.TestCase):
-    def test_adapter_package_name(self) -> None:
+    def test_adapter_top_package(self) -> None:
         pack = load_integration_pack(REPO_ROOT / "integrations/hermes/agent.json")
-        self.assertEqual(_adapter_package_name(pack), "hermes-adapter")
+        self.assertEqual(adapter_top_package(pack), "hermes_adapter")
 
-    @patch("intentframe_integrations.adapter_lifecycle.subprocess.check_call")
-    @patch("intentframe_integrations.adapter_lifecycle.adapter_venv_python")
-    def test_sync_exports_and_installs(self, venv_py: object, check_call: object) -> None:
-        from unittest.mock import MagicMock
+    def test_adapter_python_is_current_interpreter(self) -> None:
+        self.assertEqual(adapter_python(), Path(sys.executable))
 
-        from intentframe_integrations.adapter_lifecycle import sync_adapter_venv
-
+    def test_ensure_importable_raises_when_missing(self) -> None:
         pack = load_integration_pack(REPO_ROOT / "integrations/hermes/agent.json")
-        fake_python = MagicMock()
-        fake_python.is_file.return_value = True
-        fake_python.__str__ = lambda _self: "/tmp/fake-venv/bin/python"  # type: ignore[method-assign]
-        venv_py.return_value = fake_python
-
-        sync_adapter_venv(pack)
-
-        self.assertEqual(check_call.call_count, 2)
-        export_cmd = check_call.call_args_list[0].args[0]
-        install_cmd = check_call.call_args_list[1].args[0]
-        self.assertEqual(export_cmd[1], "export")
-        self.assertIn("hermes-adapter", export_cmd)
-        self.assertIn("-q", export_cmd)
-        self.assertEqual(install_cmd[1], "pip")
-        self.assertEqual(install_cmd[2], "install")
-        self.assertIn("-q", install_cmd)
+        with patch(
+            "intentframe_integrations.adapter_lifecycle.importlib.util.find_spec",
+            return_value=None,
+        ):
+            self.assertFalse(adapter_importable(pack))
+            with self.assertRaises(AdapterError):
+                ensure_adapter_importable(pack)
 
 
-class TestAdapterVenvSyncReal(unittest.TestCase):
-    """Real uv export+pip into a temp adapter state dir (not mocked)."""
+class TestAdapterImportableReal(unittest.TestCase):
+    """The adapter package is importable in the workspace interpreter."""
 
-    def test_sync_creates_runnable_venv(self) -> None:
-        import os
-        import tempfile
+    def test_adapter_importable_in_workspace_venv(self) -> None:
+        pack = load_integration_pack(REPO_ROOT / "integrations/hermes/agent.json")
+        self.assertTrue(adapter_importable(pack))
+        ensure_adapter_importable(pack)
 
-        from intentframe_integrations.adapter_lifecycle import (
-            adapter_venv_python,
-            integration_state_dir,
-            sync_adapter_venv,
+        proc = __import__("subprocess").run(
+            [str(adapter_python()), "-c", "import hermes_adapter; print('ok')"],
+            capture_output=True,
+            text=True,
+            check=False,
         )
-
-        pack = load_integration_pack(REPO_ROOT / "integrations/hermes/agent.json")
-        with tempfile.TemporaryDirectory() as tmp:
-            home = Path(tmp) / "home"
-            home.mkdir()
-            previous = os.environ.get("HOME")
-            os.environ["HOME"] = str(home)
-            try:
-                sync_adapter_venv(pack)
-                venv_py = adapter_venv_python("hermes")
-                state = integration_state_dir("hermes")
-            finally:
-                if previous is None:
-                    os.environ.pop("HOME", None)
-                else:
-                    os.environ["HOME"] = previous
-
-            self.assertTrue(venv_py.is_file())
-            self.assertTrue((state / "adapter-requirements.txt").is_file())
-
-            proc = __import__("subprocess").run(
-                [str(venv_py), "-c", "import hermes_adapter; print('ok')"],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            self.assertEqual(proc.returncode, 0, proc.stderr)
-            self.assertEqual(proc.stdout.strip(), "ok")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(proc.stdout.strip(), "ok")
 
 
 def main() -> int:

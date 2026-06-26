@@ -48,7 +48,3 @@ def agent_config_path(agent: str) -> Path:
 
 def list_agents() -> tuple[str, ...]:
     return tuple(sorted(AGENT_PROFILES))
-
-
-def bridge_client_dir() -> Path:
-    return repo_root() / "if-integration-clients" / "python"
