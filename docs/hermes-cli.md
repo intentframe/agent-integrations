@@ -36,7 +36,20 @@ bash scripts/install-hermes-plugin.sh              # full
 bash scripts/install-hermes-plugin.sh --headless   # headless
 ```
 
-Pin a **branch** (not a git tag): `VERSION=my-branch curl -fsSL …/install-hermes-plugin.sh | bash -s -- --headless`. See [known limitations](hermes-known-limitations.md#version-pins-branches-only-not-git-tags).
+### Pin a git ref (branch, tag, or commit)
+
+Use the **same ref** in the script URL and `--ref` (or `REF=`). `VERSION=` is a deprecated alias for `REF=`.
+
+| Tier | Command |
+|------|---------|
+| Latest | `curl -fsSL …/raw/main/scripts/install-hermes-plugin.sh \| bash` |
+| Branch (pre-merge) | `curl -fsSL …/raw/my-branch/… \| bash -s -- --ref my-branch --headless` |
+| Release tag | `curl -fsSL …/raw/v0.2.0/… \| bash -s -- --ref v0.2.0` |
+| Commit SHA | `curl -fsSL …/raw/<sha>/… \| bash -s -- --ref <sha>` |
+
+After install, `intentframe-integrations doctor hermes` shows the pinned ref from `~/.intentframe/agent-integrations/.install-manifest.json`.
+
+**Note:** `intentframe-integrations install hermes --version` pins the **Hermes Agent** pip package — not the integration pack ref.
 
 ### PATH and shell rc
 

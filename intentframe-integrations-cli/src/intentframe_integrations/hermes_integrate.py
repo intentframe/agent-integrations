@@ -25,6 +25,7 @@ from intentframe_integrations.adapter_lifecycle import (
     is_adapter_running,
 )
 from intentframe_integrations.hermes_install import install_status_lines, resolve_hermes_bin
+from intentframe_integrations.pack_install import pack_install_status_lines
 from intentframe_integrations.hermes_paths import (
     hermes_config_path,
     hermes_home,
@@ -529,6 +530,7 @@ def doctor_hermes(
     ok = True
 
     lines.extend(install_status_lines())
+    lines.extend(pack_install_status_lines())
     lines.append(f"Agent config: {pack.agent.source_path}")
     lines.append(f"  agent_id: {pack.agent.agent_id}")
     lines.append(f"  user_id:  {pack.agent.user_id}")

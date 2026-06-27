@@ -61,9 +61,15 @@ From a git clone (same flags):
 bash scripts/install-hermes-plugin.sh --headless
 ```
 
+**Pinned release** (script URL and pack ref should match):
+
+```bash
+curl -fsSL https://github.com/intentframe/agent-integrations/raw/v0.2.0/scripts/install-hermes-plugin.sh | bash -s -- --ref v0.2.0
+```
+
 After headless install, set `OPENAI_API_KEY` (and run `hermes setup` if chat returns 401). Then the same [three commands](#run-three-commands) as below.
 
-**Known limitations** (version pinning, full uninstall on root/Docker): [docs/hermes-known-limitations.md](docs/hermes-known-limitations.md).
+**Known limitations** (full uninstall on root/Docker): [docs/hermes-known-limitations.md](docs/hermes-known-limitations.md).
 
 ---
 

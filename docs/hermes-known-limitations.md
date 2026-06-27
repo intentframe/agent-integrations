@@ -2,7 +2,7 @@
 
 Community install path: [README.md](../README.md#install). CLI reference: [hermes-cli.md](hermes-cli.md).
 
-These are current gaps in the `curl | bash` installer and `uninstall` flow. Safe to promote the install command; call out these caveats when describing a **full wipe** or **version pinning**.
+These are current gaps in the `curl | bash` installer and `uninstall` flow. Safe to promote the install command; call out these caveats when describing a **full wipe**.
 
 ---
 
@@ -36,23 +36,22 @@ Per-user installs (`curl … | bash` without sudo) are fully covered by `--remov
 
 ---
 
-## `VERSION=` pins branches only, not git tags
+## Version pinning
 
-The install script downloads the integration pack from:
+The installer supports git **branches**, **tags**, and **commit SHAs** via `--ref` (or `REF=`). `VERSION=` is a deprecated alias.
 
-```text
-https://github.com/intentframe/agent-integrations/archive/refs/heads/${VERSION}.tar.gz
-```
+**Rule:** use the **same ref** in the install script URL and `--ref` so the script and integration pack match.
 
-So:
+| Tier | Example |
+|------|---------|
+| Latest (default) | `curl …/raw/main/scripts/install-hermes-plugin.sh \| bash` |
+| Pre-merge / branch | `curl …/raw/my-branch/… \| bash -s -- --ref my-branch --headless` |
+| Stable release | `curl …/raw/v0.2.0/… \| bash -s -- --ref v0.2.0` |
+| Locked / reproducible | `curl …/raw/<commit-sha>/… \| bash -s -- --ref <commit-sha>` |
 
-| `VERSION` value | Works? |
-|-----------------|--------|
-| `main` (default) | yes |
-| `my-feature-branch` | yes |
-| `v1.0.0` or other **tag** | **no** (404 — tags use `refs/tags/`, not implemented yet) |
+Install provenance is written to `~/.intentframe/agent-integrations/.install-manifest.json` and shown by `intentframe-integrations doctor hermes`.
 
-**Promote with:** `…/raw/main/scripts/install-hermes-plugin.sh` or `VERSION=your-branch` for pre-merge testing.
+Details: [hermes-cli.md#install](hermes-cli.md#install).
 
 ---
 
@@ -61,7 +60,6 @@ So:
 | Item | Status |
 |------|--------|
 | Uninstall removes `/usr/local/lib/hermes-agent` when present (root FHS layout) | planned |
-| `VERSION=` supports git tags (`refs/tags/…`) as well as branches | planned |
 | Document or automate cleanup of Homebrew deps installed during Hermes setup (`ffmpeg`, etc.) | under consideration |
 
 ---
@@ -69,4 +67,4 @@ So:
 ## Related docs
 
 - [hermes-cli.md#uninstall](hermes-cli.md#uninstall) — removal tables and verify commands
-- [tests/docker/README.md](../tests/docker/README.md) — Docker runs as root; uses `--headless` and `VERSION=branch`
+- [tests/docker/README.md](../tests/docker/README.md) — Docker runs as root; uses `--headless` and `REF=`

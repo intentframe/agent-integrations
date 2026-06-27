@@ -15,10 +15,11 @@ Open **http://localhost:9119/chat** — sign in with default credentials `hermes
 
 The entrypoint clears Hermes’s default OpenRouter `base_url` so `OPENAI_API_KEY` hits OpenAI directly, and runs `intentframe-integrations up hermes` before the dashboard (IntentFrame + adapter + gateway).
 
-Pin a GitHub **branch** for the install script and integration pack (tags not supported yet — see [docs/hermes-known-limitations.md](../../docs/hermes-known-limitations.md)):
+Pin a GitHub **ref** (branch, tag, or commit) for the install script and integration pack — use the same ref for both:
 
 ```bash
-export VERSION=my-branch
+export REF=my-branch   # or REF=v0.2.0, REF=<commit-sha>
+# VERSION= is a deprecated alias for REF=
 ```
 
 Optional model override:
@@ -180,7 +181,7 @@ Captured manual session write-ups (chat + audit trail): [`logs/`](./logs/README.
 After a greenfield install (`down -v` then `up`), the installer runs as root and symlinks into `/usr/local/bin`. These checks do **not** need an interactive shell or sourcing:
 
 ```bash
-# 1. Greenfield (picks up install script from GitHub main, or VERSION=your-branch)
+# 1. Greenfield (picks up install script from GitHub main, or REF=your-branch)
 docker compose -f tests/docker/docker-compose.test.yml down -v
 export OPENAI_API_KEY=sk-...
 docker compose -f tests/docker/docker-compose.test.yml up -d
@@ -209,7 +210,7 @@ command -v intentframe-integrations
 env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin intentframe-integrations --help
 ```
 
-Or pin your branch in compose: `export VERSION=your-branch` before `up` (script is fetched from GitHub).
+Or pin your ref in compose: `export REF=my-branch` (or `REF=v0.2.0`) before `up` (script is fetched from GitHub).
 
 Reset (fresh install):
 

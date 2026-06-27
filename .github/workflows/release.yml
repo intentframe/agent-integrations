@@ -1,0 +1,81 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-and-release:
+    name: Verify tag and publish release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify RELEASE.json matches tag
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          expected="$(python3 -c 'import json; print(json.load(open("RELEASE.json"))["tag"])')"
+          if [[ "${tag}" != "${expected}" ]]; then
+            echo "RELEASE.json tag (${expected}) does not match git tag (${tag})" >&2
+            exit 1
+          fi
+
+      - name: Install ref resolution tests
+        run: bash tests/install/test_ref_resolution.sh
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install Python workspace
+        run: uv sync --all-packages
+
+      - name: Pack install manifest unit tests
+        run: uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_pack_install.py
+
+      - name: Hermes integrations CLI unit tests
+        run: |
+          uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_runtime_lifecycle.py
+          uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_integration_pack.py
+          uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_hermes_install.py
+          uv run --package intentframe-integrations-cli python tests/hermes_plugin/test_integrate.py
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          version="$(python3 -c 'import json; print(json.load(open("RELEASE.json"))["version"])')"
+          gh release create "${tag}" \
+            --title "IntentFrame Hermes integration ${tag}" \
+            --notes "$(cat <<EOF
+## Install (pinned release)
+
+\`\`\`bash
+curl -fsSL https://github.com/intentframe/agent-integrations/raw/${tag}/scripts/install-hermes-plugin.sh | bash -s -- --ref ${tag}
+\`\`\`
+
+Headless (CI / Docker):
+
+\`\`\`bash
+curl -fsSL https://github.com/intentframe/agent-integrations/raw/${tag}/scripts/install-hermes-plugin.sh | bash -s -- --headless --ref ${tag}
+\`\`\`
+
+Pack version: **${version}**. See [README](https://github.com/intentframe/agent-integrations/blob/${tag}/README.md) and [hermes-cli.md](https://github.com/intentframe/agent-integrations/blob/${tag}/docs/hermes-cli.md).
+EOF
+)"

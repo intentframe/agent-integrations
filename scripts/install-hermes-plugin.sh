@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 # Install Hermes (if missing) + IntentFrame plugin.
 #
+# Latest (rolling):
 #   curl -fsSL https://github.com/intentframe/agent-integrations/raw/main/scripts/install-hermes-plugin.sh | bash
 #
+# Pinned release (script URL and pack ref should match):
+#   curl -fsSL https://github.com/intentframe/agent-integrations/raw/v0.2.0/scripts/install-hermes-plugin.sh | bash -s -- --ref v0.2.0
+#
 # Docker / CI (skip Hermes setup wizard + browser engine):
-#   curl -fsSL .../install-hermes-plugin.sh | bash -s -- --headless
+#   curl -fsSL .../install-hermes-plugin.sh | bash -s -- --headless --ref main
 #
 # Then:
 #   export OPENAI_API_KEY=sk-...
@@ -13,18 +17,42 @@
 set -euo pipefail
 
 HEADLESS=false
+REF="${REF:-}"
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --headless)
       HEADLESS=true
       shift
       ;;
+    --ref)
+      if [[ $# -lt 2 ]]; then
+        echo "ERROR: --ref requires a value" >&2
+        exit 1
+      fi
+      REF="$2"
+      shift 2
+      ;;
+    --ref=*)
+      REF="${1#*=}"
+      shift
+      ;;
     -h|--help)
       cat <<'EOF'
-Usage: install-hermes-plugin.sh [--headless]
+Usage: install-hermes-plugin.sh [--headless] [--ref REF]
 
   --headless   Skip Hermes setup wizard and browser engine (faster; for testers/CI/Docker).
                Default: full Hermes install for end users.
+
+  --ref REF    Git ref for the integration pack (branch, tag, or commit SHA).
+               Also set via REF= env. VERSION= is a deprecated alias for REF=.
+               Default: main
+
+Install tiers (use the same ref in the script URL and --ref):
+
+  Latest:    curl .../raw/main/scripts/install-hermes-plugin.sh | bash
+  Release:   curl .../raw/v0.2.0/... | bash -s -- --ref v0.2.0
+  Locked:    curl .../raw/<commit-sha>/... | bash -s -- --ref <commit-sha>
 EOF
       exit 0
       ;;
@@ -37,16 +65,20 @@ done
 
 ORG="${ORG:-intentframe}"
 REPO="${REPO:-agent-integrations}"
-VERSION="${VERSION:-main}"
+REF="${REF:-${VERSION:-main}}"
 INSTALL_DIR="${INSTALL_DIR:-${HOME}/.intentframe/agent-integrations}"
 LOCAL_BIN="${HOME}/.local/bin"
 SYSTEM_BIN="/usr/local/bin"
 HERMES_ENV="${HOME}/.hermes/.env"
 CLI_SYSTEM=""
 HERMES_SUMMARY=""
+PACK_REF=""
+PACK_ARCHIVE_URL=""
 
 step() { printf '\n==> %s\n' "$*"; }
 have() { command -v "$1" >/dev/null 2>&1; }
+
+load_integration_pack_ref_lib "${ORG}" "${REPO}" "${REF}"
 
 ensure_local_bin_on_path() {
   local path_line='export PATH="$HOME/.local/bin:$PATH"'
@@ -106,10 +138,9 @@ else
 fi
 
 # 3. IntentFrame pack (tarball, no git needed)
-step "Downloading IntentFrame integration pack (${VERSION})"
-rm -rf "${INSTALL_DIR}"; mkdir -p "${INSTALL_DIR}"
-curl -fsSL "https://github.com/${ORG}/${REPO}/archive/refs/heads/${VERSION}.tar.gz" \
-  | tar -xz -C "${INSTALL_DIR}" --strip-components=1
+step "Downloading IntentFrame integration pack (ref=${REF})"
+download_integration_pack "${REF}" "${ORG}" "${REPO}" "${INSTALL_DIR}"
+write_install_manifest "${REF}" "${PACK_ARCHIVE_URL}" "${ORG}" "${REPO}" "${HEADLESS}" "${INSTALL_DIR}"
 export INTENTFRAME_INTEGRATIONS_ROOT="${INSTALL_DIR}"
 cd "${INSTALL_DIR}"
 
@@ -166,6 +197,7 @@ Hermes:
 IntentFrame:
 ${CLI_LINES}
   Pack:    ${INSTALL_DIR}
+  Ref:     ${REF}
   Policy:  ~/.intentframe/integrations/hermes/policy.yaml
   Tools:   ~/.intentframe/integrations/hermes/governance/tools.yaml
 
@@ -176,6 +208,7 @@ Next:
 ${HERMES_NEXT}
 
 Verify gating:  tail -f ~/.intentframe/integrations/hermes/adapter.log
+Verify install: intentframe-integrations doctor hermes
 
 ${PATH_HINT}
 EOF

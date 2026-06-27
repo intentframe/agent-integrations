@@ -19,10 +19,10 @@ apt-get install -y -qq curl tar ca-certificates xz-utils git
 rm -rf /var/lib/apt/lists/*
 
 if ! have intentframe-integrations; then
-  version="${VERSION:-main}"
-  url="https://github.com/intentframe/agent-integrations/raw/${version}/scripts/install-hermes-plugin.sh"
-  step "Installing from ${url}"
-  curl -fsSL "${url}" | bash -s -- --headless
+  ref="${REF:-${VERSION:-main}}"
+  url="https://github.com/intentframe/agent-integrations/raw/${ref}/scripts/install-hermes-plugin.sh"
+  step "Installing from ${url} (ref=${ref})"
+  curl -fsSL "${url}" | bash -s -- --headless --ref "${ref}"
 fi
 
 if [[ -z "${OPENAI_API_KEY:-}" ]]; then

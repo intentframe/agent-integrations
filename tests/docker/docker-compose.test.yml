@@ -23,7 +23,8 @@ services:
       - "${DASHBOARD_PORT:-9119}:9119"
     environment:
       OPENAI_API_KEY: ${OPENAI_API_KEY:?set OPENAI_API_KEY or use tests/docker/.env}
-      VERSION: ${VERSION:-main}
+      REF: ${REF:-${VERSION:-main}}
+      VERSION: ${VERSION:-}
       INTENTFRAME_HERMES_E2E_MODEL: ${INTENTFRAME_HERMES_E2E_MODEL:-gpt-4o-mini}
       HERMES_DASHBOARD_USER: ${HERMES_DASHBOARD_USER:-hermes}
       HERMES_DASHBOARD_PASSWORD: ${HERMES_DASHBOARD_PASSWORD:-docker-test}
