@@ -1,6 +1,6 @@
 {
   "name": "@if-integration/bridge-client",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "HTTP-over-UDS client for the IntentFrame validate bridge",
   "type": "module",
   "main": "./dist/index.js",

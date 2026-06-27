@@ -330,6 +330,8 @@ Terminology: [what “governed” means](docs/agent-tool-gating.md#terminology-w
 
 ## For contributors
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).
+
 ```bash
 git clone https://github.com/intentframe/agent-integrations.git
 cd agent-integrations
@@ -355,4 +357,9 @@ RUN_HERMES_GATEWAY_E2E=1 ./scripts/e2e.sh   # optional, slow + networked
 
 Package docs: `if-integration-backend/README.md`, `if-integration-clients/README.md`.
 
-<!-- IntentFrame integrations for AI agents · Hermes Agent security plugin · Nous Research · agent tool gating · policy-as-code · ai governance -->
+## License
+
+Original code in this repository is licensed under [Apache-2.0](LICENSE). See
+[NOTICE](NOTICE) for upstream IntentFrame runtime dependency licenses (including
+AGPL-3.0-only packages installed at runtime).
+

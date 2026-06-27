@@ -1,6 +1,6 @@
 # IntentFrame × Hermes integration — state report
 
-> Snapshot of the Hermes agent integration as of **2026-06-24**. For how-to and
+> Snapshot of the Hermes agent integration as of **2026-06-28**. For how-to and
 > troubleshooting, see [`hermes-intentframe-integration-guide.md`](./hermes-intentframe-integration-guide.md).
 
 ---
@@ -9,7 +9,7 @@
 
 | Area | Status |
 |------|--------|
-| Governed tool catalog | **4 tools**: `terminal`, `write_file`, `patch`, `cronjob` (generic) |
+| Governed tool catalog | **5 tools**: `terminal`, `execute_code`, `write_file`, `patch`, `cronjob` |
 | Standalone `delete_file` Hermes tool | **Removed** — delete via `patch` V4A `*** Delete File:` → `DELETE_HOST_FILE` |
 | Plugin gateway registration | **Fixed** — selective `builtin_preload` before registry snapshot |
 | Full gateway E2E (pass 1, 2a, 2b) | **Green** — all governed catalog tools, probes typically attempt 1 |
@@ -65,6 +65,7 @@ IntentFrame gate active; **`enabled: false`** means native Hermes handler withou
 | Hermes tool | IntentFrame action(s) | Mapper kind | Notes |
 |-------------|----------------------|-------------|-------|
 | `terminal` | `RUN_COMMAND` | `terminal` | `terminal_json` blocked shape |
+| `execute_code` | `RUN_COMMAND` | `execute_code` | Python encoded as `python -c …` for `command_shield`; dynamic schema hook |
 | `write_file` | `WRITE_HOST_FILE` | `write_file` | Path + content |
 | `patch` | `WRITE_HOST_FILE`, `DELETE_HOST_FILE` | `patch` | Replace mode + V4A multi-intent |
 | `cronjob` | `HERMES_CRONJOB` | `generic` | Semantic-only via dynamic bundle; live smoke, no gateway LLM E2E |
@@ -90,6 +91,7 @@ At `register()`:
 2. **`preload_governed_builtins(governed)`** — selective import from
    ``builtin_module`` per tool in [`builtin_preload.py`](../integrations/hermes/plugin/intentframe-gate/builtin_preload.py) (from repo ``tools.yaml``):
    - `terminal` → `tools.terminal_tool`
+   - `execute_code` → `tools.code_execution_tool`
    - `write_file`, `patch` → `tools.file_tools`
    - `cronjob` → `tools.cronjob_tools`
 3. **Snapshot loop** — wrap governed entries with `inject_reason()` + `gate_tool_call()`.
@@ -151,7 +153,7 @@ or restore defaults. Policy commands apply `agent.json` env via `load_and_activa
 | **2b** | External `HERMES_BIN` symlink, first-time integrate |
 
 With default temp governance yaml, each pass runs ALLOW/BLOCK/semantic probes for native
-catalog tools (`terminal`, `write_file`, `patch`). Generic tools (e.g. `cronjob`)
+catalog tools (`terminal`, `execute_code`, `write_file`, `patch`). Generic tools (e.g. `cronjob`)
 are live-tested via adapter/plugin semantic smoke only — no gateway LLM probe.
 
 ### E2E harness determinism (2026-06)

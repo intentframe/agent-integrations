@@ -36,9 +36,9 @@ load time** — not in gate logic, adapter wiring, or governance yaml.
 
 ### Hermes builtins register at import time
 
-Importing `tools.terminal_tool` executes module-level registration:
+Importing `tools.terminal_tool` executes module-level registration ([Hermes `tools/terminal_tool.py` L2711–2719](https://github.com/NousResearch/hermes-agent/blob/main/tools/terminal_tool.py#L2711-L2719)):
 
-```2711:2719:external-reference-only-libs/hermes-agent/tools/terminal_tool.py
+```python
 registry.register(
     name="terminal",
     toolset="terminal",
@@ -50,9 +50,9 @@ registry.register(
 )
 ```
 
-Hermes' own discovery is “AST-scan `tools/*.py`, then `importlib.import_module`”:
+Hermes' own discovery is “AST-scan `tools/*.py`, then `importlib.import_module`” ([Hermes `tools/registry.py` L57–70](https://github.com/NousResearch/hermes-agent/blob/main/tools/registry.py#L57-L70)):
 
-```57:70:external-reference-only-libs/hermes-agent/tools/registry.py
+```python
 def discover_builtin_tools(tools_dir: Optional[Path] = None) -> List[str]:
     """Import built-in self-registering tool modules and return their module names."""
     ...
@@ -236,14 +236,14 @@ flowchart LR
 ```
 
 Hermes builds the OpenAI tool list via
-[`registry.get_definitions()`](../external-reference-only-libs/hermes-agent/tools/registry.py):
+[`registry.get_definitions()`](https://github.com/NousResearch/hermes-agent/blob/main/tools/registry.py):
 for each requested tool name, if there is **no registry entry**, it is **silently
 skipped** (`if not entry: continue`). No error is raised; the tool simply never
 reaches the model.
 
-[`model_tools.py`](../external-reference-only-libs/hermes-agent/model_tools.py) documents
+[`model_tools.py`](https://github.com/NousResearch/hermes-agent/blob/main/model_tools.py) documents
 this explicitly: “Ask the registry for schemas (**only returns tools whose check_fn
-passes**)”. [`GET /v1/toolsets`](../external-reference-only-libs/hermes-agent/gateway/platforms/api_server.py)
+passes**)”. [`GET /v1/toolsets`](https://github.com/NousResearch/hermes-agent/blob/main/gateway/platforms/api_server.py)
 uses static `resolve_toolset()` — it does **not** call `get_definitions()`.
 
 **Takeaway:** a passing `/v1/toolsets` snapshot does **not** prove `terminal` is in
@@ -481,17 +481,17 @@ attempt 1/3; that isolates the regression to plugin registration, not the LLM.
   [`tests/scripts/test-hermes-gateway-e2e.sh`](../tests/scripts/test-hermes-gateway-e2e.sh)
 - Preload unit tests: [`tests/hermes_plugin/test_builtin_preload.py`](../tests/hermes_plugin/test_builtin_preload.py)
 - Hermes gateway plugin discovery:
-  [`gateway/run.py`](../external-reference-only-libs/hermes-agent/gateway/run.py)
+  [Hermes `gateway/run.py`](https://github.com/NousResearch/hermes-agent/blob/main/gateway/run.py)
   (explicit `discover_plugins()` before lazy `model_tools`)
 - Hermes tool discovery order:
-  [`model_tools.py`](../external-reference-only-libs/hermes-agent/model_tools.py)
+  [Hermes `model_tools.py`](https://github.com/NousResearch/hermes-agent/blob/main/model_tools.py)
   (`discover_builtin_tools()` then `discover_plugins()` on import — but gateway
   may call plugins first)
 - Registry definition filter (silent skip):
-  [`tools/registry.py`](../external-reference-only-libs/hermes-agent/tools/registry.py)
+  [Hermes `tools/registry.py`](https://github.com/NousResearch/hermes-agent/blob/main/tools/registry.py)
   (`get_definitions()` — no entry → tool omitted from LLM payload)
 - Static toolsets endpoint (not the LLM payload):
-  [`gateway/platforms/api_server.py`](../external-reference-only-libs/hermes-agent/gateway/platforms/api_server.py)
+  [Hermes `gateway/platforms/api_server.py`](https://github.com/NousResearch/hermes-agent/blob/main/gateway/platforms/api_server.py)
   (`GET /v1/toolsets` → `resolve_toolset()`)
 - Debug session notes:
   [`.claude_chats/23_june_2026_debug-hermes-e2e-test-failures-and-plugin-integration_6ee02e88.md`](../.claude_chats/23_june_2026_debug-hermes-e2e-test-failures-and-plugin-integration_6ee02e88.md)

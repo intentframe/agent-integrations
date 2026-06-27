@@ -68,6 +68,7 @@ Configured in [`governance/tools.yaml`](../integrations/hermes/governance/tools.
 | Hermes tool | IntentFrame action(s) | Mapper kind | Notes |
 |-------------|----------------------|-------------|-------|
 | `terminal` | `RUN_COMMAND` | `terminal` | Full `command_shield` + capability analysis |
+| `execute_code` | `RUN_COMMAND` | `execute_code` | Python → `python -c …` for `command_shield`; dynamic schema hook |
 | `write_file` | `WRITE_HOST_FILE` | `write_file` | Path + content |
 | `patch` | `WRITE_HOST_FILE`, `DELETE_HOST_FILE` | `patch` | Multi-intent from V4A diff |
 | `cronjob` | `HERMES_CRONJOB` | `generic` | Semantic-only via dynamic bundle (AE + Guardian) |
@@ -485,7 +486,7 @@ if-integration-backend/
   config/profiles/executor.yaml ← validate_only supported_actions
   executor_pack/validate_adapter.py
 
-external-reference-only-libs/intentframe/.../intentframe-native-kit/
+packages/intentframe-native-kit/ (upstream [`intentframe-native-kit`](https://github.com/intentframe/intentframe/tree/main/packages/intentframe-native-kit))
   intentframe_native_bundles/   ← register_bundles(), action bundles
 
 tests/hermes_tool_probes.py     ← BLOCK/ALLOW probe payloads
