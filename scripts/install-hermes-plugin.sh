@@ -81,8 +81,8 @@ have() { command -v "$1" >/dev/null 2>&1; }
 INTEGRATION_PACK_REF_LIB=""
 if [[ -n "${INTENTFRAME_INSTALL_LIB:-}" && -f "${INTENTFRAME_INSTALL_LIB}" ]]; then
   INTEGRATION_PACK_REF_LIB="${INTENTFRAME_INSTALL_LIB}"
-elif [[ "${BASH_SOURCE[0]:-}" != bash* ]]; then
-  local_lib="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/integration-pack-ref.sh"
+elif [[ -n "${BASH_SOURCE:-}" && "${BASH_SOURCE}" != bash* ]]; then
+  local_lib="$(cd "$(dirname "${BASH_SOURCE}")" && pwd)/lib/integration-pack-ref.sh"
   if [[ -f "${local_lib}" ]]; then
     INTEGRATION_PACK_REF_LIB="${local_lib}"
   fi
