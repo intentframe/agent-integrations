@@ -48,7 +48,7 @@ Install regression tests:
 ```bash
 bash tests/install/test_ref_resolution.sh
 bash tests/install/test_installer_bootstrap_docker.sh
-bash tests/docker/test_headless_install_smoke.sh
+bash tests/install/test_installer_curl_docker.sh
 ```
 
 ## Project structure

@@ -41,9 +41,6 @@ jobs:
       - name: Install script ref resolution tests
         run: bash tests/install/test_ref_resolution.sh
 
-      - name: Install script bootstrap Docker test
-        run: bash tests/install/test_installer_bootstrap_docker.sh
-
       - name: Hermes adapter unit tests
         run: uv run --directory integrations/hermes/adapter python tests/test_adapter.py
 
@@ -113,14 +110,21 @@ jobs:
           npm run build
           test -f if-integration-clients/typescript/dist/index.js
 
-  docker-headless-install:
-    name: Docker headless install smoke
+  docker-install:
+    name: Docker install (curl | bash)
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Headless install smoke (local pack + uv sync)
-        run: bash tests/docker/test_headless_install_smoke.sh
+      - name: Install script bootstrap Docker test
+        run: bash tests/install/test_installer_bootstrap_docker.sh
+
+      - name: curl | bash install (GitHub ref)
+        env:
+          ORG: ${{ github.event.pull_request.head.repo.owner.login || github.repository_owner }}
+          REPO: ${{ github.event.pull_request.head.repo.name || github.event.repository.name }}
+          REF: ${{ github.head_ref || github.ref_name }}
+        run: bash tests/install/test_installer_curl_docker.sh
 
