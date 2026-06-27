@@ -139,9 +139,9 @@ false debugging (“`/v1/toolsets` shows terminal, so why doesn’t the model ca
 | **Config / listing** | `GET /v1/toolsets` → `resolve_toolset()` | Which toolsets Hermes *config* enables for api_server |
 | **Runtime LLM payload** | `POST /v1/responses` → `get_tool_definitions()` → `registry.get_definitions()` | Which tools have **registry entries** and pass `check_fn` |
 
-Evidence — silent skip when no registry entry:
+Evidence — silent skip when no registry entry ([Hermes `tools/registry.py` L356–357](https://github.com/NousResearch/hermes-agent/blob/main/tools/registry.py#L356-L357)):
 
-```356:357:external-reference-only-libs/hermes-agent/tools/registry.py
+```python
             if not entry:
                 continue
 ```
@@ -312,9 +312,9 @@ the registry snapshot.
 **Why not call `discover_builtin_tools()` in the plugin?**
 
 Hermes discovers builtins by AST-scanning `tools/*.py` and importing every module
-with a top-level `registry.register()`:
+with a top-level `registry.register()` ([Hermes `tools/registry.py` L57–70](https://github.com/NousResearch/hermes-agent/blob/main/tools/registry.py#L57-L70)):
 
-```57:70:external-reference-only-libs/hermes-agent/tools/registry.py
+```python
 def discover_builtin_tools(tools_dir: Optional[Path] = None) -> List[str]:
     """Import built-in self-registering tool modules and return their module names."""
     ...
@@ -371,9 +371,9 @@ This is the core lesson from the June 2026 E2E regression.
 
 ### What Hermes builtins do at import time
 
-`tools/terminal_tool.py` registers at module bottom:
+`tools/terminal_tool.py` registers at module bottom ([Hermes `tools/terminal_tool.py` L2711–2719](https://github.com/NousResearch/hermes-agent/blob/main/tools/terminal_tool.py#L2711-L2719)):
 
-```2711:2719:external-reference-only-libs/hermes-agent/tools/terminal_tool.py
+```python
 registry.register(
     name="terminal",
     toolset="terminal",
@@ -408,9 +408,9 @@ The diff from broken → fixed generic gate was **not** “add more gate logic�
 
 ### Gateway load order (why timing matters)
 
-Gateway explicitly discovers plugins **before** lazy `model_tools` import:
+Gateway explicitly discovers plugins **before** lazy `model_tools` import ([Hermes `gateway/run.py` L5343–5351](https://github.com/NousResearch/hermes-agent/blob/main/gateway/run.py#L5343-L5351)):
 
-```5343:5351:external-reference-only-libs/hermes-agent/gateway/run.py
+```python
         # Discover Python plugins before shell hooks ...
         # gateway lazily imports run_agent inside per-request handlers,
         # so the discover_plugins() side-effect in model_tools.py is NOT
@@ -420,9 +420,9 @@ Gateway explicitly discovers plugins **before** lazy `model_tools` import:
             discover_plugins()
 ```
 
-Builtin discovery runs at `model_tools` import (typically first `/v1/responses`):
+Builtin discovery runs at `model_tools` import (typically first `/v1/responses`) ([Hermes `model_tools.py` L176–180](https://github.com/NousResearch/hermes-agent/blob/main/model_tools.py#L176-L180)):
 
-```176:180:external-reference-only-libs/hermes-agent/model_tools.py
+```python
 # Tool Discovery  (importing each module triggers its registry.register calls)
 # =============================================================================
 
@@ -786,8 +786,8 @@ catalog tool (native ALLOW/BLOCK + generic semantic smoke for e.g. `cronjob`).
 | Adapter mapper | [`integrations/hermes/adapter/src/hermes_adapter/mapper.py`](../integrations/hermes/adapter/src/hermes_adapter/mapper.py) |
 | CLI integrate | [`intentframe-integrations-cli/.../hermes_integrate.py`](../intentframe-integrations-cli/src/intentframe_integrations/hermes_integrate.py) |
 | Gateway env | [`intentframe-integrations-cli/.../hermes_gateway.py`](../intentframe-integrations-cli/src/intentframe_integrations/hermes_gateway.py) |
-| Hermes registry | [`external-reference-only-libs/hermes-agent/tools/registry.py`](../external-reference-only-libs/hermes-agent/tools/registry.py) |
-| Hermes gateway startup | [`external-reference-only-libs/hermes-agent/gateway/run.py`](../external-reference-only-libs/hermes-agent/gateway/run.py) |
+| Hermes registry | [Hermes `tools/registry.py`](https://github.com/NousResearch/hermes-agent/blob/main/tools/registry.py) |
+| Hermes gateway startup | [Hermes `gateway/run.py`](https://github.com/NousResearch/hermes-agent/blob/main/gateway/run.py) |
 | E2E harness | [`tests/hermes_gateway/`](../tests/hermes_gateway/) |
 | Integration state report | [`hermes-intentframe-state-report.md`](./hermes-intentframe-state-report.md) |
 | Load-order deep dive | [`hermes-plugin-registration-order.md`](./hermes-plugin-registration-order.md) |

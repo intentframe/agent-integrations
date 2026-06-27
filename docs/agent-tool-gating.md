@@ -12,7 +12,7 @@ conceptual companion to the Hermes integration docs in
 (end-to-end integration and tool changes),
 [`hermes-plugin-registration-order.md`](./hermes-plugin-registration-order.md)
 (gateway preload + snapshot), and builds on IntentFrame's adoption guidance in
-[`do-i-have-to-rewrite-tools.md`](../external-reference-only-libs/intentframe/docs/executor/do-i-have-to-rewrite-tools.md).
+[`do-i-have-to-rewrite-tools.md`](https://github.com/intentframe/intentframe/blob/main/docs/executor/do-i-have-to-rewrite-tools.md).
 
 ---
 
@@ -178,7 +178,7 @@ refactoring of raw tool bodies is the *last* resort, not the inevitable one.
 ## 4. Selective, not blanket
 
 Do **not** gate every tool. IntentFrame's own guidance
-([`do-i-have-to-rewrite-tools.md`](../external-reference-only-libs/intentframe/docs/executor/do-i-have-to-rewrite-tools.md))
+([`do-i-have-to-rewrite-tools.md`](https://github.com/intentframe/intentframe/blob/main/docs/executor/do-i-have-to-rewrite-tools.md))
 is to govern the **privileged path** and leave low-risk helpers in-process. The
 current Hermes plugin already sits on the recommended rung: **Level 2
 validate-only** (IntentFrame judges, the agent executes locally after `ALLOW`).
@@ -233,7 +233,7 @@ plugin system that can override a tool before execution.
 
 ### The registry makes wrapping clean
 
-[`tools/registry.py`](../external-reference-only-libs/hermes-agent/tools/registry.py)
+[`tools/registry.py`](https://github.com/NousResearch/hermes-agent/blob/main/tools/registry.py)
 is exactly the "tools as objects" registry the wrap pattern assumes:
 
 - `ToolEntry` carries `name, toolset, schema, handler, check_fn, is_async`.
@@ -571,7 +571,7 @@ incrementally with policy review each time.
 ## References
 
 - IntentFrame adoption guidance:
-  [`do-i-have-to-rewrite-tools.md`](../external-reference-only-libs/intentframe/docs/executor/do-i-have-to-rewrite-tools.md)
+  [`do-i-have-to-rewrite-tools.md`](https://github.com/intentframe/intentframe/blob/main/docs/executor/do-i-have-to-rewrite-tools.md)
 - Hermes integration: [`integrations/hermes/README.md`](../integrations/hermes/README.md)
 - **Hermes + IntentFrame integration guide:** [`hermes-intentframe-integration-guide.md`](./hermes-intentframe-integration-guide.md)
 - Gateway load order (preload + snapshot): [`hermes-plugin-registration-order.md`](./hermes-plugin-registration-order.md)
@@ -579,7 +579,7 @@ incrementally with policy review each time.
 - Mapper bottleneck:
   [`hermes/adapter/src/hermes_adapter/mapper.py`](../integrations/hermes/adapter/src/hermes_adapter/mapper.py)
 - Hermes tool registry:
-  [`tools/registry.py`](../external-reference-only-libs/hermes-agent/tools/registry.py)
+  [`tools/registry.py`](https://github.com/NousResearch/hermes-agent/blob/main/tools/registry.py)
 - E2E: [`../tests/hermes_gateway/`](../tests/hermes_gateway/)
 - Design session:
   [`22_june_2026_refactor-agent-tool-signatures-with-reflection_d9a9f03b.md`](../.claude_chats/22_june_2026_refactor-agent-tool-signatures-with-reflection_d9a9f03b.md)

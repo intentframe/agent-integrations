@@ -64,7 +64,7 @@ Both can “understand” `hermes send --to email:…` — the agent chose it; A
 
 ### Send engine (not an LLM tool by default)
 
-Cross-platform sending lives in **`external-reference-only-libs/hermes-agent/tools/send_message_tool.py`**.
+Cross-platform sending lives in **`https://github.com/NousResearch/hermes-agent/blob/main/tools/send_message_tool.py`**.
 
 Supported platforms (via `gateway/config.py` `Platform` enum and send routing) include
 **Telegram, Discord, Slack, WhatsApp, WhatsApp Cloud, Signal, SMS, Email, Feishu,
@@ -118,7 +118,7 @@ is active.
 
 ## 3. Verified: how Hermes community / official docs use outbound messaging
 
-Cross-checked against **Nous Research Hermes upstream** (`external-reference-only-libs/hermes-agent`)
+Cross-checked against **Nous Research Hermes upstream** ([`hermes-agent`](https://github.com/NousResearch/hermes-agent))
 and public docs ([CLI `hermes send`](https://hermes-agent.nousresearch.com/docs/reference/cli-commands),
 [Pipe script output](https://hermes-agent.nousresearch.com/docs/guides/pipe-script-output),
 [Automate with cron](https://hermes-agent.nousresearch.com/docs/guides/automate-with-cron),

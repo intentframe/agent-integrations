@@ -109,3 +109,22 @@ jobs:
           npm ci
           npm run build
           test -f if-integration-clients/typescript/dist/index.js
+
+  docker-install:
+    name: Docker install (curl | bash)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install script bootstrap Docker test
+        run: bash tests/install/test_installer_bootstrap_docker.sh
+
+      - name: curl | bash install (GitHub ref)
+        env:
+          ORG: ${{ github.event.pull_request.head.repo.owner.login || github.repository_owner }}
+          REPO: ${{ github.event.pull_request.head.repo.name || github.event.repository.name }}
+          REF: ${{ github.head_ref || github.ref_name }}
+        run: bash tests/install/test_installer_curl_docker.sh
+

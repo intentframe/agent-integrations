@@ -14,7 +14,7 @@ members = [
 
 [[package]]
 name = "agent-integrations"
-version = "0.0.0"
+version = "0.2.0"
 source = { virtual = "." }
 
 [[package]]
@@ -287,7 +287,7 @@ wheels = [
 
 [[package]]
 name = "hermes-adapter"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "integrations/hermes/adapter" }
 dependencies = [
     { name = "hermes-governance" },
@@ -306,7 +306,7 @@ requires-dist = [
 
 [[package]]
 name = "hermes-governance"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "integrations/hermes/shared" }
 dependencies = [
     { name = "pyyaml" },
@@ -410,7 +410,7 @@ requires-dist = [
 
 [[package]]
 name = "if-integration-bridge-client"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "if-integration-clients/python" }
 dependencies = [
     { name = "httpx" },
@@ -552,7 +552,7 @@ wheels = [
 
 [[package]]
 name = "intentframe-integrations-cli"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "intentframe-integrations-cli" }
 dependencies = [
     { name = "if-integration-backend" },

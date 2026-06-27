@@ -88,7 +88,7 @@ We briefly added `install_tool_definitions_hook()` that did `import model_tools`
 **Problem:** Hermes runs full builtin discovery at `model_tools` import time:
 
 ```python
-# external-reference-only-libs/hermes-agent/model_tools.py (module level)
+# Hermes upstream model_tools.py (module level) — see https://github.com/NousResearch/hermes-agent/blob/main/model_tools.py
 discover_builtin_tools()
 ```
 
