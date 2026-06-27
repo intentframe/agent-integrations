@@ -132,6 +132,11 @@ no control-plane red team.
 - [ ] Gaps documented: RUN_COMMAND tamper of `.intentframe`, Hermes execution without IF sandbox
 - [ ] Decision on shipped policy: deterministic block vs semantic-only for shell probes
 
+
+----
+
+this should be done on intentframe side and this should also accept more admin provided paths etc...i mean it should let agents admin or dev able to extend this config
+
 ## Related
 
 - `integrations/hermes/TODO/custom-action-bundle-patch-write.md`
