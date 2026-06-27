@@ -78,7 +78,34 @@ PACK_ARCHIVE_URL=""
 step() { printf '\n==> %s\n' "$*"; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
-load_integration_pack_ref_lib "${ORG}" "${REPO}" "${REF}"
+INTEGRATION_PACK_REF_LIB=""
+if [[ -n "${INTENTFRAME_INSTALL_LIB:-}" && -f "${INTENTFRAME_INSTALL_LIB}" ]]; then
+  INTEGRATION_PACK_REF_LIB="${INTENTFRAME_INSTALL_LIB}"
+elif [[ "${BASH_SOURCE[0]:-}" != bash* ]]; then
+  local_lib="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/integration-pack-ref.sh"
+  if [[ -f "${local_lib}" ]]; then
+    INTEGRATION_PACK_REF_LIB="${local_lib}"
+  fi
+  unset local_lib
+fi
+
+if [[ -z "${INTEGRATION_PACK_REF_LIB}" ]]; then
+  INTEGRATION_PACK_REF_LIB="$(mktemp)"
+  if ! curl -fsSL \
+    "https://github.com/${ORG}/${REPO}/raw/${REF}/scripts/lib/integration-pack-ref.sh" \
+    -o "${INTEGRATION_PACK_REF_LIB}"; then
+    rm -f "${INTEGRATION_PACK_REF_LIB}"
+    echo "ERROR: could not load integration-pack-ref.sh (ref=${REF})" >&2
+    exit 1
+  fi
+fi
+
+# shellcheck source=scripts/lib/integration-pack-ref.sh
+source "${INTEGRATION_PACK_REF_LIB}"
+if [[ "${INTEGRATION_PACK_REF_LIB}" == "${TMPDIR:-/tmp}"/* ]]; then
+  rm -f "${INTEGRATION_PACK_REF_LIB}"
+fi
+unset INTEGRATION_PACK_REF_LIB
 
 ensure_local_bin_on_path() {
   local path_line='export PATH="$HOME/.local/bin:$PATH"'

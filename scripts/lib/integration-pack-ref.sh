@@ -106,35 +106,3 @@ write_install_manifest() {
 }
 EOF
 }
-
-load_integration_pack_ref_lib() {
-  local org="$1"
-  local repo="$2"
-  local ref="$3"
-  local local_lib=""
-
-  if [[ "${BASH_SOURCE[0]:-}" == *install-hermes-plugin.sh ]]; then
-    local_lib="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/integration-pack-ref.sh"
-  elif [[ -n "${INTENTFRAME_INSTALL_LIB:-}" && -f "${INTENTFRAME_INSTALL_LIB}" ]]; then
-    local_lib="${INTENTFRAME_INSTALL_LIB}"
-  fi
-
-  if [[ -n "${local_lib}" && -f "${local_lib}" ]]; then
-    # shellcheck source=scripts/lib/integration-pack-ref.sh
-    source "${local_lib}"
-    return 0
-  fi
-
-  local tmp=""
-  tmp="$(mktemp)"
-  if ! curl -fsSL \
-    "https://github.com/${org}/${repo}/raw/${ref}/scripts/lib/integration-pack-ref.sh" \
-    -o "${tmp}"; then
-    rm -f "${tmp}"
-    echo "ERROR: could not load integration-pack-ref.sh (ref=${ref})" >&2
-    return 1
-  fi
-  # shellcheck source=/dev/null
-  source "${tmp}"
-  rm -f "${tmp}"
-}
