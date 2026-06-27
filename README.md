@@ -9,10 +9,10 @@
 
 **A security checkpoint for [Hermes Agent](https://github.com/NousResearch/hermes-agent), running outside the agent.**
 
-Hermes can open a terminal, run code, write files, and schedule cron jobs on your machine. This integration routes those actions through [IntentFrame](https://github.com/intentframe/intentframe) — a policy runtime that lives *outside* Hermes and that the agent can't edit or bypass — so each one is checked against rules you control before it executes. Hermes proposes; IntentFrame judges; the action runs only on **ALLOW**.
+Hermes can open a terminal, run code, write files, and schedule cron jobs on your machine. This integration routes those tool calls through [IntentFrame](https://github.com/intentframe/intentframe) — a separate policy runtime, not part of Hermes — so each **governed** call is checked against rules you set before it runs. Hermes proposes the action; IntentFrame judges it; a governed action runs only on **ALLOW**.
 
-**Checked before they run:** `terminal` · `execute_code` · `write_file` · `patch` · `cronjob`  
-Every other Hermes tool keeps working untouched until you turn governance on.
+**Governed out of the box:** `terminal` · `execute_code` · `write_file` · `patch` · `cronjob`  
+The tools that can actually touch your machine — all checked by default. Every other Hermes tool runs untouched.
 
 ```text
 You → Hermes proposes an action → IntentFrame checks your policy
@@ -29,7 +29,7 @@ You → Hermes proposes an action → IntentFrame checks your policy
 
 ## Why IntentFrame on top of Hermes?
 
-Hermes already has command approval and container modes — but those run *inside* the agent stack. A confused or hijacked model is asking the same process that's supposed to stop it. IntentFrame moves the decision out:
+Hermes already has command approval, allowlists, and container isolation — but those run *inside* the agent stack. A confused or hijacked model is asking the same process that's supposed to stop it. IntentFrame moves the decision out:
 
 | | Hermes alone | Hermes + IntentFrame |
 |---|---|---|
@@ -48,7 +48,7 @@ It installs:
 - An IntentFrame backend that decides **ALLOW** or **BLOCK**.
 - CLI commands to install, start, stop, choose governed tools, and update policy.
 
-By default, IntentFrame can govern Hermes tools like:
+This integration ships governance for the following Hermes tools, all enabled by default:
 
 | Hermes tool | IntentFrame action | What it protects |
 |-------------|-------------------|------------------|
