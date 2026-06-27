@@ -55,27 +55,15 @@ jobs:
           uv run --package intentframe-integrations-cli python tests/intentframe_integrations/test_hermes_install.py
           uv run --package intentframe-integrations-cli python tests/hermes_plugin/test_integrate.py
 
+      - name: Write release notes
+        env:
+          TAG: ${{ github.ref_name }}
+        run: python3 .github/scripts/write_release_notes.py
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag="${GITHUB_REF_NAME}"
-          version="$(python3 -c 'import json; print(json.load(open("RELEASE.json"))["version"])')"
-          gh release create "${tag}" \
-            --title "IntentFrame Hermes integration ${tag}" \
-            --notes "$(cat <<EOF
-## Install (pinned release)
-
-\`\`\`bash
-curl -fsSL https://github.com/intentframe/agent-integrations/raw/${tag}/scripts/install-hermes-plugin.sh | bash -s -- --ref ${tag}
-\`\`\`
-
-Headless (CI / Docker):
-
-\`\`\`bash
-curl -fsSL https://github.com/intentframe/agent-integrations/raw/${tag}/scripts/install-hermes-plugin.sh | bash -s -- --headless --ref ${tag}
-\`\`\`
-
-Pack version: **${version}**. See [README](https://github.com/intentframe/agent-integrations/blob/${tag}/README.md) and [hermes-cli.md](https://github.com/intentframe/agent-integrations/blob/${tag}/docs/hermes-cli.md).
-EOF
-)"
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "IntentFrame Hermes integration ${GITHUB_REF_NAME}" \
+            --notes-file release-notes.md
