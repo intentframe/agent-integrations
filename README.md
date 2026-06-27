@@ -1,5 +1,5 @@
-# Govern your AI agent's tools
-### The IntentFrame security plugin for [Hermes Agent](https://github.com/NousResearch/hermes-agent)
+# AI-Powered Security, Governance and Policy Enforcement for Hermes Agent
+### The IntentFrame security plugin and safety gate for [Hermes Agent](https://github.com/NousResearch/hermes-agent)
 
 <p align="center">
   <a href="https://github.com/intentframe/agent-integrations/releases"><img alt="Release" src="https://img.shields.io/github/v/release/intentframe/agent-integrations?label=release"></a>
@@ -8,7 +8,7 @@
   <a href="https://github.com/intentframe/intentframe"><img alt="IntentFrame" src="https://img.shields.io/badge/IntentFrame-policy%20runtime-2563eb"></a>
 </p>
 
-**Put an external checkpoint in front of the tools [Hermes Agent](https://github.com/NousResearch/hermes-agent) runs on your machine — terminal, code, file writes, cron — powered by [IntentFrame](https://github.com/intentframe/intentframe).**
+**Put an external validation checkpoint in front of the tools [Hermes Agent](https://github.com/NousResearch/hermes-agent) runs on your machine — terminal, code, file writes, cron — powered by [IntentFrame](https://github.com/intentframe/intentframe).**
 
 IntentFrame is a separate policy runtime, not part of the agent: it judges Hermes's risky actions from *outside* the agent, against rules you set, before they run. Hermes proposes; IntentFrame judges; a governed action runs only on **ALLOW**. (IntentFrame's integration layer is agent-agnostic — Hermes is the first integration.)
 
