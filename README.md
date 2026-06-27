@@ -1,43 +1,236 @@
 # IntentFrame × Hermes
 
-**Structural security for [Hermes Agent](https://github.com/NousResearch/hermes-agent)** — validate tool calls before they touch your machine.
+<p align="center">
+  <a href="https://github.com/intentframe/agent-integrations/releases"><img alt="Release" src="https://img.shields.io/github/v/release/intentframe/agent-integrations?label=release"></a>
+  <a href="https://github.com/intentframe/agent-integrations/actions/workflows/pr.yml"><img alt="CI" src="https://github.com/intentframe/agent-integrations/actions/workflows/pr.yml/badge.svg"></a>
+  <a href="https://github.com/NousResearch/hermes-agent"><img alt="Hermes Agent" src="https://img.shields.io/badge/Hermes-Agent-6f42c1"></a>
+  <a href="https://github.com/intentframe/intentframe"><img alt="IntentFrame" src="https://img.shields.io/badge/IntentFrame-policy%20runtime-2563eb"></a>
+</p>
 
-Hermes gives you a capable agent with terminal, files, and tools. IntentFrame adds the governance layer: every dangerous action crosses a policy boundary first. The model proposes; IntentFrame judges; only then does Hermes execute.
+**A security checkpoint for [Hermes Agent](https://github.com/NousResearch/hermes-agent), running outside the agent.**
 
-[Install](#install) · [Run](#run-three-commands) · [Uninstall](#uninstall) · [CLI reference](docs/hermes-cli.md) · [Integration guide](docs/hermes-intentframe-integration-guide.md) · [IntentFrame core](https://github.com/intentframe/intentframe)
+Hermes can open a terminal, run code, write files, and schedule cron jobs on your machine. This integration routes those actions through [IntentFrame](https://github.com/intentframe/intentframe) — a policy runtime that lives *outside* Hermes and that the agent can't edit or bypass — so each one is checked against rules you control before it executes. Hermes proposes; IntentFrame judges; the action runs only on **ALLOW**.
 
----
+**Checked before they run:** `terminal` · `execute_code` · `write_file` · `patch` · `cronjob`  
+Every other Hermes tool keeps working untouched until you turn governance on.
 
-## Who is this for?
-
-| If you are… | What this gives you |
-|-------------|---------------------|
-| Running Hermes on your own machine | Governed `terminal`, `write_file`, `patch`, and `cronjob` — with a required **reason** on each call |
-| Shipping agents to users who need guardrails | Policy-driven ALLOW/BLOCK before side effects, not prompt-only hope |
-| Evaluating IntentFrame with a real agent | Production-shaped plugin + adapter + CLI — not a toy wrapper |
-| Contributing to the integration | Monorepo with plugin, adapter, backend bridge, and E2E tests |
-
----
-
-## What you get
-
-When Hermes calls a **governed** tool, IntentFrame sits in the path:
-
-| Hermes tool | IntentFrame action |
-|-------------|-------------------|
-| `terminal` | `RUN_COMMAND` |
-| `write_file`, `patch` | `WRITE_HOST_FILE` / `DELETE_HOST_FILE` |
-| `cronjob` | `HERMES_CRONJOB` |
-
-```
-You → hermes dashboard → LLM → intentframe-gate → adapter → IntentFrame policy → ALLOW → Hermes runs
+```text
+You → Hermes proposes an action → IntentFrame checks your policy
+                                      ├─ ALLOW ✓  runs
+                                      └─ BLOCK ✗  logged, never runs
 ```
 
-Ungoverned Hermes tools work as usual. Toggle which tools are governed with the CLI — [docs/hermes-cli.md](docs/hermes-cli.md).
+[Install](#install-intentframe-into-hermes) · [See a BLOCK](#see-it-work) · [Choose what's governed](#control-which-hermes-tools-are-governed) · [Write policy](#modify-intentframe-policy) · [Docs](#status-and-resources)
 
 ---
 
-## Install
+**New to Hermes?** [Hermes Agent](https://github.com/NousResearch/hermes-agent) is Nous Research's self-improving agent — terminal, tools, memory, cron, and a chat dashboard.  
+**New to IntentFrame?** [IntentFrame](https://github.com/intentframe/intentframe) is a policy runtime that judges an agent's actions from *outside* it. The full thesis and threat model live there — this repo is the Hermes integration.
+
+## Why IntentFrame on top of Hermes?
+
+Hermes already has command approval and container modes — but those run *inside* the agent stack. A confused or hijacked model is asking the same process that's supposed to stop it. IntentFrame moves the decision out:
+
+| | Hermes alone | Hermes + IntentFrame |
+|---|---|---|
+| Where the rules live | Prompts, config, allowlists inside Hermes | Policy you write, **outside** the agent |
+| Who validates risky tools | The Hermes runtime | IntentFrame, before the action runs |
+| If the model is tricked or wrong | Same process that wanted to act | An external judge blocks it + leaves an audit trail |
+
+## What This Repo Offers
+
+This repo is the official IntentFrame integration pack for Hermes Agent. It lets you add runtime safety checks without forking Hermes or rewriting its tools.
+
+It installs:
+
+- A Hermes plugin that catches selected tool calls before Hermes runs them.
+- A small adapter that translates Hermes actions into IntentFrame checks.
+- An IntentFrame backend that decides **ALLOW** or **BLOCK**.
+- CLI commands to install, start, stop, choose governed tools, and update policy.
+
+By default, IntentFrame can govern Hermes tools like:
+
+| Hermes tool | IntentFrame action | What it protects |
+|-------------|-------------------|------------------|
+| `terminal` | `RUN_COMMAND` | Shell commands before execution |
+| `execute_code` | `RUN_COMMAND` | Generated code before execution |
+| `write_file` | `WRITE_HOST_FILE` | Host file writes |
+| `patch` | `WRITE_HOST_FILE` / `DELETE_HOST_FILE` | File edits and deletes |
+| `cronjob` | `HERMES_CRONJOB` | Scheduled autonomous work |
+
+Ungoverned Hermes tools continue to work normally.
+
+## Install IntentFrame Into Hermes
+
+No git clone required:
+
+```bash
+curl -fsSL https://github.com/intentframe/agent-integrations/raw/main/scripts/install-hermes-plugin.sh | bash
+```
+
+Then run Hermes with IntentFrame:
+
+```bash
+export OPENAI_API_KEY=sk-...
+intentframe-integrations up hermes
+hermes dashboard
+```
+
+Open:
+
+```text
+http://localhost:9119/chat
+```
+
+Ask Hermes to run a terminal command. If the tool is governed, IntentFrame validates it before Hermes executes it.
+
+---
+
+## See It Work
+
+Example probes from the Docker gating session:
+
+| Prompt | Expected result |
+|--------|-----------------|
+| `sudo echo test` | **BLOCK**: privilege escalation |
+| write a file under `/etc` | **BLOCK**: path outside policy |
+| read `~/.hermes/.env` | **BLOCK**: credential access |
+| list cron jobs | **ALLOW** or semantic review, depending on policy |
+
+Full captured session: [tests/docker/logs/2026-06-26-hermes-gating-session.md](tests/docker/logs/2026-06-26-hermes-gating-session.md)
+
+---
+
+## Governed Tools vs Policy
+
+There are two separate controls:
+
+| Control | What it means | Runtime file |
+|---------|---------------|--------------|
+| Governed tools | Which Hermes tools are routed through IntentFrame | `~/.intentframe/integrations/hermes/governance/tools.yaml` |
+| Policy | Which routed actions are allowed or blocked | `~/.intentframe/integrations/hermes/policy.yaml` |
+
+A tool must be **governed** for IntentFrame to see it.  
+A governed tool must then pass **policy** before it executes.
+
+---
+
+## Control Which Hermes Tools Are Governed
+
+List governed tools:
+
+```bash
+intentframe-integrations governance list hermes
+```
+
+Enable governance for a tool:
+
+```bash
+intentframe-integrations governance enable hermes terminal
+```
+
+Disable governance for a tool:
+
+```bash
+intentframe-integrations governance disable hermes terminal
+```
+
+Restart the Hermes gateway and adapter after changing governed tools:
+
+```bash
+intentframe-integrations stop
+intentframe-integrations up hermes
+```
+
+---
+
+## Modify IntentFrame Policy
+
+Show the current Hermes policy:
+
+```bash
+intentframe-integrations policy show hermes
+```
+
+Use your own policy file:
+
+```bash
+intentframe-integrations policy set hermes /path/to/policy.yaml
+```
+
+Reload policy after editing:
+
+```bash
+intentframe-integrations policy reload hermes
+```
+
+Reset to the bundled default:
+
+```bash
+intentframe-integrations policy reset hermes
+```
+
+Policy changes apply immediately. You do not need to restart Hermes just to reload policy.
+
+---
+
+## Basic Policy Example
+
+IntentFrame policy is deny-by-default: actions must appear under `allowed_actions`.
+
+```yaml
+intentframe_schema_version: 1
+agent_id: hermes
+
+allowed_actions:
+  RUN_COMMAND:
+    safe: false
+    constraints:
+      blocked_patterns:
+        - sudo
+        - "rm -rf /"
+      deny_capabilities:
+        - "capability:data_read:credential_material"
+        - "capability:system_mutate:privilege_config"
+
+  WRITE_HOST_FILE:
+    safe: false
+    constraints:
+      allowed_host_paths:
+        - "~/*"
+
+  DELETE_HOST_FILE:
+    safe: false
+    constraints:
+      allowed_host_paths:
+        - "~/*"
+
+  HERMES_CRONJOB:
+    safe: false
+
+intent_limits:
+  - limit_id: no-secret-exfil
+    domain: data_access
+    description: Block reading secrets or credential material
+    raw: Do not read credentials, tokens, cookies, secret files, or upload private data to untrusted destinations.
+    effect: block
+```
+
+Useful policy concepts:
+
+- `allowed_actions`: which IntentFrame actions can be considered at all.
+- `safe: true`: action can pass through simpler checks.
+- `safe: false`: action is consequential and should be reviewed more carefully.
+- `constraints`: deterministic limits like allowed paths or blocked command patterns.
+- `intent_limits`: plain-English rules the Guardian uses for semantic policy review.
+- `domain_constraints`: structured rules for specific domains like deletion or spending.
+
+Full IntentFrame policy guide:  
+[docs/user_policy_yaml_guide.md](https://github.com/intentframe/intentframe/blob/main/docs/user_policy_yaml_guide.md)
+
+---
+
+## Install Options
 
 No git clone. One script installs Hermes (if needed), the integration pack, and the `intentframe-gate` plugin:
 
@@ -70,26 +263,6 @@ curl -fsSL https://github.com/intentframe/agent-integrations/raw/v0.2.0/scripts/
 After headless install, set `OPENAI_API_KEY` (and run `hermes setup` if chat returns 401). Then the same [three commands](#run-three-commands) as below.
 
 **Known limitations** (full uninstall on root/Docker): [docs/hermes-known-limitations.md](docs/hermes-known-limitations.md).
-
----
-
-## Run (three commands)
-
-```bash
-export OPENAI_API_KEY=sk-...
-intentframe-integrations up hermes
-hermes dashboard
-```
-
-Open **http://localhost:9119/chat**. Ask Hermes to run a terminal command — IntentFrame gates it in the background.
-
-**Smoke-test gating:**
-
-```bash
-tail -f ~/.intentframe/integrations/hermes/adapter.log
-```
-
-Try something policy should block (e.g. `sudo …`) and look for `BLOCK` in the log.
 
 ---
 
@@ -135,34 +308,12 @@ Full tables (what is / is not removed): [docs/hermes-cli.md#uninstall](docs/herm
 
 ---
 
-## What `up hermes` starts
+## Status and Resources
 
-| Component | Role |
-|-----------|------|
-| IntentFrame backend | Policy registry, bridge, executor |
-| Hermes adapter | Maps tool args → IntentFrame `/validate` |
-| Hermes gateway | Hermes tool runtime + `intentframe-gate` plugin |
+**Current release:** [v0.2.0](https://github.com/intentframe/agent-integrations/releases/tag/v0.2.0)  
+**Integration maturity:** Hermes plugin + adapter + CLI; Docker E2E; known uninstall caveats on root/FHS — [limitations](docs/hermes-known-limitations.md).
 
-`hermes dashboard` is the web UI — run it after `up hermes` (same or another terminal).
-
----
-
-## Docker smoke test
-
-Same install script, inside a container:
-
-```bash
-export OPENAI_API_KEY=sk-...
-docker compose -f tests/docker/docker-compose.test.yml up
-```
-
-→ **http://localhost:9119/chat** (default login `hermes` / `docker-test`). Details: [tests/docker/README.md](tests/docker/README.md).
-
-**Example session** (chat probes + full IntentFrame audit trail): [tests/docker/logs/2026-06-26-hermes-gating-session.md](tests/docker/logs/2026-06-26-hermes-gating-session.md) · [all session logs](tests/docker/logs/README.md).
-
----
-
-## Documentation
+### Documentation
 
 | Doc | Audience |
 |-----|----------|
@@ -202,3 +353,5 @@ RUN_HERMES_GATEWAY_E2E=1 ./scripts/e2e.sh   # optional, slow + networked
 ```
 
 Package docs: `if-integration-backend/README.md`, `if-integration-clients/README.md`.
+
+<!-- IntentFrame integration for Hermes Agent · agentic ai security · tool gating · policy-as-code · ai governance -->
