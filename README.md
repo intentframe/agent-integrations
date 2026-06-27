@@ -1,4 +1,5 @@
-# IntentFrame × Hermes
+# Govern your AI agent's tools
+### The IntentFrame security plugin for [Hermes Agent](https://github.com/NousResearch/hermes-agent)
 
 <p align="center">
   <a href="https://github.com/intentframe/agent-integrations/releases"><img alt="Release" src="https://img.shields.io/github/v/release/intentframe/agent-integrations?label=release"></a>
@@ -7,9 +8,17 @@
   <a href="https://github.com/intentframe/intentframe"><img alt="IntentFrame" src="https://img.shields.io/badge/IntentFrame-policy%20runtime-2563eb"></a>
 </p>
 
-**A security checkpoint for [Hermes Agent](https://github.com/NousResearch/hermes-agent), running outside the agent.**
+**Put an external checkpoint in front of the tools [Hermes Agent](https://github.com/NousResearch/hermes-agent) runs on your machine — terminal, code, file writes, cron — powered by [IntentFrame](https://github.com/intentframe/intentframe).**
 
-Hermes can open a terminal, run code, write files, and schedule cron jobs on your machine. This integration routes those tool calls through [IntentFrame](https://github.com/intentframe/intentframe) — a separate policy runtime, not part of Hermes — so each **governed** call is checked against rules you set before it runs. Hermes proposes the action; IntentFrame judges it; a governed action runs only on **ALLOW**.
+IntentFrame is a separate policy runtime, not part of the agent: it judges Hermes's risky actions from *outside* the agent, against rules you set, before they run. Hermes proposes; IntentFrame judges; a governed action runs only on **ALLOW**. (IntentFrame's integration layer is agent-agnostic — Hermes is the first integration.)
+
+[Install](#install-intentframe-into-hermes) · [See a BLOCK](#see-it-work) · [Choose what's governed](#control-which-hermes-tools-are-governed) · [Write policy](#modify-intentframe-policy) · [Docs](#status-and-resources)
+
+---
+
+## Get started with Hermes
+
+[Hermes Agent](https://github.com/NousResearch/hermes-agent) is Nous Research's self-improving agent — terminal, tools, memory, cron, and a chat dashboard. This IntentFrame plugin routes its tool calls through IntentFrame so each governed call is checked before it runs.
 
 **Governed out of the box:** `terminal` · `execute_code` · `write_file` · `patch` · `cronjob`  
 The tools that can actually touch your machine — all checked by default. Every other Hermes tool runs untouched.
@@ -19,13 +28,6 @@ You → Hermes proposes an action → IntentFrame checks your policy
                                       ├─ ALLOW ✓  runs
                                       └─ BLOCK ✗  logged, never runs
 ```
-
-[Install](#install-intentframe-into-hermes) · [See a BLOCK](#see-it-work) · [Choose what's governed](#control-which-hermes-tools-are-governed) · [Write policy](#modify-intentframe-policy) · [Docs](#status-and-resources)
-
----
-
-**New to Hermes?** [Hermes Agent](https://github.com/NousResearch/hermes-agent) is Nous Research's self-improving agent — terminal, tools, memory, cron, and a chat dashboard.  
-**New to IntentFrame?** [IntentFrame](https://github.com/intentframe/intentframe) is a policy runtime that judges an agent's actions from *outside* it. The full thesis and threat model live there — this repo is the Hermes integration.
 
 ## Why IntentFrame on top of Hermes?
 
@@ -37,11 +39,9 @@ Hermes already has command approval, allowlists, and container isolation — but
 | Who validates risky tools | The Hermes runtime | IntentFrame, before the action runs |
 | If the model is tricked or wrong | Same process that wanted to act | An external judge blocks it + leaves an audit trail |
 
-## What This Repo Offers
+## What the Hermes integration installs
 
-This repo is the official IntentFrame integration pack for Hermes Agent. It lets you add runtime safety checks without forking Hermes or rewriting its tools.
-
-It installs:
+Without forking Hermes or rewriting its tools, the integration installs:
 
 - A Hermes plugin that catches selected tool calls before Hermes runs them.
 - A small adapter that translates Hermes actions into IntentFrame checks.
@@ -341,6 +341,7 @@ uv sync --all-packages
 |------|---------|
 | `intentframe-integrations-cli/` | `intentframe-integrations` CLI |
 | `integrations/hermes/` | Plugin, adapter, governance templates |
+| `integrations/_template/` | Scaffold for adding a new agent integration |
 | `if-integration-backend/` | IntentFrame runtime supervisor |
 | `if-integration-clients/` | Bridge clients (Python + TypeScript) |
 | `tests/hermes_gateway/` | Opt-in gateway E2E (isolated sandbox) |
@@ -354,4 +355,4 @@ RUN_HERMES_GATEWAY_E2E=1 ./scripts/e2e.sh   # optional, slow + networked
 
 Package docs: `if-integration-backend/README.md`, `if-integration-clients/README.md`.
 
-<!-- IntentFrame integration for Hermes Agent · agentic ai security · tool gating · policy-as-code · ai governance -->
+<!-- IntentFrame integrations for AI agents · Hermes Agent security plugin · Nous Research · agent tool gating · policy-as-code · ai governance -->
