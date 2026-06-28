@@ -6,7 +6,7 @@
 IntentFrame is a separate policy runtime, not part of the agent: it judges Hermes's risky actions from *outside* the agent, against rules you set, before they run. Hermes proposes; IntentFrame judges; a governed action runs only on **ALLOW**. (IntentFrame's integration layer is agent-agnostic — Hermes is the first integration.)
 
 <p align="center">
-  <img src="assets/if_control_plane_1.png" alt="IntentFrame Control Plane — Overview with enforcement stack status and start/stop controls" width="720">
+  <img src="assets/if_control_plane.gif" alt="IntentFrame Control Plane — governance, policy, stack control, and audit at http://127.0.0.1:9720" width="720">
 </p>
 
 <p align="center">
