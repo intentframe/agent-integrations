@@ -100,11 +100,12 @@ async def auth_middleware(request: Request, call_next):
 
 @app.get("/api/health")
 async def health() -> JSONResponse:
-    status = control_plane_status()
+    settings = ControlPlaneSettings.from_env()
     return _ok(
         {
             "service": "intentframe-control-plane",
-            "url": status.url,
+            "url": settings.url,
+            "status": "ok",
         }
     )
 

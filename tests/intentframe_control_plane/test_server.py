@@ -20,6 +20,26 @@ class TestControlPlaneApi(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         body = resp.json()
         self.assertTrue(body["ok"])
+        self.assertEqual(body["data"]["service"], "intentframe-control-plane")
+        self.assertEqual(body["data"]["status"], "ok")
+
+    def test_health_fast_with_pid_file(self) -> None:
+        import os
+        import tempfile
+        import time
+        from pathlib import Path
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmp:
+            pid_path = Path(tmp) / "control-plane.pid"
+            pid_path.write_text(str(os.getpid()), encoding="utf-8")
+            with patch("intentframe_control_plane.config.PID_FILE", pid_path):
+                start = time.monotonic()
+                resp = self.client.get("/api/health")
+                elapsed = time.monotonic() - start
+            self.assertEqual(resp.status_code, 200)
+            self.assertLess(elapsed, 0.5)
+            self.assertEqual(resp.json()["data"]["status"], "ok")
 
     def test_status_json(self) -> None:
         resp = self.client.get("/api/status")

@@ -86,6 +86,9 @@ jobs:
           uv run --package intentframe-control-plane python tests/intentframe_control_plane/test_read_models.py
           uv run --package intentframe-control-plane python tests/intentframe_control_plane/test_server.py
 
+      - name: Control plane Docker smoke
+        run: bash tests/docker/test_control_plane_smoke.sh
+
       - name: Hermes gateway unit tests
         run: |
           uv run --package intentframe-integrations-cli python tests/hermes_gateway/test_isolation.py
