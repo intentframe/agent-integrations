@@ -1,6 +1,14 @@
 # AI-Powered Security, Governance and Policy Enforcement for Hermes Agent
 ### The IntentFrame security plugin and safety gate for [Hermes Agent](https://github.com/NousResearch/hermes-agent)
 
+**Put an external validation checkpoint in front of the tools [Hermes Agent](https://github.com/NousResearch/hermes-agent) runs on your machine — terminal, code, file writes, cron — powered by [IntentFrame](https://github.com/intentframe/intentframe).**
+
+IntentFrame is a separate policy runtime, not part of the agent: it judges Hermes's risky actions from *outside* the agent, against rules you set, before they run. Hermes proposes; IntentFrame judges; a governed action runs only on **ALLOW**. (IntentFrame's integration layer is agent-agnostic — Hermes is the first integration.)
+
+<p align="center">
+  <img src="assets/if_control_plane.gif" alt="IntentFrame Control Plane — governance, policy, stack control, and audit at http://127.0.0.1:9720" width="720">
+</p>
+
 <p align="center">
   <a href="https://github.com/intentframe/agent-integrations/releases"><img alt="Release" src="https://img.shields.io/github/v/release/intentframe/agent-integrations?label=release"></a>
   <a href="https://github.com/intentframe/agent-integrations/actions/workflows/pr.yml"><img alt="CI" src="https://github.com/intentframe/agent-integrations/actions/workflows/pr.yml/badge.svg"></a>
@@ -8,11 +16,13 @@
   <a href="https://github.com/intentframe/intentframe"><img alt="IntentFrame" src="https://img.shields.io/badge/IntentFrame-policy%20runtime-2563eb"></a>
 </p>
 
-**Put an external validation checkpoint in front of the tools [Hermes Agent](https://github.com/NousResearch/hermes-agent) runs on your machine — terminal, code, file writes, cron — powered by [IntentFrame](https://github.com/intentframe/intentframe).**
-
-IntentFrame is a separate policy runtime, not part of the agent: it judges Hermes's risky actions from *outside* the agent, against rules you set, before they run. Hermes proposes; IntentFrame judges; a governed action runs only on **ALLOW**. (IntentFrame's integration layer is agent-agnostic — Hermes is the first integration.)
-
-[Install](#install-intentframe-into-hermes) · [See a BLOCK](#see-it-work) · [Choose what's governed](#control-which-hermes-tools-are-governed) · [Write policy](#modify-intentframe-policy) · [Docs](#status-and-resources)
+<p align="center">
+  <a href="#install-intentframe-into-hermes">Install</a> ·
+  <a href="#see-it-work">See a BLOCK</a> ·
+  <a href="#control-which-hermes-tools-are-governed">Choose what's governed</a> ·
+  <a href="#modify-intentframe-policy">Write policy</a> ·
+  <a href="#status-and-resources">Docs</a>
+</p>
 
 ---
 
