@@ -10,6 +10,13 @@ from intentframe_control_plane.lifecycle import format_status_line, control_plan
 
 
 class TestControlPlaneConfig(unittest.TestCase):
+    def test_health_host_for_wildcard_bind(self) -> None:
+        from intentframe_control_plane.lifecycle import _health_host
+
+        self.assertEqual(_health_host("0.0.0.0"), "127.0.0.1")
+        self.assertEqual(_health_host("::"), "127.0.0.1")
+        self.assertEqual(_health_host("127.0.0.1"), "127.0.0.1")
+
     def test_validate_loopback_ok(self) -> None:
         validate_bind_host("127.0.0.1", allow_remote=False)
 
@@ -42,6 +49,16 @@ class TestControlPlaneStatus(unittest.TestCase):
         self.assertTrue(status.healthy)
         line = format_status_line(status)
         self.assertIn("control-plane: running", line)
+
+    @patch("intentframe_control_plane.lifecycle._health_check", return_value=True)
+    @patch("intentframe_control_plane.lifecycle._pid_alive", return_value=True)
+    @patch("intentframe_control_plane.lifecycle._read_pid", return_value=4242)
+    def test_status_wildcard_bind_probes_loopback(self, _pid, _alive, mock_health) -> None:
+        status = control_plane_status(
+            ControlPlaneSettings(host="0.0.0.0", port=9720, token=None, allow_remote=True)
+        )
+        self.assertTrue(status.healthy)
+        mock_health.assert_called_once_with("127.0.0.1", 9720)
 
 
 class TestStartControlPlaneCleanup(unittest.TestCase):
@@ -84,6 +101,34 @@ class TestStartControlPlaneCleanup(unittest.TestCase):
             mock_terminate.assert_called_once_with(9999)
             mock_kill.assert_called_once_with(9999)
             self.assertFalse(pid_path.exists())
+
+    @patch("intentframe_control_plane.lifecycle._health_check", return_value=True)
+    @patch("intentframe_control_plane.lifecycle.subprocess.Popen")
+    @patch("intentframe_control_plane.lifecycle.control_plane_status")
+    def test_start_wildcard_bind_probes_loopback(
+        self,
+        mock_status,
+        mock_popen,
+        mock_health,
+    ) -> None:
+        import tempfile
+        from pathlib import Path
+
+        from intentframe_control_plane.lifecycle import start_control_plane
+
+        with tempfile.TemporaryDirectory() as tmp:
+            log_path = Path(tmp) / "control-plane.log"
+            pid_path = Path(tmp) / "control-plane.pid"
+            mock_status.return_value.running = False
+            mock_status.return_value.healthy = False
+            mock_popen.return_value.pid = 9999
+
+            with patch("intentframe_control_plane.lifecycle.LOG_FILE", log_path):
+                with patch("intentframe_control_plane.lifecycle.PID_FILE", pid_path):
+                    with patch.dict("os.environ", {"INTENTFRAME_CONTROL_PLANE_ALLOW_REMOTE": "1"}, clear=False):
+                        start_control_plane(host="0.0.0.0", port=9720, quiet=True)
+
+            mock_health.assert_called_with("127.0.0.1", 9720, timeout=1.0)
 
 
 if __name__ == "__main__":

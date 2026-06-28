@@ -84,6 +84,13 @@ def is_control_plane_running() -> bool:
     return True
 
 
+def _health_host(bind_host: str) -> str:
+    """Map bind-all addresses to a loopback host for HTTP health probes."""
+    if bind_host in {"0.0.0.0", "::"}:
+        return "127.0.0.1"
+    return bind_host
+
+
 def _health_check(host: str, port: int, *, timeout: float = 2.0) -> bool:
     url = f"http://{host}:{port}/api/health"
     try:
@@ -99,7 +106,7 @@ def control_plane_status(settings: ControlPlaneSettings | None = None) -> Contro
     running = pid is not None and _pid_alive(pid)
     if not running:
         pid = None
-    healthy = running and _health_check(cfg.host, cfg.port)
+    healthy = running and _health_check(_health_host(cfg.host), cfg.port)
     return ControlPlaneStatus(
         running=running,
         pid=pid,
@@ -184,9 +191,11 @@ def start_control_plane(
     PID_FILE.write_text(str(proc_pid), encoding="utf-8")
     log_fh.close()
 
+    health_host = _health_host(bind_host)
+
     deadline = time.monotonic() + 30.0
     while time.monotonic() < deadline:
-        if _health_check(bind_host, bind_port, timeout=1.0):
+        if _health_check(health_host, bind_port, timeout=1.0):
             status = control_plane_status(
                 ControlPlaneSettings(
                     host=bind_host,
