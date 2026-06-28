@@ -74,7 +74,7 @@ Then open the IntentFrame Control Plane (started by the installer):
 http://127.0.0.1:9720
 ```
 
-Use it to configure keys, start the enforcement stack, manage governed tools, and load policy.
+Use this web UI to configure keys, start the enforcement stack, manage governed tools, load policy, and view audit logs — a browser alternative to the CLI commands below.
 
 Hermes chat (separate, after the stack is up):
 
