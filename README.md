@@ -68,21 +68,23 @@ No git clone required:
 curl -fsSL https://github.com/intentframe/agent-integrations/raw/main/scripts/install-hermes-plugin.sh | bash
 ```
 
-Then run Hermes with IntentFrame:
+Then open the IntentFrame Control Plane (started by the installer):
+
+```text
+http://127.0.0.1:9720
+```
+
+Use it to configure keys, start the enforcement stack, manage governed tools, and load policy.
+
+Hermes chat (separate, after the stack is up):
 
 ```bash
-export OPENAI_API_KEY=sk-...
-intentframe-integrations up hermes
 hermes dashboard
 ```
 
-Open:
-
 ```text
-http://localhost:9119/chat
+http://127.0.0.1:9119/chat
 ```
-
-Ask Hermes to run a terminal command. If the tool is governed, IntentFrame validates it before Hermes executes it.
 
 ---
 

@@ -90,12 +90,22 @@ command -v hermes
 
 ## Happy path
 
+After [install](hermes-cli.md#install), the installer starts the **IntentFrame Control Plane** at `http://127.0.0.1:9720`.
+
 ```bash
+# Control plane (operator UI — started by installer)
+open http://127.0.0.1:9720
+
+# From Control Plane or CLI: start enforcement stack
 export OPENAI_API_KEY=sk-...
 intentframe-integrations up hermes      # backend + adapter + gateway
-hermes dashboard                        # http://localhost:9119/chat
-intentframe-integrations stop           # tear down
+
+# Hermes chat (separate from control plane)
+hermes dashboard                        # http://127.0.0.1:9119/chat
+intentframe-integrations stop           # enforcement stack only (not control plane)
 ```
+
+See [intentframe-control-plane.md](intentframe-control-plane.md) for port registry and lifecycle.
 
 ## Command overview
 
@@ -262,6 +272,19 @@ Runtime file: `~/.intentframe/integrations/hermes/policy.yaml`
 
 Policy changes apply immediately — no gateway restart.
 
+### Control plane (operator UI)
+
+Separate from Hermes dashboard. Default: `http://127.0.0.1:9720`.
+
+```bash
+intentframe-integrations control-plane start
+intentframe-integrations control-plane stop
+intentframe-integrations control-plane status
+intentframe-integrations control-plane serve   # foreground
+```
+
+`stop` stops the enforcement stack only — not the control plane. See [intentframe-control-plane.md](intentframe-control-plane.md).
+
 ### Other
 
 ```bash
@@ -285,6 +308,14 @@ Written to `~/.hermes/.env` on install (plugin paths):
 | `OPENAI_API_KEY` | Required for `up hermes` and LLM chat |
 | `HERMES_BIN` | Override Hermes binary |
 | `HERMES_HOME` | Hermes config dir (default `~/.hermes`) |
+
+Written to `~/.intentframe/.env` on install (control plane):
+
+| Variable | Purpose |
+|----------|---------|
+| `INTENTFRAME_CONTROL_PLANE_HOST` | Bind host (default `127.0.0.1`) |
+| `INTENTFRAME_CONTROL_PLANE_PORT` | UI port (default `9720`) |
+| `INTENTFRAME_CONTROL_PLANE_TOKEN` | Optional bearer token for `/api/*` |
 
 Shell exports win over `agent.json` defaults (`setdefault` in `load_and_activate_pack`).
 

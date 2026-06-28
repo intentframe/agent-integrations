@@ -8,10 +8,12 @@ Full command reference: [docs/hermes-cli.md](../docs/hermes-cli.md).
 
 ## Hermes (summary)
 
+After install, open **IntentFrame Control Plane** at `http://127.0.0.1:9720` (started by the installer).
+
 ```bash
-export OPENAI_API_KEY=sk-...
-intentframe-integrations up hermes
-hermes dashboard
+intentframe-integrations control-plane start   # if not already running
+intentframe-integrations up hermes              # from UI or CLI
+hermes dashboard                                # http://127.0.0.1:9119/chat
 ```
 
 ```bash

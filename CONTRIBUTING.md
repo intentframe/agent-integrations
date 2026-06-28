@@ -25,6 +25,7 @@ git clone https://github.com/intentframe/agent-integrations.git
 cd agent-integrations
 uv sync --all-packages
 npm ci && npm run build
+cd intentframe-control-plane/web && npm ci && npm run build
 ```
 
 The dev launcher is `./bin/intentframe-integrations`.

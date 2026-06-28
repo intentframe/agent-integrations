@@ -159,6 +159,19 @@ def policy_show(agent: str) -> PolicyShowReport:
     )
 
 
+def policy_show_to_dict(report: PolicyShowReport) -> dict[str, object]:
+    return {
+        "agent_id": report.agent_id,
+        "user_id": report.user_id,
+        "runtime_path": str(report.runtime_path),
+        "runtime_exists": report.runtime_exists,
+        "shipped_template": str(report.shipped_template),
+        "registry_loaded": report.registry_loaded,
+        "registry_action_count": report.registry_action_count,
+        "registry_message": report.registry_message,
+    }
+
+
 def format_policy_show(report: PolicyShowReport) -> str:
     lines = [
         f"Policy ({report.agent_id}):",

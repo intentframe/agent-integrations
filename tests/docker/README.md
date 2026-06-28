@@ -1,6 +1,6 @@
 # Docker test: Hermes web chat user journey
 
-Production-like install: the container runs the same GitHub install script as a real user (`curl …/install-hermes-plugin.sh | bash -s -- --headless`). Only `entrypoint.sh` is mounted — it seeds Docker-only config (OpenAI provider, dashboard auth for `0.0.0.0`) and starts services.
+Production-like install: the container runs the same GitHub install script as a real user (`curl …/install-hermes-plugin.sh | bash -s -- --headless --no-control-plane`). Only `entrypoint.sh` is mounted — it seeds Docker-only config, starts the **IntentFrame Control Plane** on `0.0.0.0:9720`, then brings up the enforcement stack and Hermes dashboard.
 
 User-facing install and chat flow: [README.md](../../README.md).
 
@@ -11,9 +11,18 @@ export OPENAI_API_KEY=sk-...
 docker compose -f tests/docker/docker-compose.test.yml up
 ```
 
-Open **http://localhost:9119/chat** — sign in with default credentials `hermes` / `docker-test` (override via `HERMES_DASHBOARD_USER` / `HERMES_DASHBOARD_PASSWORD`). If you already have a session cookie, use **Log out** first to see the login screen.
+### User journey (from your host)
 
-The entrypoint clears Hermes’s default OpenRouter `base_url` so `OPENAI_API_KEY` hits OpenAI directly, and runs `intentframe-integrations up hermes` before the dashboard (IntentFrame + adapter + gateway).
+| Step | URL | Notes |
+|------|-----|-------|
+| 1. Control Plane | **http://localhost:9720** | Governance, policy, stack status |
+| 2. Hermes chat | **http://localhost:9119/chat** | Sign in with `hermes` / `docker-test` |
+
+The entrypoint auto-starts the enforcement stack (`intentframe-integrations up hermes`) so chat is ready immediately; you can also start/stop it from the Control Plane Overview page.
+
+If you already have a Hermes session cookie, use **Log out** first to see the login screen.
+
+The entrypoint clears Hermes’s default OpenRouter `base_url` so `OPENAI_API_KEY` hits OpenAI directly.
 
 Pin a GitHub **ref** (branch, tag, or commit) for the install script and integration pack — use the same ref for both:
 
@@ -36,6 +45,7 @@ All paths below are inside the container (`hermes-intentframe-test`). Run from t
 
 | Path | What it shows |
 |------|----------------|
+| `/root/.intentframe/logs/control-plane.log` | IntentFrame Control Plane (uvicorn) |
 | `/root/.intentframe/logs/intentframe-server.log` | **Primary** — pretty INTENT boxes (FILE SHIELD, deterministic Guardian, AE, Guardian ALLOW/BLOCK) |
 | `/root/.intentframe/logs/bundle-sdk.log` | JSON per bundle hook (`enforce_constraints`, `structural_gates`, …) with full intent + evidence |
 | `/root/.intentframe/logs/analysis_outputs.log` | Analysis Engine JSON (scope mismatch, risk, hidden behaviors) |
@@ -171,6 +181,7 @@ After a path-policy block, chat should show tool `status: blocked` and a file-mu
 | Chat 401 to OpenRouter | Stale volume — `down -v` and restart; entrypoint clears `base_url` for OpenAI |
 | `adapter.log` only shows `200 OK` | Normal; use `intentframe-server.log` and `state.db` for detail |
 | Config change ignored | Named volumes persist — `docker compose … down -v` |
+| Control Plane 503 / empty UI | Git ref may lack pre-built `static/` assets; use a ref that includes the built frontend, or rebuild locally before pinning `REF=` |
 
 More on IntentFrame log layers: `tests/hermes_gateway/README.md` (sandbox paths; same filenames under `/root/.intentframe` in Docker).
 

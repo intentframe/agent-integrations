@@ -1,0 +1,3 @@
+"""IntentFrame operator control plane."""
+
+__version__ = "0.2.0"

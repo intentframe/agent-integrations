@@ -9,6 +9,7 @@ members = [
     "hermes-governance",
     "if-integration-backend",
     "if-integration-bridge-client",
+    "intentframe-control-plane",
     "intentframe-integrations-cli",
 ]
 
@@ -477,6 +478,25 @@ wheels = [
 ]
 
 [[package]]
+name = "intentframe-control-plane"
+version = "0.2.0"
+source = { editable = "intentframe-control-plane" }
+dependencies = [
+    { name = "fastapi" },
+    { name = "python-multipart" },
+    { name = "pyyaml" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastapi", specifier = ">=0.115.0" },
+    { name = "python-multipart", specifier = ">=0.0.18" },
+    { name = "pyyaml", specifier = ">=6.0.2" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.32.0" },
+]
+
+[[package]]
 name = "intentframe-core"
 version = "0.1.1"
 source = { registry = "https://pypi.org/simple" }
@@ -556,10 +576,14 @@ version = "0.2.0"
 source = { editable = "intentframe-integrations-cli" }
 dependencies = [
     { name = "if-integration-backend" },
+    { name = "intentframe-control-plane" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "if-integration-backend", editable = "if-integration-backend" }]
+requires-dist = [
+    { name = "if-integration-backend", editable = "if-integration-backend" },
+    { name = "intentframe-control-plane", editable = "intentframe-control-plane" },
+]
 
 [[package]]
 name = "intentframe-native-kit"

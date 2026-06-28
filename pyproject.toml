@@ -9,6 +9,7 @@ dependencies = []
 members = [
   "if-integration-backend",
   "if-integration-clients/python",
+  "intentframe-control-plane",
   "intentframe-integrations-cli",
   "integrations/hermes/adapter",
   "integrations/hermes/shared",
