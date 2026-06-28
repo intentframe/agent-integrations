@@ -106,7 +106,13 @@ def control_plane_status(settings: ControlPlaneSettings | None = None) -> Contro
     running = pid is not None and _pid_alive(pid)
     if not running:
         pid = None
-    healthy = running and _health_check(_health_host(cfg.host), cfg.port)
+        healthy = False
+    elif pid == os.getpid():
+        # In-process callers (e.g. /api/status) must not HTTP-probe this server:
+        # a single-worker uvicorn would deadlock waiting on itself.
+        healthy = True
+    else:
+        healthy = _health_check(_health_host(cfg.host), cfg.port)
     return ControlPlaneStatus(
         running=running,
         pid=pid,

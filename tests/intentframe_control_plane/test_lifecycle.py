@@ -50,6 +50,20 @@ class TestControlPlaneStatus(unittest.TestCase):
         line = format_status_line(status)
         self.assertIn("control-plane: running", line)
 
+    @patch("intentframe_control_plane.lifecycle._health_check", return_value=False)
+    @patch("intentframe_control_plane.lifecycle._pid_alive", return_value=True)
+    @patch("intentframe_control_plane.lifecycle._read_pid")
+    def test_status_in_process_skips_http_probe(self, mock_read_pid, _alive, mock_health) -> None:
+        import os
+
+        mock_read_pid.return_value = os.getpid()
+        status = control_plane_status(
+            ControlPlaneSettings(host="0.0.0.0", port=9720, token=None, allow_remote=True)
+        )
+        self.assertTrue(status.running)
+        self.assertTrue(status.healthy)
+        mock_health.assert_not_called()
+
     @patch("intentframe_control_plane.lifecycle._health_check", return_value=True)
     @patch("intentframe_control_plane.lifecycle._pid_alive", return_value=True)
     @patch("intentframe_control_plane.lifecycle._read_pid", return_value=4242)

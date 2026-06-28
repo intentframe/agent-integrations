@@ -49,6 +49,29 @@ class TestControlPlaneApi(unittest.TestCase):
         self.assertIn("control_plane", body["data"])
         self.assertIn("bridge_present", body["data"])
 
+    def test_status_healthy_in_process_without_self_probe(self) -> None:
+        import os
+        import tempfile
+        import time
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            pid_path = Path(tmp) / "control-plane.pid"
+            pid_path.write_text(str(os.getpid()), encoding="utf-8")
+            with patch("intentframe_control_plane.lifecycle.PID_FILE", pid_path):
+                with patch(
+                    "intentframe_control_plane.lifecycle._health_check",
+                    side_effect=AssertionError("must not HTTP-probe self"),
+                ):
+                    start = time.monotonic()
+                    resp = self.client.get("/api/status")
+                    elapsed = time.monotonic() - start
+            self.assertEqual(resp.status_code, 200)
+            self.assertLess(elapsed, 0.5)
+            cp = resp.json()["data"]["control_plane"]
+            self.assertTrue(cp["running"])
+            self.assertTrue(cp["healthy"])
+
     def test_governance_read(self) -> None:
         resp = self.client.get("/api/governance")
         self.assertEqual(resp.status_code, 200)
