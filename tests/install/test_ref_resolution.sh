@@ -31,20 +31,20 @@ assert_eq "feature branch" \
   "branch:feat/install-ref"
 
 assert_eq "semver tag (fallback candidate)" \
-  "$(pack_archive_url v0.2.0 "${ORG}" "${REPO}")" \
-  "branch:v0.2.0"
+  "$(pack_archive_url v0.2.1 "${ORG}" "${REPO}")" \
+  "branch:v0.2.1"
 
 assert_eq "explicit tag prefix" \
-  "$(pack_archive_url tag/v0.2.0 "${ORG}" "${REPO}")" \
-  "https://github.com/${ORG}/${REPO}/archive/refs/tags/v0.2.0.tar.gz"
+  "$(pack_archive_url tag/v0.2.1 "${ORG}" "${REPO}")" \
+  "https://github.com/${ORG}/${REPO}/archive/refs/tags/v0.2.1.tar.gz"
 
 assert_eq "explicit branch prefix" \
   "$(pack_archive_url branch/main "${ORG}" "${REPO}")" \
   "https://github.com/${ORG}/${REPO}/archive/refs/heads/main.tar.gz"
 
 assert_eq "refs/tags" \
-  "$(pack_archive_url refs/tags/v0.2.0 "${ORG}" "${REPO}")" \
-  "https://github.com/${ORG}/${REPO}/archive/refs/tags/v0.2.0.tar.gz"
+  "$(pack_archive_url refs/tags/v0.2.1 "${ORG}" "${REPO}")" \
+  "https://github.com/${ORG}/${REPO}/archive/refs/tags/v0.2.1.tar.gz"
 
 assert_eq "refs/heads" \
   "$(pack_archive_url refs/heads/main "${ORG}" "${REPO}")" \

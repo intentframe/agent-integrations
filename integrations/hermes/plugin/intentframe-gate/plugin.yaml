@@ -1,5 +1,5 @@
 name: intentframe-gate
-version: 0.2.0
+version: 0.2.1
 description: "IntentFrame validate-only gate for governed Hermes tools — requires reason, calls adapter before side effects."
 author: "IntentFrame Integrations"
 requires_env:

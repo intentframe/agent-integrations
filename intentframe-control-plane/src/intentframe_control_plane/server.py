@@ -88,7 +88,7 @@ def _require_cli_result(
     return result, None
 
 
-app = FastAPI(title="IntentFrame Control Plane", version="0.2.0")
+app = FastAPI(title="IntentFrame Control Plane", version="0.2.1")
 
 
 @app.exception_handler(HTTPException)

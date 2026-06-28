@@ -5,7 +5,7 @@
 #   curl -fsSL https://github.com/intentframe/agent-integrations/raw/main/scripts/install-hermes-plugin.sh | bash
 #
 # Pinned release (script URL and pack ref should match):
-#   curl -fsSL https://github.com/intentframe/agent-integrations/raw/v0.2.0/scripts/install-hermes-plugin.sh | bash -s -- --ref v0.2.0
+#   curl -fsSL https://github.com/intentframe/agent-integrations/raw/v0.2.1/scripts/install-hermes-plugin.sh | bash -s -- --ref v0.2.1
 #
 # Docker / CI (skip Hermes setup wizard + browser engine; defer control plane start):
 #   curl -fsSL .../install-hermes-plugin.sh | bash -s -- --headless --no-control-plane --ref main
@@ -66,7 +66,7 @@ Usage: install-hermes-plugin.sh [--headless] [--no-control-plane] [--no-open] [-
 Install tiers (use the same ref in the script URL and --ref):
 
   Latest:    curl .../raw/main/scripts/install-hermes-plugin.sh | bash
-  Release:   curl .../raw/v0.2.0/... | bash -s -- --ref v0.2.0
+  Release:   curl .../raw/v0.2.1/... | bash -s -- --ref v0.2.1
   Locked:    curl .../raw/<commit-sha>/... | bash -s -- --ref <commit-sha>
 EOF
       exit 0

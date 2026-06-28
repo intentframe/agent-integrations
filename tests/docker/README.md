@@ -45,7 +45,7 @@ The entrypoint clears Hermes’s default OpenRouter `base_url` so `OPENAI_API_KE
 Pin a GitHub **ref** (branch, tag, or commit) for the install script and integration pack — use the same ref for both:
 
 ```bash
-export REF=my-branch   # or REF=v0.2.0, REF=<commit-sha>
+export REF=my-branch   # or REF=v0.2.1, REF=<commit-sha>
 # VERSION= is a deprecated alias for REF=
 ```
 
@@ -241,7 +241,7 @@ command -v intentframe-integrations
 env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin intentframe-integrations --help
 ```
 
-Or pin your ref in compose: `export REF=my-branch` (or `REF=v0.2.0`) before `up` (script is fetched from GitHub).
+Or pin your ref in compose: `export REF=my-branch` (or `REF=v0.2.1`) before `up` (script is fetched from GitHub).
 
 Reset (fresh install):
 

@@ -265,7 +265,7 @@ bash scripts/install-hermes-plugin.sh --headless
 **Pinned release** (script URL and pack ref should match):
 
 ```bash
-curl -fsSL https://github.com/intentframe/agent-integrations/raw/v0.2.0/scripts/install-hermes-plugin.sh | bash -s -- --ref v0.2.0
+curl -fsSL https://github.com/intentframe/agent-integrations/raw/v0.2.1/scripts/install-hermes-plugin.sh | bash -s -- --ref v0.2.1
 ```
 
 After headless install, set `OPENAI_API_KEY` (and run `hermes setup` if chat returns 401). Then the same [three commands](#run-three-commands) as below.
@@ -318,7 +318,7 @@ Full tables (what is / is not removed): [docs/hermes-cli.md#uninstall](docs/herm
 
 ## Status and Resources
 
-**Current release:** [v0.2.0](https://github.com/intentframe/agent-integrations/releases/tag/v0.2.0)  
+**Current release:** [v0.2.1](https://github.com/intentframe/agent-integrations/releases/tag/v0.2.1)  
 **Integration maturity:** Hermes plugin + adapter + CLI; Docker E2E; known uninstall caveats on root/FHS — [limitations](docs/hermes-known-limitations.md).
 
 ### Documentation

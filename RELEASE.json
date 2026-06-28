@@ -1,6 +1,6 @@
 {
-  "version": "0.2.0",
-  "tag": "v0.2.0",
+  "version": "0.2.1",
+  "tag": "v0.2.1",
   "product": "agent-integrations",
-  "description": "IntentFrame Hermes integration pack release metadata. Tag v0.2.0 should match this file."
+  "description": "IntentFrame Hermes integration pack release metadata. Tag v0.2.1 should match this file."
 }

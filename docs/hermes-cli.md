@@ -46,7 +46,7 @@ Use the **same ref** in the script URL and `--ref` (or `REF=`). `VERSION=` is a 
 |------|---------|
 | Latest | `curl -fsSL …/raw/main/scripts/install-hermes-plugin.sh \| bash` |
 | Branch (pre-merge) | `curl -fsSL …/raw/my-branch/… \| bash -s -- --ref my-branch --headless` |
-| Release tag | `curl -fsSL …/raw/v0.2.0/… \| bash -s -- --ref v0.2.0` |
+| Release tag | `curl -fsSL …/raw/v0.2.1/… \| bash -s -- --ref v0.2.1` |
 | Commit SHA | `curl -fsSL …/raw/<sha>/… \| bash -s -- --ref <sha>` |
 
 After install, `intentframe-integrations doctor hermes` shows the pinned ref from `~/.intentframe/agent-integrations/.install-manifest.json`.
