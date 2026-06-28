@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Run control-plane lifecycle smoke in a throwaway container (local repo, no Hermes install).
+# Verifies: start on 0.0.0.0, external health probe, /api/status, SPA index, stop.
+# See tests/docker/control_plane_smoke_inner.sh and tests/docker/README.md.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"

@@ -11,7 +11,7 @@ DEFAULT_PORT = 9720
 
 INTENTFRAME_HOME = Path.home() / ".intentframe"
 ENV_FILE = INTENTFRAME_HOME / ".env"
-PID_FILE = INTENTFRAME_HOME / "control-plane.pid"
+PID_FILE = INTENTFRAME_HOME / "control-plane.pid"  # uvicorn PID from control-plane start
 LOG_FILE = INTENTFRAME_HOME / "logs" / "control-plane.log"
 SERVER_LOG = INTENTFRAME_HOME / "logs" / "intentframe-server.log"
 POLICY_RUNTIME = INTENTFRAME_HOME / "integrations" / "hermes" / "policy.yaml"

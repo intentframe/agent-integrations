@@ -2,6 +2,24 @@
 
 Production-like install: the container runs the same GitHub install script as a real user (`curl …/install-hermes-plugin.sh | bash -s -- --headless --no-control-plane`). Only `entrypoint.sh` is mounted — it seeds Docker-only config, starts the **IntentFrame Control Plane** on `0.0.0.0:9720`, then brings up the enforcement stack and Hermes dashboard.
 
+### Why `--no-control-plane` during install?
+
+The installer normally starts the control plane at the end of install. Docker uses `--no-control-plane` so the entrypoint can:
+
+1. Seed `INTENTFRAME_CONTROL_PLANE_HOST=0.0.0.0` and `ALLOW_REMOTE=1` (required for port publishing)
+2. Start the control plane **after** config is written
+
+The installer may print `Control Plane: not started` — that is expected; the entrypoint starts it on the next step.
+
+### How the control plane UI is served in Docker
+
+Same as a local install: one **uvicorn** process on `:9720` serves the pre-built React static files (`static/index.html`, `/assets/*`) and the JSON API (`/api/*`). There is no separate nginx or Vite container. App code and static assets come from the GitHub integration pack tarball; only `entrypoint.sh` is bind-mounted from this repo.
+
+```text
+Host browser → localhost:9720 → container uvicorn → static/ + /api/*
+Host browser → localhost:9119 → hermes dashboard (separate process)
+```
+
 User-facing install and chat flow: [README.md](../../README.md).
 
 Hermes is installed with `--headless` (skip setup wizard + browser engine). OpenAI model/provider are seeded in entrypoint like `tests/hermes_gateway/isolation.py`. Dashboard basic auth is seeded so Hermes can bind `0.0.0.0` for Docker port publishing (required since Hermes 0.17+).
@@ -182,6 +200,8 @@ After a path-policy block, chat should show tool `status: blocked` and a file-mu
 | `adapter.log` only shows `200 OK` | Normal; use `intentframe-server.log` and `state.db` for detail |
 | Config change ignored | Named volumes persist — `docker compose … down -v` |
 | Control Plane 503 / empty UI | Git ref may lack pre-built `static/` assets; use a ref that includes the built frontend, or rebuild locally before pinning `REF=` |
+| Overview shows UI server **unhealthy** but page loads | Fixed in current branch — was uvicorn self-deadlock on `/api/status`; update ref or rebuild |
+| Overview URL shows `http://0.0.0.0:9720` | Display only (bind address from `.env`); use **http://localhost:9720** in the browser |
 
 More on IntentFrame log layers: `tests/hermes_gateway/README.md` (sandbox paths; same filenames under `/root/.intentframe` in Docker).
 
@@ -228,6 +248,16 @@ Reset (fresh install):
 ```bash
 docker compose -f tests/docker/docker-compose.test.yml down -v
 ```
+
+### Control plane smoke (local, no Hermes)
+
+Throwaway container using the **local repo** (not GitHub tarball). Exercises lifecycle on `0.0.0.0:9720`, external health probe, and SPA index:
+
+```bash
+bash tests/docker/test_control_plane_smoke.sh
+```
+
+See [control_plane_smoke_inner.sh](./control_plane_smoke_inner.sh).
 
 ### Test uninstall (inside container)
 

@@ -10,6 +10,8 @@ Full command reference: [docs/hermes-cli.md](../docs/hermes-cli.md).
 
 After install, open **IntentFrame Control Plane** at `http://127.0.0.1:9720` (started by the installer).
 
+Details: [docs/intentframe-control-plane.md](../docs/intentframe-control-plane.md).
+
 ```bash
 intentframe-integrations control-plane start   # if not already running
 intentframe-integrations up hermes              # from UI or CLI

@@ -1,5 +1,15 @@
 #!/usr/bin/env bash
 # Docker harness: GitHub install → control plane (9720) → up hermes → dashboard (9119).
+#
+# Flow:
+#   1. install-hermes-plugin.sh --headless --no-control-plane  (pack + uv sync; CP deferred)
+#   2. seed ~/.intentframe/.env (0.0.0.0:9720, ALLOW_REMOTE=1)
+#   3. intentframe-integrations control-plane start
+#   4. intentframe-integrations up hermes
+#   5. exec hermes dashboard --host 0.0.0.0
+#
+# Frontend: pre-built static/ from the GitHub pack; uvicorn on :9720 serves SPA + /api/*.
+# Only this entrypoint is bind-mounted; app code comes from the tarball at REF=.
 set -euo pipefail
 
 export PATH="/root/.local/bin:/usr/local/bin:${PATH}"
@@ -123,6 +133,7 @@ seed_hermes_runtime_config
 
 seed_control_plane_docker_config() {
   step "Seeding IntentFrame Control Plane config (bind 0.0.0.0:${CONTROL_PLANE_PORT})"
+  # ALLOW_REMOTE=1 is required to bind 0.0.0.0; host maps published port in compose.
   mkdir -p "$(dirname "${IF_ENV}")"
   touch "${IF_ENV}"
   for line in \
@@ -142,6 +153,7 @@ seed_control_plane_docker_config() {
 
 start_control_plane() {
   step "Starting IntentFrame Control Plane on 0.0.0.0:${CONTROL_PLANE_PORT}"
+  # Installer used --no-control-plane; we start here after Docker env is seeded.
   export INTENTFRAME_CONTROL_PLANE_ALLOW_REMOTE=1
   if ! intentframe-integrations control-plane start --host 0.0.0.0 --port "${CONTROL_PLANE_PORT}"; then
     echo "WARNING: control plane failed to start (see /root/.intentframe/logs/control-plane.log)" >&2

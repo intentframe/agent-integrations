@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Throwaway Docker smoke: control-plane start on 0.0.0.0 with PID file + fast /api/health.
+# Uses local repo tarball (not GitHub install). External probes only — in-process /api/status
+# health is covered by tests/intentframe_control_plane/test_server.py.
 set -euo pipefail
 
 export HOME="${HOME:-/tmp/cp-smoke-home}"

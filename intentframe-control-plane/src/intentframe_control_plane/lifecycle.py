@@ -1,4 +1,15 @@
-"""Start/stop/status for the IntentFrame control plane HTTP server."""
+"""Start/stop/status for the IntentFrame control plane HTTP server.
+
+The control plane runs as a background uvicorn process (``control-plane start``) or
+foreground (``control-plane serve``). Health is determined differently by caller:
+
+- **External** (CLI, startup loop, ``control-plane status``): HTTP GET ``/api/health``.
+- **In-process** (``GET /api/status`` inside uvicorn): skip HTTP when PID file matches
+  ``os.getpid()`` to avoid single-worker self-deadlock.
+
+External probes map bind-all hosts (``0.0.0.0``, ``::``) to ``127.0.0.1`` via
+``_health_host()``.
+"""
 
 from __future__ import annotations
 
@@ -92,6 +103,7 @@ def _health_host(bind_host: str) -> str:
 
 
 def _health_check(host: str, port: int, *, timeout: float = 2.0) -> bool:
+    """External liveness probe — used by CLI and startup, not in-process /api/status."""
     url = f"http://{host}:{port}/api/health"
     try:
         with urllib.request.urlopen(url, timeout=timeout) as resp:
@@ -101,6 +113,11 @@ def _health_check(host: str, port: int, *, timeout: float = 2.0) -> bool:
 
 
 def control_plane_status(settings: ControlPlaneSettings | None = None) -> ControlPlaneStatus:
+    """Return running/healthy state from PID file and optional HTTP probe.
+
+    When called from inside the running server (PID file matches current process),
+    ``healthy`` is True without HTTP — serving this request proves the server is up.
+    """
     cfg = settings or ControlPlaneSettings.from_env()
     pid = _read_pid(PID_FILE)
     running = pid is not None and _pid_alive(pid)

@@ -1,4 +1,8 @@
-"""Read-only views of runtime state without subprocess side effects."""
+"""Read-only views of runtime state without subprocess side effects.
+
+Used by ``GET /api/status``, ``/api/governance``, and ``/api/policy`` so page loads
+do not spawn CLI subprocesses or mutate runtime state.
+"""
 
 from __future__ import annotations
 

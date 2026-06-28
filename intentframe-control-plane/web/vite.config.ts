@@ -4,6 +4,7 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   build: {
+    // Git-tracked output — shipped with the Python package; installs skip npm when present.
     outDir: "../src/intentframe_control_plane/static",
     emptyOutDir: true,
   },

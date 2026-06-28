@@ -1,4 +1,11 @@
-"""FastAPI control plane server and JSON API."""
+"""FastAPI control plane server and JSON API.
+
+Serves the built React SPA from ``static/`` (same port as ``/api/*``). Vite output is
+git-tracked under ``static/``; uvicorn is the only production frontend server.
+
+Read endpoints use ``read_models`` (direct file/PID reads). Mutations subprocess to
+``intentframe-integrations`` via ``cli_runner``.
+"""
 
 from __future__ import annotations
 
@@ -100,6 +107,11 @@ async def auth_middleware(request: Request, call_next):
 
 @app.get("/api/health")
 async def health() -> JSONResponse:
+    """Lightweight liveness for external probes (CLI startup, ``control-plane status``).
+
+    Must not call ``control_plane_status()`` — that would HTTP-probe back into this
+    process and deadlock a single-worker uvicorn.
+    """
     settings = ControlPlaneSettings.from_env()
     return _ok(
         {
@@ -117,6 +129,7 @@ async def api_config() -> JSONResponse:
 
 @app.get("/api/status")
 async def api_status() -> JSONResponse:
+    """Enforcement stack snapshot + control plane row for the Overview page."""
     data = collect_status_dict()
     cp = control_plane_status()
     data["control_plane"] = {
@@ -257,7 +270,8 @@ async def api_audit_log(tail: int = 200) -> JSONResponse:
     return _ok({"lines": lines, "path": str(SERVER_LOG)})
 
 
-# Static assets + SPA fallback (supports BrowserRouter deep links).
+# Static assets + SPA fallback (BrowserRouter deep links like /governance).
+# Built by Vite into static/; committed so installs work without Node.js.
 if INDEX_HTML.is_file():
 
     @app.get("/assets/{asset_path:path}")

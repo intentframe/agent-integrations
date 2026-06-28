@@ -3,6 +3,9 @@
 #   export OPENAI_API_KEY=sk-...
 #   docker compose -f tests/docker/docker-compose.test.yml up
 #
+# Control plane (:9720): uvicorn serves pre-built React static/ + /api/* from GitHub pack.
+# Hermes chat (:9119): separate hermes dashboard process.
+#
 # Or: cp tests/docker/.env.example tests/docker/.env  (set key there)
 #
 # Open http://localhost:9720 (IntentFrame Control Plane) and http://localhost:9119/chat (Hermes).

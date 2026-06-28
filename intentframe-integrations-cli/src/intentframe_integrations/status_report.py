@@ -1,4 +1,7 @@
-"""Structured status report for CLI and control plane."""
+"""Structured status report for ``intentframe-integrations status --json``.
+
+Enforcement stack fields are shared with the control plane ``read_models`` views.
+"""
 
 from __future__ import annotations
 

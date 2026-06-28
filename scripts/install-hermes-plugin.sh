@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install Hermes (if missing) + IntentFrame plugin.
+# Install Hermes (if missing) + IntentFrame plugin + Control Plane UI.
 #
 # Latest (rolling):
 #   curl -fsSL https://github.com/intentframe/agent-integrations/raw/main/scripts/install-hermes-plugin.sh | bash
@@ -7,13 +7,15 @@
 # Pinned release (script URL and pack ref should match):
 #   curl -fsSL https://github.com/intentframe/agent-integrations/raw/v0.2.0/scripts/install-hermes-plugin.sh | bash -s -- --ref v0.2.0
 #
-# Docker / CI (skip Hermes setup wizard + browser engine):
-#   curl -fsSL .../install-hermes-plugin.sh | bash -s -- --headless --ref main
+# Docker / CI (skip Hermes setup wizard + browser engine; defer control plane start):
+#   curl -fsSL .../install-hermes-plugin.sh | bash -s -- --headless --no-control-plane --ref main
 #
-# Then open IntentFrame Control Plane (auto-started by installer):
-#   http://127.0.0.1:9720
+# Control plane UI (auto-started unless --no-control-plane):
+#   http://127.0.0.1:9720  — React SPA + /api/* served by one uvicorn process
+#   Static assets are pre-built in the integration pack (git-tracked); npm build runs
+#   only when static/index.html is missing.
 #
-# Start enforcement stack from Control Plane, then Hermes chat:
+# Hermes chat (separate, after enforcement stack is up):
 #   hermes dashboard            # http://localhost:9119
 set -euo pipefail
 
@@ -54,6 +56,7 @@ Usage: install-hermes-plugin.sh [--headless] [--no-control-plane] [--no-open] [-
 
   --headless           Skip Hermes setup wizard and browser engine (also skips browser open).
   --no-control-plane   Do not start IntentFrame Control Plane after install (CI/Docker).
+                       Docker entrypoint starts CP separately with 0.0.0.0 bind.
   --no-open            Do not open http://127.0.0.1:9720 in a browser after install.
 
   --ref REF    Git ref for the integration pack (branch, tag, or commit SHA).
@@ -172,6 +175,8 @@ seed_intentframe_env() {
 }
 
 build_control_plane_frontend() {
+  # Vite output is git-tracked under intentframe_control_plane/static/ so most installs
+  # (GitHub tarball, Docker) skip npm. Rebuild only when static/index.html is absent.
   local web_dir="${INSTALL_DIR}/intentframe-control-plane/web"
   local static_index="${INSTALL_DIR}/intentframe-control-plane/src/intentframe_control_plane/static/index.html"
   if [[ -f "${static_index}" ]]; then
@@ -299,7 +304,7 @@ fi
 
 CP_LINE="  Control Plane: ${CONTROL_PLANE_URL}"
 if [[ "${NO_CONTROL_PLANE}" == true ]]; then
-  CP_LINE="  Control Plane: not started (run: intentframe-integrations control-plane start)"
+  CP_LINE="  Control Plane: not started (--no-control-plane; run: intentframe-integrations control-plane start)"
 fi
 
 cat <<EOF

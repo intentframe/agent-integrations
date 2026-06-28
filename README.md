@@ -250,6 +250,12 @@ curl -fsSL https://github.com/intentframe/agent-integrations/raw/main/scripts/in
 curl -fsSL https://github.com/intentframe/agent-integrations/raw/main/scripts/install-hermes-plugin.sh | bash -s -- --headless
 ```
 
+**Skip control plane during install** (Docker/CI — entrypoint starts it separately):
+
+```bash
+curl -fsSL .../install-hermes-plugin.sh | bash -s -- --headless --no-control-plane
+```
+
 From a git clone (same flags):
 
 ```bash
@@ -319,9 +325,11 @@ Full tables (what is / is not removed): [docs/hermes-cli.md#uninstall](docs/herm
 
 | Doc | Audience |
 |-----|----------|
+| [docs/intentframe-control-plane.md](docs/intentframe-control-plane.md) | Operator UI — ports, frontend, health checks, Docker |
 | [docs/hermes-cli.md](docs/hermes-cli.md) | CLI commands — governance, policy, gateway, env vars |
 | [docs/hermes-known-limitations.md](docs/hermes-known-limitations.md) | Install/uninstall caveats and roadmap |
 | [docs/hermes-intentframe-integration-guide.md](docs/hermes-intentframe-integration-guide.md) | Architecture, adding tools, troubleshooting |
+| [tests/docker/README.md](tests/docker/README.md) | Docker user journey (:9720 control plane + :9119 chat) |
 | [tests/docker/logs/](tests/docker/logs/README.md) | Captured Docker chat + gating audit sessions (example probes) |
 | [integrations/hermes/README.md](integrations/hermes/README.md) | Monorepo dev reference |
 | [IntentFrame](https://github.com/intentframe/intentframe) | Core runtime — threat model, principles, Actor SDK |
@@ -344,10 +352,12 @@ uv sync --all-packages
 | Path | Purpose |
 |------|---------|
 | `intentframe-integrations-cli/` | `intentframe-integrations` CLI |
+| `intentframe-control-plane/` | Operator UI (React + FastAPI on :9720) |
 | `integrations/hermes/` | Plugin, adapter, governance templates |
 | `integrations/_template/` | Scaffold for adding a new agent integration |
 | `if-integration-backend/` | IntentFrame runtime supervisor |
 | `if-integration-clients/` | Bridge clients (Python + TypeScript) |
+| `tests/intentframe_control_plane/` | Control plane unit tests |
 | `tests/hermes_gateway/` | Opt-in gateway E2E (isolated sandbox) |
 | `tests/docker/` | Production-like Docker user journey |
 | `tests/docker/logs/` | Captured manual gating sessions (chat + audit trail) |
