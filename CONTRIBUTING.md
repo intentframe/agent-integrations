@@ -25,9 +25,21 @@ git clone https://github.com/intentframe/agent-integrations.git
 cd agent-integrations
 uv sync --all-packages
 npm ci && npm run build
+cd intentframe-control-plane/web && npm ci && npm run build
 ```
 
 The dev launcher is `./bin/intentframe-integrations`.
+
+### Control plane frontend
+
+When you change `intentframe-control-plane/web/`, rebuild and **commit** the output:
+
+```bash
+cd intentframe-control-plane/web && npm run build
+git add ../src/intentframe_control_plane/static/
+```
+
+Static assets under `src/intentframe_control_plane/static/` are git-tracked so installs and Docker work without Node.js. CI verifies `static/index.html` exists after build.
 
 ## Running tests
 
@@ -49,6 +61,7 @@ Install regression tests:
 bash tests/install/test_ref_resolution.sh
 bash tests/install/test_installer_bootstrap_docker.sh
 bash tests/install/test_installer_curl_docker.sh
+bash tests/docker/test_control_plane_smoke.sh   # local throwaway CP lifecycle smoke
 ```
 
 ## Project structure
@@ -56,10 +69,13 @@ bash tests/install/test_installer_curl_docker.sh
 | Path | Purpose |
 |------|---------|
 | `intentframe-integrations-cli/` | User-facing CLI |
+| `intentframe-control-plane/` | Operator UI (React) + FastAPI server on :9720 |
 | `if-integration-backend/` | Validate-only IntentFrame runtime supervisor |
 | `if-integration-clients/` | Bridge clients (Python + TypeScript) |
 | `integrations/hermes/` | Hermes plugin, adapter, governance templates |
 | `integrations/_template/` | Scaffold for new agent integrations |
+| `tests/intentframe_control_plane/` | Control plane lifecycle + API unit tests |
+| `tests/docker/` | Production-like Docker user journey (CP :9720 + chat :9119) |
 | `tests/` | Unit, install, Docker, and gateway E2E tests |
 
 Use `uv sync --all-packages` from the repo root. Do not install workspace members

@@ -132,6 +132,14 @@ def uninstall_hermes(
     messages: list[str] = []
     env_keys = frozenset(pack.agent.env)
 
+    try:
+        from intentframe_control_plane.lifecycle import stop_control_plane
+
+        stop_control_plane(quiet=True)
+        messages.append("Stopped IntentFrame control plane")
+    except Exception:
+        pass
+
     plugin_dest = plugin_install_path()
     if plugin_dest.exists() or plugin_dest.is_symlink():
         _remove_path(plugin_dest, messages, "Hermes plugin")

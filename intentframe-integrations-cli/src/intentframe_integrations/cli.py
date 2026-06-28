@@ -7,6 +7,7 @@ Commands that need agent env or Hermes runtime artifacts use
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -26,6 +27,7 @@ from intentframe_integrations.hermes_gateway import (
     HermesGatewayError,
     gateway_log_file,
     is_gateway_running,
+    normalize_hermes_gateway_argv,
     start_hermes_gateway,
     stop_hermes_gateway,
 )
@@ -60,7 +62,9 @@ from intentframe_integrations.policy_manage import (
     policy_reset,
     policy_set,
     policy_show,
+    policy_show_to_dict,
 )
+from intentframe_integrations.status_report import status_report_json
 from intentframe_integrations.paths import agent_config_path, list_agents
 from intentframe_integrations.runtime_lifecycle import (
     backend_ready_for_pack,
@@ -305,7 +309,10 @@ def _cmd_stop() -> int:
     return _run_backend(["stop"])
 
 
-def _cmd_status() -> int:
+def _cmd_status(*, as_json: bool = False) -> int:
+    if as_json:
+        print(status_report_json())
+        return 0
     ec = _run_backend(["status"])
     for agent in list_agents():
         try:
@@ -374,12 +381,15 @@ def _cmd_doctor(
     return 0
 
 
-def _cmd_policy_show(agent: str) -> int:
+def _cmd_policy_show(agent: str, *, as_json: bool = False) -> int:
     try:
         report = policy_show(agent)
     except (PolicyError, FileNotFoundError, ValueError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
+    if as_json:
+        print(json.dumps(policy_show_to_dict(report), indent=2))
+        return 0
     print(format_policy_show(report))
     return 0
 
@@ -542,7 +552,7 @@ def _cmd_gateway_stop(agent: str) -> int:
     return 0
 
 
-def _cmd_governance_list(agent: str) -> int:
+def _cmd_governance_list(agent: str, *, as_json: bool = False) -> int:
     if agent != "hermes":
         print(f"ERROR: governance is only implemented for hermes (got {agent!r})", file=sys.stderr)
         return 1
@@ -551,6 +561,16 @@ def _cmd_governance_list(agent: str) -> int:
     except GovernanceEditError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
+
+    if as_json:
+        governed = runtime_governed_tool_names(agent)
+        payload = {
+            "agent": agent,
+            "tools": [{"name": name, "enabled": enabled} for name, enabled in entries],
+            "runtime_governed": governed,
+        }
+        print(json.dumps(payload, indent=2))
+        return 0
 
     print(f"Governed tool catalog ({agent}):")
     for name, enabled in entries:
@@ -600,6 +620,48 @@ def _ensure_runtime(pack: IntegrationPack) -> int:
     if not backend_ready_for_pack(pack):
         print("ERROR: IntentFrame runtime is not ready for this agent.", file=sys.stderr)
         return 1
+    return 0
+
+
+def _cmd_control_plane_start(*, host: str | None, port: int | None) -> int:
+    from intentframe_control_plane.lifecycle import ControlPlaneError, start_control_plane
+
+    try:
+        status = start_control_plane(host=host, port=port)
+    except ControlPlaneError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    print(status.url)
+    return 0
+
+
+def _cmd_control_plane_stop() -> int:
+    from intentframe_control_plane.lifecycle import stop_control_plane
+
+    stop_control_plane()
+    return 0
+
+
+def _cmd_control_plane_status() -> int:
+    from intentframe_control_plane.lifecycle import control_plane_status, format_status_line
+
+    print(format_status_line(control_plane_status()))
+    return 0
+
+
+def _cmd_control_plane_serve(*, host: str | None, port: int | None) -> int:
+    from intentframe_control_plane.lifecycle import ControlPlaneError, serve_control_plane
+
+    try:
+        serve_control_plane(host=host, port=port)
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        return 130
     return 0
 
 
@@ -703,8 +765,12 @@ def main(argv: list[str] | None = None) -> int:
         help="Pass --skip-if-exists to seed-policy",
     )
 
-    sub.add_parser("stop", help="Stop agent adapters, IntentFrame runtime, and bridge")
-    sub.add_parser("status", help="Runtime, bridge, and adapter status")
+    sub.add_parser(
+        "stop",
+        help="Stop enforcement stack (gateway, adapters, backend — not control plane)",
+    )
+    p_status = sub.add_parser("status", help="Runtime, bridge, and adapter status")
+    p_status.add_argument("--json", action="store_true", help="Emit JSON status report")
 
     p_seed = sub.add_parser("seed", help="Seed policy for an agent profile")
     p_seed.add_argument("agent", nargs="?", choices=agents)
@@ -796,6 +862,7 @@ def main(argv: list[str] | None = None) -> int:
 
     p_policy_show = policy_sub.add_parser("show", help="Show runtime policy path and registry status")
     p_policy_show.add_argument("agent", choices=agents)
+    p_policy_show.add_argument("--json", action="store_true", help="Emit JSON policy report")
 
     p_policy_reload = policy_sub.add_parser(
         "reload",
@@ -873,6 +940,7 @@ def main(argv: list[str] | None = None) -> int:
 
     p_governance_list = governance_sub.add_parser("list", help="Show catalog and runtime governed tools")
     p_governance_list.add_argument("agent", choices=agents)
+    p_governance_list.add_argument("--json", action="store_true", help="Emit JSON tool catalog")
 
     p_governance_enable = governance_sub.add_parser("enable", help="Enable a governed tool")
     p_governance_enable.add_argument("agent", choices=agents)
@@ -881,6 +949,23 @@ def main(argv: list[str] | None = None) -> int:
     p_governance_disable = governance_sub.add_parser("disable", help="Disable a governed tool")
     p_governance_disable.add_argument("agent", choices=agents)
     p_governance_disable.add_argument("tool", help="Hermes tool name from governance/tools.yaml")
+
+    p_cp = sub.add_parser(
+        "control-plane",
+        help="IntentFrame operator control plane (http://127.0.0.1:9720)",
+    )
+    cp_sub = p_cp.add_subparsers(dest="control_plane_command", required=True)
+
+    p_cp_start = cp_sub.add_parser("start", help="Start control plane in background")
+    p_cp_start.add_argument("--host", default=None, help="Bind host (default: 127.0.0.1)")
+    p_cp_start.add_argument("--port", type=int, default=None, help="Bind port (default: 9720)")
+
+    cp_sub.add_parser("stop", help="Stop control plane only")
+    cp_sub.add_parser("status", help="Show control plane status")
+
+    p_cp_serve = cp_sub.add_parser("serve", help="Run control plane in foreground")
+    p_cp_serve.add_argument("--host", default=None)
+    p_cp_serve.add_argument("--port", type=int, default=None)
 
     args = parser.parse_args(argv)
 
@@ -910,7 +995,7 @@ def main(argv: list[str] | None = None) -> int:
         case "stop":
             return _cmd_stop()
         case "status":
-            return _cmd_status()
+            return _cmd_status(as_json=args.json)
         case "seed":
             if args.agent_config is not None:
                 if args.agent is not None:
@@ -950,7 +1035,7 @@ def main(argv: list[str] | None = None) -> int:
         case "policy":
             match args.policy_command:
                 case "show":
-                    return _cmd_policy_show(args.agent)
+                    return _cmd_policy_show(args.agent, as_json=args.json)
                 case "reload":
                     return _cmd_policy_reload(args.agent)
                 case "set":
@@ -987,13 +1072,26 @@ def main(argv: list[str] | None = None) -> int:
         case "governance":
             match args.governance_command:
                 case "list":
-                    return _cmd_governance_list(args.agent)
+                    return _cmd_governance_list(args.agent, as_json=args.json)
                 case "enable":
                     return _cmd_governance_set(args.agent, args.tool, enabled=True)
                 case "disable":
                     return _cmd_governance_set(args.agent, args.tool, enabled=False)
                 case _:
                     parser.error(f"Unknown governance command: {args.governance_command}")
+                    return 2
+        case "control-plane":
+            match args.control_plane_command:
+                case "start":
+                    return _cmd_control_plane_start(host=args.host, port=args.port)
+                case "stop":
+                    return _cmd_control_plane_stop()
+                case "status":
+                    return _cmd_control_plane_status()
+                case "serve":
+                    return _cmd_control_plane_serve(host=args.host, port=args.port)
+                case _:
+                    parser.error(f"Unknown control-plane command: {args.control_plane_command}")
                     return 2
         case _:
             parser.error(f"Unknown command: {args.command}")

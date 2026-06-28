@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "if-integration-backend"
-version = "0.2.0"
+version = "0.2.1"
 description = "Generic IntentFrame validate-only backend: runtime, bridge, noop executor"
 readme = "README.md"
 requires-python = ">=3.14"

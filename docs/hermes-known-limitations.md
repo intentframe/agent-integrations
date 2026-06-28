@@ -46,7 +46,7 @@ The installer supports git **branches**, **tags**, and **commit SHAs** via `--re
 |------|---------|
 | Latest (default) | `curl …/raw/main/scripts/install-hermes-plugin.sh \| bash` |
 | Pre-merge / branch | `curl …/raw/my-branch/… \| bash -s -- --ref my-branch --headless` |
-| Stable release | `curl …/raw/v0.2.0/… \| bash -s -- --ref v0.2.0` |
+| Stable release | `curl …/raw/v0.2.1/… \| bash -s -- --ref v0.2.1` |
 | Locked / reproducible | `curl …/raw/<commit-sha>/… \| bash -s -- --ref <commit-sha>` |
 
 Install provenance is written to `~/.intentframe/agent-integrations/.install-manifest.json` and shown by `intentframe-integrations doctor hermes`.

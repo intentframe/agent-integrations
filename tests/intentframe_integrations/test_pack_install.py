@@ -33,7 +33,7 @@ class PackInstallManifestTests(unittest.TestCase):
             manifest.write_text(
                 json.dumps(
                     {
-                        "ref": "v0.2.0",
+                        "ref": "v0.2.1",
                         "installed_at": "2026-06-27T12:00:00Z",
                     }
                 ),
@@ -45,7 +45,7 @@ class PackInstallManifestTests(unittest.TestCase):
             ):
                 lines = pack_install_status_lines()
         self.assertEqual(len(lines), 1)
-        self.assertIn("ref v0.2.0", lines[0])
+        self.assertIn("ref v0.2.1", lines[0])
         self.assertIn("installed 2026-06-27T12:00:00Z", lines[0])
 
     def test_load_manifest(self) -> None:

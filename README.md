@@ -68,21 +68,23 @@ No git clone required:
 curl -fsSL https://github.com/intentframe/agent-integrations/raw/main/scripts/install-hermes-plugin.sh | bash
 ```
 
-Then run Hermes with IntentFrame:
+Then open the IntentFrame Control Plane (started by the installer):
+
+```text
+http://127.0.0.1:9720
+```
+
+Use it to configure keys, start the enforcement stack, manage governed tools, and load policy.
+
+Hermes chat (separate, after the stack is up):
 
 ```bash
-export OPENAI_API_KEY=sk-...
-intentframe-integrations up hermes
 hermes dashboard
 ```
 
-Open:
-
 ```text
-http://localhost:9119/chat
+http://127.0.0.1:9119/chat
 ```
-
-Ask Hermes to run a terminal command. If the tool is governed, IntentFrame validates it before Hermes executes it.
 
 ---
 
@@ -248,6 +250,12 @@ curl -fsSL https://github.com/intentframe/agent-integrations/raw/main/scripts/in
 curl -fsSL https://github.com/intentframe/agent-integrations/raw/main/scripts/install-hermes-plugin.sh | bash -s -- --headless
 ```
 
+**Skip control plane during install** (Docker/CI — entrypoint starts it separately):
+
+```bash
+curl -fsSL .../install-hermes-plugin.sh | bash -s -- --headless --no-control-plane
+```
+
 From a git clone (same flags):
 
 ```bash
@@ -257,7 +265,7 @@ bash scripts/install-hermes-plugin.sh --headless
 **Pinned release** (script URL and pack ref should match):
 
 ```bash
-curl -fsSL https://github.com/intentframe/agent-integrations/raw/v0.2.0/scripts/install-hermes-plugin.sh | bash -s -- --ref v0.2.0
+curl -fsSL https://github.com/intentframe/agent-integrations/raw/v0.2.1/scripts/install-hermes-plugin.sh | bash -s -- --ref v0.2.1
 ```
 
 After headless install, set `OPENAI_API_KEY` (and run `hermes setup` if chat returns 401). Then the same [three commands](#run-three-commands) as below.
@@ -310,16 +318,18 @@ Full tables (what is / is not removed): [docs/hermes-cli.md#uninstall](docs/herm
 
 ## Status and Resources
 
-**Current release:** [v0.2.0](https://github.com/intentframe/agent-integrations/releases/tag/v0.2.0)  
+**Current release:** [v0.2.1](https://github.com/intentframe/agent-integrations/releases/tag/v0.2.1)  
 **Integration maturity:** Hermes plugin + adapter + CLI; Docker E2E; known uninstall caveats on root/FHS — [limitations](docs/hermes-known-limitations.md).
 
 ### Documentation
 
 | Doc | Audience |
 |-----|----------|
+| [docs/intentframe-control-plane.md](docs/intentframe-control-plane.md) | Operator UI — ports, frontend, health checks, Docker |
 | [docs/hermes-cli.md](docs/hermes-cli.md) | CLI commands — governance, policy, gateway, env vars |
 | [docs/hermes-known-limitations.md](docs/hermes-known-limitations.md) | Install/uninstall caveats and roadmap |
 | [docs/hermes-intentframe-integration-guide.md](docs/hermes-intentframe-integration-guide.md) | Architecture, adding tools, troubleshooting |
+| [tests/docker/README.md](tests/docker/README.md) | Docker user journey (:9720 control plane + :9119 chat) |
 | [tests/docker/logs/](tests/docker/logs/README.md) | Captured Docker chat + gating audit sessions (example probes) |
 | [integrations/hermes/README.md](integrations/hermes/README.md) | Monorepo dev reference |
 | [IntentFrame](https://github.com/intentframe/intentframe) | Core runtime — threat model, principles, Actor SDK |
@@ -342,10 +352,12 @@ uv sync --all-packages
 | Path | Purpose |
 |------|---------|
 | `intentframe-integrations-cli/` | `intentframe-integrations` CLI |
+| `intentframe-control-plane/` | Operator UI (React + FastAPI on :9720) |
 | `integrations/hermes/` | Plugin, adapter, governance templates |
 | `integrations/_template/` | Scaffold for adding a new agent integration |
 | `if-integration-backend/` | IntentFrame runtime supervisor |
 | `if-integration-clients/` | Bridge clients (Python + TypeScript) |
+| `tests/intentframe_control_plane/` | Control plane unit tests |
 | `tests/hermes_gateway/` | Opt-in gateway E2E (isolated sandbox) |
 | `tests/docker/` | Production-like Docker user journey |
 | `tests/docker/logs/` | Captured manual gating sessions (chat + audit trail) |

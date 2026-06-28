@@ -29,7 +29,7 @@ export HOME=/tmp/if-home
 export INSTALL_DIR=\"\${HOME}/.intentframe/agent-integrations\"
 mkdir -p \"\${HOME}\"
 
-curl -fsSL \"${INSTALL_URL}\" | bash -s -- --headless --ref \"${REF}\"
+curl -fsSL \"${INSTALL_URL}\" | bash -s -- --headless --no-control-plane --ref \"${REF}\"
 
 export PATH=\"\${HOME}/.local/bin:/usr/local/bin:\${PATH}\"
 command -v intentframe-integrations

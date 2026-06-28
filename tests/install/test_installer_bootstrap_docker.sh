@@ -104,7 +104,7 @@ EOF
 chmod +x /tmp/bin/curl
 
 export PATH="/tmp/bin:${PATH}"
-bash -s -- --headless --ref test-ref </repo/scripts/install-hermes-plugin.sh
+bash -s -- --headless --no-control-plane --ref test-ref </repo/scripts/install-hermes-plugin.sh
 
 export PATH="${HOME}/.local/bin:${PATH}"
 command -v intentframe-integrations

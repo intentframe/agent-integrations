@@ -9,12 +9,13 @@ members = [
     "hermes-governance",
     "if-integration-backend",
     "if-integration-bridge-client",
+    "intentframe-control-plane",
     "intentframe-integrations-cli",
 ]
 
 [[package]]
 name = "agent-integrations"
-version = "0.2.0"
+version = "0.2.1"
 source = { virtual = "." }
 
 [[package]]
@@ -287,7 +288,7 @@ wheels = [
 
 [[package]]
 name = "hermes-adapter"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "integrations/hermes/adapter" }
 dependencies = [
     { name = "hermes-governance" },
@@ -306,7 +307,7 @@ requires-dist = [
 
 [[package]]
 name = "hermes-governance"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "integrations/hermes/shared" }
 dependencies = [
     { name = "pyyaml" },
@@ -385,7 +386,7 @@ wheels = [
 
 [[package]]
 name = "if-integration-backend"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "if-integration-backend" }
 dependencies = [
     { name = "httpx" },
@@ -410,7 +411,7 @@ requires-dist = [
 
 [[package]]
 name = "if-integration-bridge-client"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "if-integration-clients/python" }
 dependencies = [
     { name = "httpx" },
@@ -474,6 +475,25 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/65/35/16146d57394eb57a14550af4efe779c9749c267a663b805189d0a84c9f93/intentframe_components-0.1.1.tar.gz", hash = "sha256:9f48b39fe5fa04886410ebcc86143a5b05d8903a45f2962581ecd75e02fd5870", size = 39730, upload-time = "2026-06-21T05:42:12.258Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/88/5e/a9f406f59e3b35fceaa4612aeb7a4fd5653b0fc218bca33bf942d3325684/intentframe_components-0.1.1-py3-none-any.whl", hash = "sha256:84cfe2c157c368c0e29cf299c691e93c88e7f9973a1dfeee83273c517063afee", size = 43371, upload-time = "2026-06-21T05:41:47.475Z" },
+]
+
+[[package]]
+name = "intentframe-control-plane"
+version = "0.2.1"
+source = { editable = "intentframe-control-plane" }
+dependencies = [
+    { name = "fastapi" },
+    { name = "python-multipart" },
+    { name = "pyyaml" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastapi", specifier = ">=0.115.0" },
+    { name = "python-multipart", specifier = ">=0.0.18" },
+    { name = "pyyaml", specifier = ">=6.0.2" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.32.0" },
 ]
 
 [[package]]
@@ -552,14 +572,18 @@ wheels = [
 
 [[package]]
 name = "intentframe-integrations-cli"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "intentframe-integrations-cli" }
 dependencies = [
     { name = "if-integration-backend" },
+    { name = "intentframe-control-plane" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "if-integration-backend", editable = "if-integration-backend" }]
+requires-dist = [
+    { name = "if-integration-backend", editable = "if-integration-backend" },
+    { name = "intentframe-control-plane", editable = "intentframe-control-plane" },
+]
 
 [[package]]
 name = "intentframe-native-kit"

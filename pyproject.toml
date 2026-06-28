@@ -1,6 +1,6 @@
 [project]
 name = "agent-integrations"
-version = "0.2.0"
+version = "0.2.1"
 description = "IntentFrame agent integrations monorepo (workspace root)"
 requires-python = ">=3.14"
 dependencies = []
@@ -9,6 +9,7 @@ dependencies = []
 members = [
   "if-integration-backend",
   "if-integration-clients/python",
+  "intentframe-control-plane",
   "intentframe-integrations-cli",
   "integrations/hermes/adapter",
   "integrations/hermes/shared",

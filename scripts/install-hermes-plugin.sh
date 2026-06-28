@@ -1,28 +1,41 @@
 #!/usr/bin/env bash
-# Install Hermes (if missing) + IntentFrame plugin.
+# Install Hermes (if missing) + IntentFrame plugin + Control Plane UI.
 #
 # Latest (rolling):
 #   curl -fsSL https://github.com/intentframe/agent-integrations/raw/main/scripts/install-hermes-plugin.sh | bash
 #
 # Pinned release (script URL and pack ref should match):
-#   curl -fsSL https://github.com/intentframe/agent-integrations/raw/v0.2.0/scripts/install-hermes-plugin.sh | bash -s -- --ref v0.2.0
+#   curl -fsSL https://github.com/intentframe/agent-integrations/raw/v0.2.1/scripts/install-hermes-plugin.sh | bash -s -- --ref v0.2.1
 #
-# Docker / CI (skip Hermes setup wizard + browser engine):
-#   curl -fsSL .../install-hermes-plugin.sh | bash -s -- --headless --ref main
+# Docker / CI (skip Hermes setup wizard + browser engine; defer control plane start):
+#   curl -fsSL .../install-hermes-plugin.sh | bash -s -- --headless --no-control-plane --ref main
 #
-# Then:
-#   export OPENAI_API_KEY=sk-...
-#   intentframe-integrations up hermes
+# Control plane UI (auto-started unless --no-control-plane):
+#   http://127.0.0.1:9720  — React SPA + /api/* served by one uvicorn process
+#   Static assets are pre-built in the integration pack (git-tracked); npm build runs
+#   only when static/index.html is missing.
+#
+# Hermes chat (separate, after enforcement stack is up):
 #   hermes dashboard            # http://localhost:9119
 set -euo pipefail
 
 HEADLESS=false
+NO_CONTROL_PLANE=false
+NO_OPEN=false
 REF="${REF:-}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --headless)
       HEADLESS=true
+      shift
+      ;;
+    --no-control-plane)
+      NO_CONTROL_PLANE=true
+      shift
+      ;;
+    --no-open)
+      NO_OPEN=true
       shift
       ;;
     --ref)
@@ -39,10 +52,12 @@ while [[ $# -gt 0 ]]; do
       ;;
     -h|--help)
       cat <<'EOF'
-Usage: install-hermes-plugin.sh [--headless] [--ref REF]
+Usage: install-hermes-plugin.sh [--headless] [--no-control-plane] [--no-open] [--ref REF]
 
-  --headless   Skip Hermes setup wizard and browser engine (faster; for testers/CI/Docker).
-               Default: full Hermes install for end users.
+  --headless           Skip Hermes setup wizard and browser engine (also skips browser open).
+  --no-control-plane   Do not start IntentFrame Control Plane after install (CI/Docker).
+                       Docker entrypoint starts CP separately with 0.0.0.0 bind.
+  --no-open            Do not open http://127.0.0.1:9720 in a browser after install.
 
   --ref REF    Git ref for the integration pack (branch, tag, or commit SHA).
                Also set via REF= env. VERSION= is a deprecated alias for REF=.
@@ -51,7 +66,7 @@ Usage: install-hermes-plugin.sh [--headless] [--ref REF]
 Install tiers (use the same ref in the script URL and --ref):
 
   Latest:    curl .../raw/main/scripts/install-hermes-plugin.sh | bash
-  Release:   curl .../raw/v0.2.0/... | bash -s -- --ref v0.2.0
+  Release:   curl .../raw/v0.2.1/... | bash -s -- --ref v0.2.1
   Locked:    curl .../raw/<commit-sha>/... | bash -s -- --ref <commit-sha>
 EOF
       exit 0
@@ -63,6 +78,10 @@ EOF
   esac
 done
 
+if [[ "${HEADLESS}" == true ]]; then
+  NO_OPEN=true
+fi
+
 ORG="${ORG:-intentframe}"
 REPO="${REPO:-agent-integrations}"
 REF="${REF:-${VERSION:-main}}"
@@ -70,6 +89,8 @@ INSTALL_DIR="${INSTALL_DIR:-${HOME}/.intentframe/agent-integrations}"
 LOCAL_BIN="${HOME}/.local/bin"
 SYSTEM_BIN="/usr/local/bin"
 HERMES_ENV="${HOME}/.hermes/.env"
+IF_ENV="${HOME}/.intentframe/.env"
+CONTROL_PLANE_URL="http://127.0.0.1:9720"
 CLI_SYSTEM=""
 HERMES_SUMMARY=""
 PACK_REF=""
@@ -120,6 +141,69 @@ ensure_local_bin_on_path() {
     } >> "${rc}"
   done
   export PATH="${LOCAL_BIN}:${SYSTEM_BIN}:${PATH}"
+}
+
+open_browser() {
+  local url="$1"
+  if [[ "${NO_OPEN}" == true ]]; then
+    return 0
+  fi
+  if [[ -n "${DISPLAY:-}" ]] || [[ "$(uname -s)" == "Darwin" ]]; then
+    :
+  else
+    return 0
+  fi
+  if [[ "$(uname -s)" == "Darwin" ]] && have open; then
+    open "${url}" >/dev/null 2>&1 || true
+    return 0
+  fi
+  if have xdg-open; then
+    xdg-open "${url}" >/dev/null 2>&1 || true
+  fi
+}
+
+seed_intentframe_env() {
+  mkdir -p "${HOME}/.intentframe"
+  touch "${IF_ENV}"
+  for line in \
+    "INTENTFRAME_CONTROL_PLANE_HOST=127.0.0.1" \
+    "INTENTFRAME_CONTROL_PLANE_PORT=9720" \
+    "INTENTFRAME_INTEGRATIONS_BIN=${IF_CLI}"; do
+    key="${line%%=*}"
+    grep -q "^${key}=" "${IF_ENV}" || echo "${line}" >> "${IF_ENV}"
+  done
+}
+
+build_control_plane_frontend() {
+  # Vite output is git-tracked under intentframe_control_plane/static/ so most installs
+  # (GitHub tarball, Docker) skip npm. Rebuild only when static/index.html is absent.
+  local web_dir="${INSTALL_DIR}/intentframe-control-plane/web"
+  local static_index="${INSTALL_DIR}/intentframe-control-plane/src/intentframe_control_plane/static/index.html"
+  if [[ -f "${static_index}" ]]; then
+    return 0
+  fi
+  if [[ ! -d "${web_dir}" ]]; then
+    echo "WARNING: control plane frontend source missing; UI may be unavailable" >&2
+    return 0
+  fi
+  if ! have npm; then
+    echo "WARNING: npm not found; skipping control plane frontend build" >&2
+    return 0
+  fi
+  step "Building IntentFrame Control Plane frontend"
+  (cd "${web_dir}" && npm ci && npm run build)
+}
+
+start_control_plane() {
+  if [[ "${NO_CONTROL_PLANE}" == true ]]; then
+    return 0
+  fi
+  step "Starting IntentFrame Control Plane"
+  if ! "${IF_CLI}" control-plane start; then
+    echo "WARNING: control plane failed to start (port may be in use). Open ${CONTROL_PLANE_URL} manually after: intentframe-integrations control-plane start" >&2
+    return 0
+  fi
+  open_browser "${CONTROL_PLANE_URL}"
 }
 
 install_cli_on_path() {
@@ -177,6 +261,8 @@ IF_CLI="${INSTALL_DIR}/.venv/bin/intentframe-integrations"
 step "Installing Python workspace"
 uv sync --all-packages
 
+build_control_plane_frontend
+
 step "Installing IntentFrame plugin into Hermes"
 "${IF_CLI}" integrate hermes --copy
 
@@ -193,6 +279,11 @@ for line in \
   key="${line%%=*}"
   grep -q "^${key}=" "${HERMES_ENV}" || echo "${line}" >> "${HERMES_ENV}"
 done
+
+step "Writing IntentFrame env to ${IF_ENV}"
+seed_intentframe_env
+
+start_control_plane
 
 PATH_HINT='intentframe-integrations is on PATH in this shell.'
 if ! have intentframe-integrations; then
@@ -211,9 +302,18 @@ if [[ "${HEADLESS}" == true ]]; then
 Hermes (headless): run hermes setup if API keys are not configured yet."
 fi
 
+CP_LINE="  Control Plane: ${CONTROL_PLANE_URL}"
+if [[ "${NO_CONTROL_PLANE}" == true ]]; then
+  CP_LINE="  Control Plane: not started (--no-control-plane; run: intentframe-integrations control-plane start)"
+fi
+
 cat <<EOF
 
 Done.
+
+IntentFrame Control Plane:
+${CP_LINE}
+  Use it to configure keys, start the enforcement stack, manage governed tools, and load policy.
 
 Hermes:
   ${HERMES_SUMMARY}
@@ -221,7 +321,7 @@ Hermes:
   Config:  ~/.hermes/config.yaml
   Env:     ~/.hermes/.env (adapter socket + governance paths)
 
-IntentFrame:
+IntentFrame CLI:
 ${CLI_LINES}
   Pack:    ${INSTALL_DIR}
   Ref:     ${REF}
@@ -229,9 +329,8 @@ ${CLI_LINES}
   Tools:   ~/.intentframe/integrations/hermes/governance/tools.yaml
 
 Next:
-  export OPENAI_API_KEY=sk-...
-  intentframe-integrations up hermes
-  hermes dashboard        # http://localhost:9119  → Chat
+  Open ${CONTROL_PLANE_URL} and start the enforcement stack when ready.
+  Hermes chat (separate): hermes dashboard   # http://127.0.0.1:9119/chat
 ${HERMES_NEXT}
 
 Verify gating:  tail -f ~/.intentframe/integrations/hermes/adapter.log

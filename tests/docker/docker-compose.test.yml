@@ -3,9 +3,12 @@
 #   export OPENAI_API_KEY=sk-...
 #   docker compose -f tests/docker/docker-compose.test.yml up
 #
+# Control plane (:9720): uvicorn serves pre-built React static/ + /api/* from GitHub pack.
+# Hermes chat (:9119): separate hermes dashboard process.
+#
 # Or: cp tests/docker/.env.example tests/docker/.env  (set key there)
 #
-# Open http://localhost:9119/chat — ask Hermes to run a terminal command.
+# Open http://localhost:9720 (IntentFrame Control Plane) and http://localhost:9119/chat (Hermes).
 # Verify gating / logs: tests/docker/README.md#logs-and-analysis-inside-the-container
 #   docker compose -f tests/docker/docker-compose.test.yml exec hermes-intentframe \
 #     tail -f /root/.intentframe/logs/intentframe-server.log
@@ -21,6 +24,7 @@ services:
     container_name: hermes-intentframe-test
     ports:
       - "${DASHBOARD_PORT:-9119}:9119"
+      - "${CONTROL_PLANE_PORT:-9720}:9720"
     environment:
       OPENAI_API_KEY: ${OPENAI_API_KEY:?set OPENAI_API_KEY or use tests/docker/.env}
       REF: ${REF:-${VERSION:-main}}
@@ -28,6 +32,11 @@ services:
       INTENTFRAME_HERMES_E2E_MODEL: ${INTENTFRAME_HERMES_E2E_MODEL:-gpt-4o-mini}
       HERMES_DASHBOARD_USER: ${HERMES_DASHBOARD_USER:-hermes}
       HERMES_DASHBOARD_PASSWORD: ${HERMES_DASHBOARD_PASSWORD:-docker-test}
+      INTENTFRAME_CONTROL_PLANE_HOST: 0.0.0.0
+      INTENTFRAME_CONTROL_PLANE_PORT: ${CONTROL_PLANE_PORT:-9720}
+      INTENTFRAME_CONTROL_PLANE_ALLOW_REMOTE: "1"
+      HERMES_DASHBOARD_HOST: 127.0.0.1
+      HERMES_DASHBOARD_PORT: ${DASHBOARD_PORT:-9119}
     volumes:
       - intentframe-data:/root/.intentframe
       - hermes-data:/root/.hermes
